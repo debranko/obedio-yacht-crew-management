@@ -1,102 +1,100 @@
-/**
- * Guests API Routes
- * CRUD operations for yacht guests
- */
-
 import { Router } from 'express';
-import { asyncHandler, createValidationError, createNotFoundError } from '../middleware/error-handler';
-import { requirePermission } from '../middleware/auth';
-import { DatabaseService } from '../services/database';
-import { Logger } from '../utils/logger';
+import { prisma } from '../services/db';
 
 const router = Router();
-const dbService = new DatabaseService();
-const logger = new Logger();
 
-/**
- * GET /api/guests
- * Get all guests with filtering and pagination
- */
-router.get('/', requirePermission('guests.view'), asyncHandler(async (req, res) => {
-  const { status, type, search, page, limit } = req.query;
-  
-  const filters = {
-    status: status as string,
-    type: type as string,
-    search: search as string,
-    page: page ? parseInt(page as string) : 1,
-    limit: limit ? parseInt(limit as string) : 25
-  };
+router.get('/', async (_, res) => {
+  try {
+    const data = await prisma.guest.findMany({ 
+      orderBy: { createdAt: 'desc' },
+      include: {
+        serviceRequests: {
+          select: { id: true, status: true }
+        }
+      }
+    });
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch guests' });
+  }
+});
 
-  const result = await dbService.getGuests(filters);
-
-  res.json({
-    success: true,
-    data: result.items,
-    pagination: {
-      page: result.page,
-      limit: result.limit,
-      total: result.total,
-      totalPages: result.totalPages
+router.post('/', async (req, res) => {
+  try {
+    const { firstName, lastName, preferredName, type, status, nationality, languages } = req.body ?? {};
+    
+    if (!firstName || !lastName) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'First name and last name are required' 
+      });
     }
-  });
-}));
 
-/**
- * POST /api/guests
- * Create new guest
- */
-router.post('/', requirePermission('guests.add'), asyncHandler(async (req, res) => {
-  const guestData = {
-    ...req.body,
-    createdBy: req.user?.username || 'System'
-  };
+    const item = await prisma.guest.create({ 
+      data: { 
+        firstName, 
+        lastName, 
+        preferredName,
+        type: type ?? 'guest',
+        status: status ?? 'onboard',
+        nationality,
+        languages: languages ?? []
+      } 
+    });
+    res.json({ success: true, data: item });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to create guest' });
+  }
+});
 
-  const guest = await dbService.createGuest(guestData);
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = await prisma.guest.findUnique({
+      where: { id },
+      include: {
+        serviceRequests: true
+      }
+    });
+    
+    if (!data) {
+      return res.status(404).json({ success: false, error: 'Guest not found' });
+    }
+    
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch guest' });
+  }
+});
 
-  logger.info('Guest created', { guestId: guest.id, name: `${guest.firstName} ${guest.lastName}`, createdBy: req.user?.username });
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { firstName, lastName, preferredName, type, status, nationality, languages } = req.body;
+    
+    const data = await prisma.guest.update({
+      where: { id },
+      data: { firstName, lastName, preferredName, type, status, nationality, languages }
+    });
+    
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to update guest' });
+  }
+});
 
-  res.status(201).json({
-    success: true,
-    message: 'Guest created successfully',
-    data: guest
-  });
-}));
-
-/**
- * PUT /api/guests/:id
- * Update existing guest
- */
-router.put('/:id', requirePermission('guests.edit'), asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const updates = req.body;
-
-  const guest = await dbService.updateGuest(id, updates);
-
-  logger.info('Guest updated', { guestId: guest.id, name: `${guest.firstName} ${guest.lastName}`, updatedBy: req.user?.username });
-
-  res.json({
-    success: true,
-    message: 'Guest updated successfully',
-    data: guest
-  });
-}));
-
-/**
- * DELETE /api/guests/:id
- * Delete guest
- */
-router.delete('/:id', requirePermission('guests.delete'), asyncHandler(async (req, res) => {
-  const { id } = req.params;
-
-  await dbService.deleteGuest(id);
-
-  logger.info('Guest deleted', { guestId: id, deletedBy: req.user?.username });
-
-  res.json({
-    success: true,
-    message: 'Guest deleted successfully'
-  });
-}));
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    await prisma.guest.delete({
+      where: { id }
+    });
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to delete guest' });
+  }
+});
 
 export default router;

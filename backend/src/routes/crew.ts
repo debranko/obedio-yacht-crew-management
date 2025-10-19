@@ -1,28 +1,25 @@
-/**
- * Crew Management API Routes
- */
-
 import { Router } from 'express';
-import { asyncHandler } from '../middleware/error-handler';
-import { requirePermission } from '../middleware/auth';
-import { DatabaseService } from '../services/database';
+import { prisma } from '../services/db';
+const r = Router();
 
-const router = Router();
-const dbService = new DatabaseService();
+r.get('/', async (_, res) => {
+  const data = await prisma.crewMember.findMany({ orderBy: { name: 'asc' } });
+  res.json({ success: true, data });
+});
 
-router.get('/', requirePermission('crew.view'), asyncHandler(async (req, res) => {
-  const crew = await dbService.getCrewMembers();
-  res.json({ success: true, data: crew });
-}));
+r.post('/', async (req, res) => {
+  const { name, position, department, status, contact, email, joinDate, role } = req.body ?? {};
+  const created = await prisma.crewMember.create({
+    data: {
+      name, position, department,
+      status: status ?? 'active',
+      contact: contact ?? null,
+      email: email ?? null,
+      joinDate: joinDate ? new Date(joinDate) : null,
+      role: role ?? null
+    }
+  });
+  res.json({ success: true, data: created });
+});
 
-router.post('/', requirePermission('crew.add'), asyncHandler(async (req, res) => {
-  const crew = await dbService.createCrewMember(req.body);
-  res.status(201).json({ success: true, data: crew });
-}));
-
-router.put('/:id', requirePermission('crew.edit'), asyncHandler(async (req, res) => {
-  const crew = await dbService.updateCrewMember(req.params.id, req.body);
-  res.json({ success: true, data: crew });
-}));
-
-export default router;
+export default r;

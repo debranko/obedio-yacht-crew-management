@@ -1,651 +1,69 @@
-// Obedio Yacht Crew Management System - Database Schema
-// PostgreSQL database for production Windows server deployment
-
 generator client {
   provider = "prisma-client-js"
 }
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// ===== AUTHENTICATION & USERS =====
-
 model User {
   id        String   @id @default(cuid())
   username  String   @unique
   email     String   @unique
-  password  String   // bcrypt hashed
-  role      Role     @default(CREW)
-  isActive  Boolean  @default(true)
-  
-  // Profile
+  password  String
+  role      String   // "admin","chief-stewardess","stewardess","crew","eto"
   firstName String?
   lastName  String?
-  avatar    String?
-  
-  // Metadata
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  lastLogin DateTime?
-  
-  // Relations
-  crewMember     CrewMember?
-  activityLogs   ActivityLog[]
-  deviceAssignments DeviceAssignment[]
-  
-  @@map("users")
 }
-
-enum Role {
-  ADMIN
-  CHIEF_STEWARDESS
-  STEWARDESS
-  CREW
-  ETO
-  CAPTAIN
-}
-
-// ===== CREW MANAGEMENT =====
 
 model CrewMember {
-  id          String      @id @default(cuid())
-  userId      String?     @unique
-  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
-  
-  // Basic Info
-  name        String
-  position    String
-  department  Department
-  
-  // Status & Availability
-  status      CrewStatus  @default(OFF_DUTY)
-  shift       String?
-  contact     String?
-  email       String?
-  joinDate    DateTime?
-  
-  // Metadata
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  
-  // Relations
-  assignments     Assignment[]
-  deviceAssignments DeviceAssignment[]
-  serviceRequests ServiceRequest[]
-  messages        Message[] @relation("MessageRecipients")
-  sentMessages    Message[] @relation("MessageSender")
-  
-  @@map("crew_members")
+  id         String   @id @default(cuid())
+  name       String
+  position   String
+  department String
+  status     String   @default("active") // "on-duty","off-duty","on-leave"
+  contact    String?
+  email      String?
+  joinDate   DateTime?
+  role       String?  // mirror with User.role if needed
+  createdAt  DateTime @default(now())
 }
-
-enum Department {
-  INTERIOR
-  DECK
-  ENGINE
-  GALLEY
-  BRIDGE
-}
-
-enum CrewStatus {
-  ON_DUTY
-  OFF_DUTY
-  ON_LEAVE
-}
-
-// ===== DUTY ROSTER =====
-
-model ShiftConfig {
-  id        String   @id
-  name      String
-  startTime String   // HH:MM format
-  endTime   String   // HH:MM format
-  color     String
-  
-  assignments Assignment[]
-  
-  @@map("shift_configs")
-}
-
-model Assignment {
-  id       String         @id @default(cuid())
-  date     String         // YYYY-MM-DD format
-  type     AssignmentType @default(PRIMARY)
-  
-  // Relations
-  shiftId    String
-  shift      ShiftConfig @relation(fields: [shiftId], references: [id], onDelete: Cascade)
-  crewId     String
-  crew       CrewMember  @relation(fields: [crewId], references: [id], onDelete: Cascade)
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  @@unique([date, shiftId, crewId, type])
-  @@map("assignments")
-}
-
-enum AssignmentType {
-  PRIMARY
-  BACKUP
-}
-
-// ===== LOCATIONS =====
 
 model Location {
-  id          String         @id @default(cuid())
-  name        String         @unique
-  type        LocationType
+  id          String   @id @default(cuid())
+  name        String   @unique
+  type        String
   description String?
-  floor       String?
-  capacity    Int?
-  
-  // Status & Features
-  status      LocationStatus @default(ACTIVE)
-  doNotDisturb Boolean       @default(false)
-  
-  // Device Integration
-  smartButtonId   String?
-  smartButtonName String?
-  deviceCount     Int?
-  
-  // Media
-  image       String?
-  notes       String?
-  
-  // Metadata
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  createdBy   String?
-  
-  // Relations
-  guests          Guest[]
-  serviceRequests ServiceRequest[]
-  activityLogs    ActivityLog[]
-  devices         Device[]
-  
-  @@map("locations")
 }
-
-enum LocationType {
-  CABIN
-  COMMON
-  SERVICE
-  OUTDOOR
-  TECHNICAL
-}
-
-enum LocationStatus {
-  ACTIVE
-  MAINTENANCE
-  RESTRICTED
-}
-
-// ===== GUEST MANAGEMENT =====
 
 model Guest {
-  id              String      @id @default(cuid())
-  
-  // Basic Info
-  firstName       String
-  lastName        String
-  preferredName   String?
-  photo           String?
-  type            GuestType
-  status          GuestStatus
-  nationality     String?
-  languages       String[]    @default([])
-  passportNumber  String?
-  
-  // Accommodation - PROPER FOREIGN KEY RELATIONSHIP
-  locationId      String?
-  location        Location?   @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  cabin           String?     // Legacy field for backward compatibility
-  
-  // Check-in/out
-  checkInDate     String      // YYYY-MM-DD
-  checkInTime     String?     // HH:MM
-  checkOutDate    String      // YYYY-MM-DD
-  checkOutTime    String?     // HH:MM
-  
-  // Preferences & Restrictions
-  doNotDisturb        Boolean  @default(false)
-  allergies           String[] @default([])
-  medicalConditions   String[] @default([])
-  dietaryRestrictions String[] @default([])
-  foodDislikes        String[] @default([])
-  favoriteFoods       String[] @default([])
-  favoriteDrinks      String[] @default([])
-  
-  // Special Occasions
-  specialOccasion     String?
-  specialOccasionDate String?
-  
-  // Notes
-  specialRequests String?
-  vipNotes        String?
-  crewNotes       String?
-  
-  // Contact Person
-  contactPersonName  String?
-  contactPersonPhone String?
-  contactPersonEmail String?
-  contactPersonRole  String?
-  
-  // Metadata
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  createdBy String?
-  
-  // Relations
-  serviceRequests ServiceRequest[]
-  activityLogs    ActivityLog[]
-  
-  @@map("guests")
+  id            String   @id @default(cuid())
+  firstName     String
+  lastName      String
+  preferredName String?
+  photo         String?
+  type          String    @default("guest")      // align with UI enums if any
+  status        String    @default("onboard")    // align with UI enums if any
+  nationality   String?
+  languages     String[]  @default([])
+  passportNumber String?
+  createdAt     DateTime  @default(now())
 }
-
-enum GuestType {
-  PRIMARY
-  PARTNER
-  FAMILY
-  CHILD
-  VIP
-  OWNER
-  CHARTER
-}
-
-enum GuestStatus {
-  EXPECTED
-  ONBOARD
-  DEPARTED
-}
-
-// ===== SERVICE REQUESTS =====
 
 model ServiceRequest {
-  id            String            @id @default(cuid())
-  
-  // Guest & Location
-  guestId       String?
-  guest         Guest?            @relation(fields: [guestId], references: [id], onDelete: SetNull)
-  locationId    String
-  location      Location          @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  
-  // Legacy fields for backward compatibility
-  guestName     String
-  guestCabin    String
-  cabinId       String
-  
-  // Request Details
-  requestType   RequestType
-  priority      Priority          @default(NORMAL)
-  status        RequestStatus     @default(PENDING)
-  
-  // Voice & Media
-  voiceTranscript String?
-  voiceAudioUrl   String?
-  cabinImage      String?
-  notes           String?
-  
-  // Assignment & Workflow
-  assignedToId    String?
-  assignedTo      CrewMember?     @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
-  forwardedToTeam InteriorTeam?
-  
-  // Timestamps
-  timestamp    DateTime @default(now())
-  acceptedAt   DateTime?
-  completedAt  DateTime?
-  forwardedAt  DateTime?
-  
-  // Relations
-  history ActivityLog[]
-  
-  @@map("service_requests")
-}
-
-enum RequestType {
-  CALL
-  SERVICE
-  EMERGENCY
-}
-
-enum Priority {
-  NORMAL
-  URGENT
-  EMERGENCY
-}
-
-enum RequestStatus {
-  PENDING
-  ACCEPTED
-  COMPLETED
-  DELEGATED
-  FORWARDED
-}
-
-enum InteriorTeam {
-  GALLEY
-  PANTRY
-  HOUSEKEEPING
-  LAUNDRY
-  BAR_SERVICE
-  DECK_SERVICE
-}
-
-// ===== DEVICE MANAGEMENT =====
-
-model Device {
-  id            String       @id @default(cuid())
-  name          String
-  type          DeviceType
-  
-  // Technical Details
-  macAddress    String?      @unique
-  ipAddress     String?
-  firmwareVersion String?
-  batteryLevel  Int?         // 0-100
-  
-  // Status & Location
-  status        DeviceStatus @default(OFFLINE)
-  locationId    String?
-  location      Location?    @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  
-  // Metadata
-  lastSeen      DateTime?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  
-  // Relations
-  assignments   DeviceAssignment[]
-  activityLogs  ActivityLog[]
-  
-  @@map("devices")
-}
-
-enum DeviceType {
-  SMART_BUTTON
-  TABLET
-  WATCH
-  PHONE
-  SENSOR
-  OTHER
-}
-
-enum DeviceStatus {
-  ONLINE
-  OFFLINE
-  ALERT
-  MAINTENANCE
-  LOW_BATTERY
-}
-
-model DeviceAssignment {
-  id           String       @id @default(cuid())
-  
-  deviceId     String
-  device       Device       @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-  crewMemberId String
-  crewMember   CrewMember   @relation(fields: [crewMemberId], references: [id], onDelete: Cascade)
-  userId       String?
-  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
-  
-  status       AssignmentStatus @default(CONNECTED)
-  assignedAt   DateTime     @default(now())
-  lastSync     DateTime     @default(now())
-  
-  @@unique([deviceId]) // One device per assignment
-  @@unique([crewMemberId]) // One assignment per crew member
-  @@map("device_assignments")
-}
-
-enum AssignmentStatus {
-  CONNECTED
-  DISCONNECTED
-  LOW_BATTERY
-}
-
-// ===== COMMUNICATION =====
-
-model Message {
-  id            String          @id @default(cuid())
-  
-  fromId        String
-  from          CrewMember      @relation("MessageSender", fields: [fromId], references: [id], onDelete: Cascade)
-  
-  recipients    CrewMember[]    @relation("MessageRecipients")
-  recipientIds  String[]        @default([])
-  
-  message       String
-  location      String?
-  priority      Priority        @default(NORMAL)
-  
-  deliveryStatus MessageStatus  @default(SENT)
-  
-  timestamp     DateTime        @default(now())
-  
-  @@map("messages")
-}
-
-enum MessageStatus {
-  SENT
-  DELIVERED
-  READ
-}
-
-// ===== ACTIVITY LOGGING =====
-
-model ActivityLog {
-  id        String      @id @default(cuid())
-  timestamp DateTime    @default(now())
-  
-  type      ActivityType
-  action    String
-  
-  // Context
-  locationId String?
-  location   Location?   @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  guestId    String?
-  guest      Guest?      @relation(fields: [guestId], references: [id], onDelete: SetNull)
-  userId     String?
-  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
-  deviceId   String?
-  device     Device?     @relation(fields: [deviceId], references: [id], onDelete: SetNull)
-  serviceRequestId String?
-  serviceRequest   ServiceRequest? @relation(fields: [serviceRequestId], references: [id], onDelete: SetNull)
-  
-  details   String?
-  metadata  Json?       // Additional structured data
-  
-  @@map("activity_logs")
-}
-
-enum ActivityType {
-  DND
-  SERVICE
-  DEVICE
-  CREW
-  GUEST
-  SYSTEM
-  AUTHENTICATION
-}
-
-// ===== SYSTEM SETTINGS =====
-
-model SystemSetting {
-  id    String @id
-  value Json
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  @@map("system_settings")
-}
-
-// ===== USER PREFERENCES =====
-
-model UserPreference {
-  id     String @id @default(cuid())
-  userId String @unique
-  
-  // Service Request Settings
-  serviceRequestDisplayMode String @default("guest-name") // "guest-name" | "location"
-  servingNowTimeout        Int    @default(5)           // seconds
-  requestDialogRepeatInterval Int @default(60)          // seconds
-  
-  // Notification Settings
-  notificationsEnabled     Boolean @default(true)
-  shiftStartAdvanceTime    String  @default("1hour")
-  shiftEndAdvanceTime      String  @default("30min")
-  shiftStartEnabled        Boolean @default(true)
-  shiftEndEnabled          Boolean @default(true)
-  
-  // UI Preferences
-  theme                String  @default("light")      // "light" | "dark" | "auto"
-  language             String  @default("en")         // ISO language code
-  timezone             String  @default("UTC")
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  @@map("user_preferences")
-}
-
-// ===== ESP32 SMART BUTTON INTEGRATION =====
-
-model SmartButton {
-  id          String       @id @default(cuid())
-  deviceId    String       @unique
-  name        String
-  
-  // Hardware Info
-  macAddress  String       @unique
-  ipAddress   String?
-  version     String?      // Firmware version
-  
-  // Status
-  status      DeviceStatus @default(OFFLINE)
-  batteryLevel Int?        // 0-100
-  lastSeen    DateTime?
-  
-  // Location Assignment
+  id          String   @id @default(cuid())
+  requestType String   @default("call")  // "call","service","emergency"
+  guestId     String?
   locationId  String?
-  assignedLocation String? // Location name (for display)
-  
-  // Button Configuration
-  mainButtonFunction String @default("service_call")
-  auxButton1Function String @default("dnd_toggle")
-  auxButton2Function String @default("lights_control")
-  auxButton3Function String @default("housekeeping")
-  auxButton4Function String @default("climate_control")
-  
-  // Calibration & Settings
-  pressThreshold     Int @default(500)  // ms for long press
-  doubleClickTimeout Int @default(300)  // ms
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  @@map("smart_buttons")
-}
+  cabinId     String?
+  priority    String   @default("normal") // "normal","urgent","emergency"
+  status      String   @default("open")   // "open","accepted","completed"
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-// ===== REAL-TIME EVENTS =====
-
-model RealtimeEvent {
-  id        String    @id @default(cuid())
-  eventType String    // "service_request", "dnd_toggle", "crew_status", etc.
-  payload   Json
-  
-  // Targeting
-  broadcastToAll Boolean @default(false)
-  targetUserIds  String[] @default([])
-  targetRoles    Role[]   @default([])
-  
-  timestamp DateTime @default(now())
-  
-  @@map("realtime_events")
-}
-
-// ===== ANALYTICS & REPORTING =====
-
-model ServiceRequestHistory {
-  id              String   @id @default(cuid())
-  originalRequestId String
-  
-  // Performance Metrics
-  completedBy     String
-  completedAt     DateTime
-  responseTime    Int      // seconds from created to accepted
-  completionTime  Int      // seconds from accepted to completed
-  
-  // Request Details (snapshot)
-  guestName       String
-  location        String
-  requestType     String
-  priority        String
-  
-  createdAt DateTime @default(now())
-  
-  @@map("service_request_history")
-}
-
-model DeviceMetrics {
-  id         String   @id @default(cuid())
-  deviceId   String
-  
-  // Performance Data
-  uptime     Int      // seconds
-  batteryLevel Int?   // 0-100
-  signalStrength Int? // dBm or percentage
-  temperature    Float?
-  
-  // Usage Statistics
-  buttonPresses  Int @default(0)
-  lastActivity   DateTime?
-  
-  // Metadata
-  recordedAt DateTime @default(now())
-  
-  @@map("device_metrics")
-}
-
-// ===== API TOKENS & SESSIONS =====
-
-model ApiToken {
-  id        String   @id @default(cuid())
-  token     String   @unique
-  userId    String
-  name      String   // Human readable name
-  
-  // Permissions & Scope
-  scopes    String[] @default([])
-  roles     Role[]   @default([])
-  
-  // Lifecycle
-  expiresAt DateTime?
-  lastUsed  DateTime?
-  isActive  Boolean  @default(true)
-  
-  createdAt DateTime @default(now())
-  
-  @@map("api_tokens")
-}
-
-model UserSession {
-  id        String   @id @default(cuid())
-  userId    String
-  token     String   @unique
-  
-  // Session Info
-  ipAddress String?
-  userAgent String?
-  
-  // Lifecycle
-  expiresAt DateTime
-  lastActivity DateTime @default(now())
-  
-  createdAt DateTime @default(now())
-  
-  @@map("user_sessions")
+  guest    Guest?    @relation(fields: [guestId], references: [id])
+  location Location? @relation(fields: [locationId], references: [id])
 }
