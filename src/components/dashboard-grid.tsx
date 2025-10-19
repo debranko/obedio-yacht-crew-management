@@ -1,0 +1,308 @@
+/**
+ * Dashboard Grid with Draggable & Resizable Widgets
+ * Uses react-grid-layout for drag and drop functionality
+ */
+
+import { useState, forwardRef, useImperativeHandle, useEffect } from "react";
+import { Responsive, WidthProvider } from "react-grid-layout";
+import "react-grid-layout/css/styles.css";
+import "react-resizable/css/styles.css";
+import { toast } from "sonner";
+import { availableWidgets } from "./manage-widgets-dialog";
+
+const ResponsiveGridLayout = WidthProvider(Responsive);
+
+export interface DashboardGridHandle {
+  resetLayout: () => void;
+  openManageWidgets: () => void;
+}
+import { KpiCard } from "./kpi-card";
+import { MiniChart } from "./mini-chart";
+import { Card } from "./ui/card";
+import { WidgetCard } from "./widget-card";
+import { DNDWidget } from "./dnd-widget";
+import { DNDGuestsWidget } from "./dnd-guests-widget";
+import { ServingNowWidget } from "./serving-now-widget";
+import { DutyTimerCard } from "./duty-timer-card";
+import { useAppData } from "../contexts/AppDataContext";
+import { useDND } from "../hooks/useDND";
+import { Activity, Clock, Smartphone, BatteryLow, Users, BellOff, GripVertical, Bell } from "lucide-react";
+import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
+
+const requestsData = [12, 15, 10, 18, 22, 19, 25, 21, 24, 20, 26, 24];
+const responseData = [3.2, 2.8, 3.5, 2.9, 2.5, 2.7, 2.4, 2.6, 2.3, 2.5, 2.2, 2.4];
+const devicesData = [98, 98, 97, 99, 98, 99, 99, 98, 99, 99, 100, 100];
+
+interface WidgetLayout {
+  i: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  minW?: number;
+  minH?: number;
+  maxH?: number;
+}
+
+const defaultLayout: WidgetLayout[] = [
+  { i: "dnd-guests", x: 0, y: 0, w: 4, h: 3, minW: 2, minH: 2 },
+  { i: "serving-now", x: 4, y: 0, w: 4, h: 3, minW: 2, minH: 2 },
+  { i: "pending-requests", x: 0, y: 3, w: 2, h: 2, minW: 1, minH: 2 },
+  { i: "battery-alerts", x: 2, y: 3, w: 2, h: 2, minW: 1, minH: 2 },
+  { i: "duty-timer", x: 4, y: 3, w: 2, h: 2, minW: 1, minH: 2 },
+  { i: "active-crew", x: 6, y: 3, w: 2, h: 2, minW: 1, minH: 2 },
+];
+
+interface DashboardGridProps {
+  isEditMode?: boolean;
+  onEditModeChange?: (isEdit: boolean) => void;
+  activeWidgets?: string[];
+  onActiveWidgetsChange?: (widgets: string[]) => void;
+  onOpenManageWidgets?: () => void;
+  onNavigate?: (page: string) => void;
+}
+
+export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>(
+  ({ isEditMode = false, onEditModeChange, activeWidgets = [], onActiveWidgetsChange, onOpenManageWidgets, onNavigate }, ref) => {
+  // Use the same source of truth for DND locations
+  const { dndLocations, hasDND } = useDND();
+  
+  const [layout, setLayout] = useState<WidgetLayout[]>(() => {
+    // Load saved layout from localStorage
+    const saved = localStorage.getItem("obedio-dashboard-layout");
+    return saved ? JSON.parse(saved) : defaultLayout;
+  });
+
+  // Save layout to localStorage
+  const handleLayoutChange = (newLayout: any[]) => {
+    const updatedLayout = newLayout.map(item => ({
+      i: item.i,
+      x: item.x,
+      y: item.y,
+      w: item.w,
+      h: item.h,
+      minW: item.minW,
+      minH: item.minH,
+      maxH: item.maxH,
+    }));
+    setLayout(updatedLayout);
+    localStorage.setItem("obedio-dashboard-layout", JSON.stringify(updatedLayout));
+  };
+
+  // Update layout when widgets are added/removed
+  useEffect(() => {
+    if (activeWidgets.length === 0) return;
+    
+    // Check if any new widgets need to be added to layout
+    const layoutIds = layout.map(l => l.i);
+    const missingWidgets = activeWidgets.filter(id => !layoutIds.includes(id));
+    
+    if (missingWidgets.length > 0) {
+      // Add new widgets with default positions
+      const newLayouts: WidgetLayout[] = missingWidgets.map((widgetId, index) => {
+        const config = availableWidgets.find(w => w.id === widgetId);
+        if (!config) return null;
+        
+        // Find next available position
+        const maxY = layout.length > 0 ? Math.max(...layout.map(l => l.y + l.h)) : 0;
+        
+        return {
+          i: widgetId,
+          x: (index * config.defaultSize.w) % 8,
+          y: maxY,
+          w: config.defaultSize.w,
+          h: config.defaultSize.h,
+          minW: config.defaultSize.minW,
+          minH: config.defaultSize.minH,
+        };
+      }).filter(Boolean) as WidgetLayout[];
+      
+      const updatedLayout = [...layout, ...newLayouts];
+      setLayout(updatedLayout);
+      localStorage.setItem("obedio-dashboard-layout", JSON.stringify(updatedLayout));
+    }
+    
+    // Remove widgets that are no longer active
+    const filteredLayout = layout.filter(l => activeWidgets.includes(l.i));
+    if (filteredLayout.length !== layout.length) {
+      setLayout(filteredLayout);
+      localStorage.setItem("obedio-dashboard-layout", JSON.stringify(filteredLayout));
+    }
+  }, [activeWidgets]);
+
+  // Expose functions to parent via ref
+  useImperativeHandle(ref, () => ({
+    resetLayout: () => {
+      // Reset to default layout but only for active widgets
+      const filteredDefault = defaultLayout.filter(l => activeWidgets.includes(l.i));
+      setLayout(filteredDefault);
+      localStorage.setItem("obedio-dashboard-layout", JSON.stringify(filteredDefault));
+      toast.success("Dashboard layout reset to default");
+    },
+    openManageWidgets: () => {
+      if (onOpenManageWidgets) {
+        onOpenManageWidgets();
+      }
+    }
+  }));
+
+  // Widget wrapper with drag handle
+  const WidgetWrapper = ({ children, id }: { children: React.ReactNode; id: string }) => (
+    <div className="relative h-full">
+      {isEditMode && (
+        <div className="absolute top-2 right-2 z-10 cursor-move drag-handle">
+          <Badge variant="secondary" className="cursor-move">
+            <GripVertical className="h-3 w-3" />
+          </Badge>
+        </div>
+      )}
+      <div className={`h-full ${isEditMode ? 'opacity-90' : ''}`}>
+        {children}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4"
+>
+
+      {/* Grid Layout */}
+      <ResponsiveGridLayout
+        className="layout"
+        layouts={{ lg: layout, md: layout, sm: layout, xs: layout }}
+        breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480 }}
+        cols={{ lg: 8, md: 6, sm: 4, xs: 2 }}
+        rowHeight={80}
+        isDraggable={isEditMode}
+        isResizable={isEditMode}
+        onLayoutChange={handleLayoutChange}
+        draggableHandle=".drag-handle"
+        compactType="vertical"
+        preventCollision={false}
+      >
+        {hasDND && activeWidgets.includes("dnd") && (
+          <div key="dnd" className="dashboard-widget">
+            <WidgetWrapper id="dnd">
+              <DNDWidget dndList={dndLocations} />
+            </WidgetWrapper>
+          </div>
+        )}
+
+        {hasDND && activeWidgets.includes("dnd-guests") && (
+          <div key="dnd-guests" className="dashboard-widget">
+            <WidgetWrapper id="dnd-guests">
+              <DNDGuestsWidget />
+            </WidgetWrapper>
+          </div>
+        )}
+
+        {activeWidgets.includes("serving-now") && (
+          <div key="serving-now" className="dashboard-widget">
+            <WidgetWrapper id="serving-now">
+              <ServingNowWidget onNavigate={onNavigate} />
+            </WidgetWrapper>
+          </div>
+        )}
+
+        {activeWidgets.includes("pending-requests") && (
+          <div key="pending-requests" className="dashboard-widget">
+            <WidgetWrapper id="pending-requests">
+              <KpiCard
+                icon={Bell}
+                title="Pending Requests"
+                value="12"
+                trend="up"
+                trendValue="+8%"
+                chart={<MiniChart data={requestsData} color="#C8A96B" />}
+              />
+            </WidgetWrapper>
+          </div>
+        )}
+
+        {activeWidgets.includes("battery-alerts") && (
+          <div key="battery-alerts" className="dashboard-widget">
+            <WidgetWrapper id="battery-alerts">
+              <KpiCard
+                icon={BatteryLow}
+                title="Battery Alerts"
+                value="3"
+                trend="down"
+                trendValue="-25%"
+                chart={<MiniChart data={[5, 4, 6, 5, 3, 4, 3, 2, 4, 3, 3, 3]} color="#B26A00" />}
+              />
+            </WidgetWrapper>
+          </div>
+        )}
+
+        {activeWidgets.includes("duty-timer") && (
+          <div key="duty-timer" className="dashboard-widget">
+            <WidgetWrapper id="duty-timer">
+              <Card className="p-0 overflow-hidden h-full">
+                <DutyTimerCard />
+              </Card>
+            </WidgetWrapper>
+          </div>
+        )}
+
+        {activeWidgets.includes("active-crew") && (
+          <div key="active-crew" className="dashboard-widget">
+            <WidgetWrapper id="active-crew">
+              <KpiCard
+                icon={Users}
+                title="Active Crew"
+                value="8"
+                trend="neutral"
+                trendValue="0%"
+                chart={<MiniChart data={[8, 8, 7, 8, 8, 8, 9, 8, 8, 8, 8, 8]} color="#2E7D32" />}
+              />
+            </WidgetWrapper>
+          </div>
+        )}
+
+        {activeWidgets.includes("active-devices") && (
+          <div key="active-devices" className="dashboard-widget">
+            <WidgetWrapper id="active-devices">
+              <KpiCard
+                icon={Smartphone}
+                title="Active Devices"
+                value="100"
+                trend="up"
+                trendValue="+2%"
+                chart={<MiniChart data={devicesData} color="#4A4F57" />}
+              />
+            </WidgetWrapper>
+          </div>
+        )}
+
+        {activeWidgets.includes("requests-chart") && (
+          <div key="requests-chart" className="dashboard-widget">
+            <WidgetWrapper id="requests-chart">
+              <Card className="p-4 h-full">
+                <h3 className="text-sm mb-3">Service Requests Trend</h3>
+                <div className="h-[calc(100%-36px)]">
+                  <MiniChart data={requestsData} color="#C8A96B" height={120} />
+                </div>
+              </Card>
+            </WidgetWrapper>
+          </div>
+        )}
+
+        {activeWidgets.includes("response-time-chart") && (
+          <div key="response-time-chart" className="dashboard-widget">
+            <WidgetWrapper id="response-time-chart">
+              <Card className="p-4 h-full">
+                <h3 className="text-sm mb-3">Avg Response Time (min)</h3>
+                <div className="h-[calc(100%-36px)]">
+                  <MiniChart data={responseData} color="#2E7D32" height={120} />
+                </div>
+              </Card>
+            </WidgetWrapper>
+          </div>
+        )}
+      </ResponsiveGridLayout>
+    </div>
+  );
+});
+
+DashboardGrid.displayName = "DashboardGrid";

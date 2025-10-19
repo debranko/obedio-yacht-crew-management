@@ -1,0 +1,454 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Obedio Brand Colors */
+  --neutral-bg: #F7F7F5;
+  --surface: #FFFFFF;
+  --surface-muted: #F3F4F6;
+  
+  --text-primary: #101214;
+  --text-secondary: #4A4F57;
+  
+  --border-color: #E6E8EB;
+  
+  --accent-gold: #C8A96B;
+  --accent-platinum: #B7BDC6;
+  
+  --success: #2E7D32;
+  --warning: #B26A00;
+  --error: #C62828;
+  
+  /* Typography Scale */
+  --text-h1: 32px;
+  --line-h1: 40px;
+  --text-h2: 24px;
+  --line-h2: 32px;
+  --text-h3: 20px;
+  --line-h3: 28px;
+  --text-body: 16px;
+  --line-body: 24px;
+  --text-caption: 12px;
+  --line-caption: 16px;
+  
+  /* Spacing */
+  --spacing-base: 8px;
+  
+  /* Shadows - subtle luxury */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.10);
+  
+  /* Standard tokens for compatibility */
+  --font-size: 16px;
+  --background: #F7F7F5;
+  --foreground: #101214;
+  --card: #FFFFFF;
+  --card-foreground: #101214;
+  --popover: #FFFFFF;
+  --popover-foreground: #101214;
+  --primary: #C8A96B;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F3F4F6;
+  --secondary-foreground: #101214;
+  --muted: #F3F4F6;
+  --muted-foreground: #4A4F57;
+  --accent: #C8A96B;
+  --accent-foreground: #FFFFFF;
+  --destructive: #C62828;
+  --destructive-foreground: #FFFFFF;
+  --border: #E6E8EB;
+  --input: #E6E8EB;
+  --input-background: #FFFFFF;
+  --switch-background: #E6E8EB;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --ring: #C8A96B;
+  --chart-1: #C8A96B;
+  --chart-2: #B7BDC6;
+  --chart-3: #2E7D32;
+  --chart-4: #B26A00;
+  --chart-5: #4A4F57;
+  --radius: 8px;
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #101214;
+  --sidebar-primary: #C8A96B;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #F7F7F5;
+  --sidebar-accent-foreground: #101214;
+  --sidebar-border: #E6E8EB;
+  --sidebar-ring: #C8A96B;
+}
+
+.dark {
+  --neutral-bg: #0A0A0B;
+  --surface: #141416;
+  --surface-muted: #1C1C1F;
+  
+  --text-primary: #F7F7F5;
+  --text-secondary: #A8AAAF;
+  
+  --border-color: #2A2A2E;
+  
+  --accent-gold: #D4B877;
+  --accent-platinum: #C5CBD4;
+  
+  --success: #4CAF50;
+  --warning: #FFA726;
+  --error: #EF5350;
+  
+  /* Dark mode shadows - more subtle */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+  
+  --background: #0A0A0B;
+  --foreground: #F7F7F5;
+  --card: #141416;
+  --card-foreground: #F7F7F5;
+  --popover: #141416;
+  --popover-foreground: #F7F7F5;
+  --primary: #D4B877;
+  --primary-foreground: #0A0A0B;
+  --secondary: #1C1C1F;
+  --secondary-foreground: #F7F7F5;
+  --muted: #1C1C1F;
+  --muted-foreground: #A8AAAF;
+  --accent: #D4B877;
+  --accent-foreground: #0A0A0B;
+  --destructive: #D32F2F;
+  --destructive-foreground: #F7F7F5;
+  --border: #2A2A2E;
+  --input: #2A2A2E;
+  --ring: #D4B877;
+  --sidebar: #141416;
+  --sidebar-foreground: #F7F7F5;
+  --sidebar-primary: #D4B877;
+  --sidebar-primary-foreground: #0A0A0B;
+  --sidebar-accent: #1C1C1F;
+  --sidebar-accent-foreground: #F7F7F5;
+  --sidebar-border: #2A2A2E;
+  --sidebar-ring: #D4B877;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+}
+
+/* Custom shadow utilities */
+@layer utilities {
+  .shadow-sm {
+    box-shadow: var(--shadow-sm);
+  }
+  
+  .shadow-md {
+    box-shadow: var(--shadow-md);
+  }
+  
+  .shadow-lg {
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+/**
+ * Emergency animations for Shake-to-Call
+ */
+@keyframes emergency-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes emergency-flash {
+  0%, 50%, 100% {
+    background-color: var(--error);
+  }
+  25%, 75% {
+    background-color: #D32F2F;
+  }
+}
+
+@layer utilities {
+  .animate-emergency-pulse {
+    animation: emergency-pulse 1s ease-in-out infinite;
+  }
+  
+  .animate-emergency-flash {
+    animation: emergency-flash 2s ease-in-out infinite;
+  }
+}
+
+/**
+ * Base typography with Obedio scale
+ */
+@layer base {
+  :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) {
+    h1 {
+      font-size: var(--text-h1);
+      line-height: var(--line-h1);
+      font-weight: 500;
+      letter-spacing: -0.01em;
+    }
+
+    h2 {
+      font-size: var(--text-h2);
+      line-height: var(--line-h2);
+      font-weight: 500;
+      letter-spacing: -0.01em;
+    }
+
+    h3 {
+      font-size: var(--text-h3);
+      line-height: var(--line-h3);
+      font-weight: 500;
+      letter-spacing: -0.005em;
+    }
+
+    h4 {
+      font-size: var(--text-body);
+      line-height: var(--line-body);
+      font-weight: 500;
+    }
+
+    p {
+      font-size: var(--text-body);
+      line-height: var(--line-body);
+      font-weight: 400;
+    }
+
+    label {
+      font-size: var(--text-body);
+      line-height: var(--line-body);
+      font-weight: 500;
+    }
+
+    button {
+      font-size: var(--text-body);
+      line-height: var(--line-body);
+      font-weight: 500;
+    }
+
+    input {
+      font-size: var(--text-body);
+      line-height: var(--line-body);
+      font-weight: 400;
+    }
+  }
+}
+
+html {
+  font-size: var(--font-size);
+}
+
+/**
+ * Table zebra striping
+ */
+@layer utilities {
+  .table-zebra tbody tr:nth-child(even) {
+    background-color: rgb(var(--muted) / 0.3);
+  }
+}
+
+/**
+ * React Grid Layout Custom Styles
+ */
+.react-grid-layout {
+  position: relative;
+  transition: height 200ms ease;
+  margin: -8px;
+}
+
+.react-grid-item {
+  transition: all 200ms ease;
+  transition-property: left, top, width, height;
+  padding: 8px;
+}
+
+.react-grid-item img {
+  pointer-events: none;
+  user-select: none;
+}
+
+.react-grid-item > .react-resizable-handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+}
+
+.react-grid-item > .react-resizable-handle::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--border);
+  border-bottom: 2px solid var(--border);
+  opacity: 0.5;
+}
+
+.react-grid-item > .react-resizable-handle:hover::after {
+  opacity: 1;
+  border-color: var(--accent);
+}
+
+.react-grid-item.react-draggable-dragging {
+  transition: none;
+  z-index: 100;
+  opacity: 0.8;
+}
+
+.react-grid-item.resizing {
+  transition: none;
+  z-index: 100;
+  opacity: 0.8;
+}
+
+.react-grid-item.react-grid-placeholder {
+  background: var(--accent);
+  opacity: 0.2;
+  transition-duration: 100ms;
+  z-index: 2;
+  border-radius: var(--radius);
+}
+
+.dashboard-widget {
+  height: 100%;
+  overflow: hidden;
+}
+
+.dashboard-widget > div {
+  height: 100%;
+}
+
+/**
+ * Print styles - Only calendar with dates, times and names
+ */
+@media print {
+  /* Hide everything except the calendar */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Show only the calendar content */
+  .duty-roster-calendar,
+  .duty-roster-calendar * {
+    visibility: visible;
+  }
+
+  /* Position calendar at top of page */
+  .duty-roster-calendar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  /* Remove backgrounds and borders for clean print */
+  @page {
+    margin: 1cm;
+    size: A4 landscape;
+  }
+
+  /* Ensure proper spacing */
+  body {
+    background: white !important;
+  }
+
+  /* Hide interactive elements */
+  button,
+  .no-print {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Show print header */
+  .print\:block {
+    display: block !important;
+  }
+
+  /* Optimize text for print */
+  * {
+    color: black !important;
+    background: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Keep borders for calendar structure */
+  [class*="border"] {
+    border-color: #999 !important;
+  }
+
+  /* Ensure names and times are visible */
+  [class*="text-"] {
+    color: black !important;
+  }
+
+  /* Remove shadows for cleaner print */
+  * {
+    box-shadow: none !important;
+  }
+
+  /* Ensure calendar cells are properly sized */
+  .duty-roster-calendar {
+    max-width: 100% !important;
+  }
+}
