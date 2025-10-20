@@ -54,11 +54,11 @@ function TickCountdownRing({
   };
 
   const color = getColor();
-  const size = 240; // Reduced from 320 for more compact size
+  const size = 320;
   const cx = size / 2;
   const cy = size / 2;
-  const innerR = 78; // inner radius (scaled down proportionally)
-  const outerR = 92; // outer radius (tick thickness ≈ 14px)
+  const innerR = 104; // inner radius
+  const outerR = 122; // outer radius (tick thickness ≈ 18px)
 
   const pct = Math.max(0, Math.min(1, remainSec / Math.max(1, totalSec)));
   const visibleTicks = Math.round(ticks * pct);
@@ -115,20 +115,20 @@ function TickCountdownRing({
         {lines}
       </svg>
 
-      {/* Center Content - Countdown INSIDE circle */}
-      <div className="absolute inset-0 grid place-items-center pointer-events-none">
-        <div className="text-center max-w-[160px]">
+      {/* Center Content - Clean typography */}
+      <div className="absolute inset-0 grid place-items-center p-4 pointer-events-none">
+        <div className="text-center">
           <div
             className="font-light tabular-nums tracking-tight text-foreground"
             style={{
-              fontSize: 'clamp(36px, 8vw, 52px)', // Smaller font for compact size
-              lineHeight: 0.95,
+              fontSize: 'clamp(48px, 11vw, 90px)',
+              lineHeight: 1,
               fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
             }}
           >
             {formatHm(remainSec)}
           </div>
-          <div className="mt-1.5 text-[9px] uppercase tracking-[0.15em] leading-tight text-muted-foreground/70 px-2">
+          <div className="mt-2 text-[11px] uppercase tracking-widest text-muted-foreground/60">
             {isCritical ? 'shift change soon' : isUrgent ? 'shift ending' : 'hours between shifts'}
           </div>
         </div>
