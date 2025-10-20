@@ -1,157 +1,82 @@
 /**
- * Guest Status Widget - Advanced
- * Shows guest onboard status, count, and service mode
+ * Guest Status Widget - Shows guests by cabin
+ * Displays who's onboard and where they're staying
  */
 
 import { Card } from './ui/card';
-import { Badge } from './ui/badge';
-import { Users, UserX, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { MapPin, Users } from 'lucide-react';
 import { cn } from './ui/utils';
+import { useAppData } from '../contexts/AppDataContext';
+import { useMemo } from 'react';
 
 interface GuestStatusWidgetProps {
   className?: string;
-  guestsOnboard: boolean;
-  guestCount: number;
-  expectedGuests?: number;
-  expectedArrival?: string; // e.g., "Tomorrow 14:00" or "In 2 days"
-  onToggle?: (onboard: boolean) => void;
 }
 
 export function GuestStatusWidget({ 
-  className, 
-  guestsOnboard = true, 
-  guestCount = 0,
-  expectedGuests = 0,
-  expectedArrival,
-  onToggle
+  className
 }: GuestStatusWidgetProps) {
   
-  const serviceMode = guestsOnboard ? 'Full Service' : 'Maintenance Mode';
-  const crewRequirement = guestsOnboard ? '24/7 Coverage' : 'Skeleton Crew';
+  const { guests, locations } = useAppData();
+  
+  // Get guests with their cabin information
+  const guestsWithCabins = useMemo(() => {
+    return guests
+      .filter(g => g.status === 'onboard' && g.locationId)
+      .map(guest => {
+        const location = locations.find(l => l.id === guest.locationId);
+        return {
+          name: `${guest.firstName} ${guest.lastName}`,
+          cabin: location?.name || 'Unknown',
+          id: guest.id
+        };
+      })
+      .sort((a, b) => a.cabin.localeCompare(b.cabin));
+  }, [guests, locations]);
+  
+  const totalGuests = guestsWithCabins.length;
   
   return (
     <Card 
       className={cn(
-        "p-4 h-full relative overflow-hidden cursor-pointer transition-all hover:shadow-lg",
+        "p-3 h-full relative overflow-hidden",
         className
       )}
-      onClick={() => onToggle?.(!guestsOnboard)}
     >
-      {/* Background gradient */}
-      <div 
-        className={cn(
-          "absolute inset-0 opacity-5 transition-opacity",
-          guestsOnboard 
-            ? "bg-gradient-to-br from-green-500 to-emerald-500" 
-            : "bg-gradient-to-br from-gray-400 to-gray-500"
-        )}
-      />
-      
-      {/* Content - Compact Layout */}
-      <div className="relative z-10 h-full flex flex-col">
-        {/* Header with Status Indicator */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            {guestsOnboard ? (
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            ) : (
-              <div className="w-2 h-2 rounded-full bg-muted-foreground/50" />
-            )}
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Guest Status</h3>
-          </div>
-          {guestsOnboard ? (
-            <CheckCircle className="h-3.5 w-3.5 text-green-500" />
-          ) : (
-            <AlertCircle className="h-3.5 w-3.5 text-muted-foreground" />
-          )}
+      {/* Header */}
+      <div className="flex items-center justify-between mb-2.5">
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-primary" />
+          <h3 className="text-xs font-semibold text-muted-foreground">Guests Onboard</h3>
         </div>
-
-        {/* Main Status - Compact */}
-        <div className="flex items-center gap-3 mb-3">
-          {/* Icon - Smaller */}
-          <div 
-            className={cn(
-              "w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-all",
-              guestsOnboard 
-                ? "bg-green-500/20 text-green-600 dark:text-green-400" 
-                : "bg-muted text-muted-foreground"
-            )}
-          >
-            {guestsOnboard ? (
-              <Users className="h-6 w-6" />
-            ) : (
-              <UserX className="h-6 w-6" />
-            )}
-          </div>
-
-          {/* Status Text - Compact */}
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-bold leading-tight truncate">
-              {guestsOnboard ? 'Guests Onboard' : 'No Guests'}
-            </h2>
-            {guestsOnboard && guestCount > 0 && (
-              <p className="text-2xl font-bold text-primary leading-tight">
-                {guestCount} {guestCount === 1 ? 'Guest' : 'Guests'}
-              </p>
-            )}
-          </div>
+        <div className="text-xs font-bold text-primary">
+          {totalGuests} {totalGuests === 1 ? 'guest' : 'guests'}
         </div>
+      </div>
 
-        {/* Service Mode Info - Compact Grid */}
-        <div className="grid grid-cols-2 gap-2 text-xs flex-1">
-          {/* Expected Arrivals or Service Mode */}
-          {!guestsOnboard && expectedGuests > 0 ? (
-            <div className="flex flex-col gap-0.5 col-span-2">
-              <span className="text-muted-foreground font-medium">Expected</span>
-              <div className="flex items-baseline gap-1">
-                <span className="font-bold text-sm text-primary">{expectedGuests}</span>
-                <span className="font-semibold">{expectedGuests === 1 ? 'guest' : 'guests'}</span>
-              </div>
-              {expectedArrival && (
-                <span className="text-[10px] text-muted-foreground">{expectedArrival}</span>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground font-medium">Service</span>
-              <span className="font-semibold truncate">{serviceMode}</span>
-            </div>
-          )}
-
-          {/* Butler Calls */}
-          <div className={cn("flex flex-col gap-0.5", !guestsOnboard && expectedGuests > 0 && "col-span-2")}>
-            <span className="text-muted-foreground font-medium">Calls</span>
-            <Badge 
-              variant="outline" 
-              className={cn(
-                "text-[10px] px-1.5 py-0 h-5 w-fit",
-                guestsOnboard 
-                  ? "border-green-500/30 text-green-600 dark:text-green-400" 
-                  : "border-muted text-muted-foreground"
-              )}
+      {/* Guest List - Responsive */}
+      <div className="space-y-1.5 overflow-y-auto" style={{ maxHeight: 'calc(100% - 36px)' }}>
+        {guestsWithCabins.length > 0 ? (
+          guestsWithCabins.map((guest) => (
+            <div
+              key={guest.id}
+              className="flex items-center justify-between py-1.5 px-2 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors"
             >
-              {guestsOnboard ? 'Enabled' : 'Disabled'}
-            </Badge>
-          </div>
-
-          {/* Crew Coverage - Only if no expected guests shown */}
-          {!(expectedGuests > 0 && !guestsOnboard) && (
-            <div className="flex flex-col gap-0.5 col-span-2">
-              <span className="text-muted-foreground font-medium flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                Coverage
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                <span className="text-xs font-medium truncate">{guest.name}</span>
+              </div>
+              <span className="text-xs text-muted-foreground font-medium ml-2 flex-shrink-0">
+                {guest.cabin}
               </span>
-              <span className="font-semibold">{crewRequirement}</span>
             </div>
-          )}
-        </div>
-
-        {/* Action Hint - Minimal */}
-        <div className="mt-2 pt-2 border-t border-border/50">
-          <p className="text-[10px] text-center text-muted-foreground">
-            Click to toggle
-          </p>
-        </div>
+          ))
+        ) : (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <Users className="h-8 w-8 text-muted-foreground/30 mb-2" />
+            <p className="text-xs text-muted-foreground">No guests onboard</p>
+          </div>
+        )}
       </div>
     </Card>
   );

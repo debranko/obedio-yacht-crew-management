@@ -188,16 +188,7 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
         {activeWidgets.includes("guest-status") && (
           <div key="guest-status" className="dashboard-widget">
             <WidgetWrapper id="guest-status">
-              <GuestStatusWidget 
-                guestsOnboard={true}
-                guestCount={6}
-                expectedGuests={3}
-                expectedArrival="Tomorrow 14:00"
-                onToggle={(onboard) => {
-                  console.log('Guest status toggled:', onboard);
-                  // TODO: Connect to state management
-                }}
-              />
+              <GuestStatusWidget />
             </WidgetWrapper>
           </div>
         )}

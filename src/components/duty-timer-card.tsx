@@ -365,7 +365,7 @@ export function DutyTimerCard() {
         <div
           className="flex-1 p-3 pl-4 relative"
           style={{
-            background: `linear-gradient(to right, ${hexToRgba(currentShiftColor, 0.12)}, ${hexToRgba(currentShiftColor, 0.04)} 70%, transparent)`,
+            background: `linear-gradient(to bottom, ${hexToRgba(currentShiftColor, 0.12)}, ${hexToRgba(currentShiftColor, 0.04)} 70%, transparent)`,
           }}
         >
           <div className="flex items-center justify-between mb-2">
@@ -405,7 +405,7 @@ export function DutyTimerCard() {
         <div
           className="flex-1 p-3 pr-4 relative"
           style={{
-            background: `linear-gradient(to left, ${hexToRgba(nextShiftColor, 0.12)}, ${hexToRgba(nextShiftColor, 0.04)} 70%, transparent)`,
+            background: `linear-gradient(to bottom, ${hexToRgba(nextShiftColor, 0.12)}, ${hexToRgba(nextShiftColor, 0.04)} 70%, transparent)`,
           }}
         >
           <p className="text-xs font-medium text-muted-foreground mb-2 lg:text-right">Next on duty</p>
