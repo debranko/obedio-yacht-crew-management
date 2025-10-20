@@ -57,16 +57,16 @@ export function ClockWidget({ className, timezone = "auto" }: ClockWidgetProps) 
   const date = getFormattedDate();
 
   return (
-    <Card className={`p-4 h-full flex flex-col ${className}`}>
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
-            <ClockIcon className="h-4 w-4 text-primary" />
+    <Card className={`p-3 h-full flex flex-col ${className}`}>
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex items-center gap-1.5">
+          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
+            <ClockIcon className="h-3 w-3 text-primary" />
           </div>
           <div className="min-w-0">
-            <h3 className="font-semibold text-xs">Current Time</h3>
-            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-              <MapPin className="h-2.5 w-2.5" />
+            <h3 className="font-semibold text-[10px] leading-tight">Current Time</h3>
+            <div className="flex items-center gap-0.5 text-[9px] text-muted-foreground leading-tight">
+              <MapPin className="h-2 w-2" />
               <span className="truncate">{location}</span>
             </div>
           </div>
@@ -74,13 +74,13 @@ export function ClockWidget({ className, timezone = "auto" }: ClockWidgetProps) 
       </div>
 
       {/* Time Display - Responsive */}
-      <div className="flex-1 flex flex-col justify-center space-y-1 overflow-hidden px-1">
+      <div className="flex-1 flex flex-col justify-center space-y-0.5 overflow-hidden">
         <div 
-          className="font-light tabular-nums w-full"
+          className="font-light tabular-nums w-full text-center"
           style={{ 
             fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-            fontSize: 'clamp(1.5rem, 5.5vw, 3.5rem)', // Tighter range for better scaling
-            lineHeight: 1,
+            fontSize: 'clamp(1.25rem, 6vw, 3rem)', // Better scaling for widget size
+            lineHeight: 0.95,
             letterSpacing: '-0.02em',
             fontWeight: 300,
             whiteSpace: 'nowrap',
@@ -91,7 +91,7 @@ export function ClockWidget({ className, timezone = "auto" }: ClockWidgetProps) 
           {time}
         </div>
         
-        <p className="text-xs text-muted-foreground truncate">
+        <p className="text-[10px] text-muted-foreground truncate text-center">
           {date}
         </p>
       </div>
