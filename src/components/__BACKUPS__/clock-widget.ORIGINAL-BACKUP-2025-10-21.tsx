@@ -57,29 +57,29 @@ export function ClockWidget({ className, timezone = "auto" }: ClockWidgetProps) 
   const date = getFormattedDate();
 
   return (
-    <Card className={`p-4 h-full flex flex-col ${className}`}>
-      <div className="flex items-start justify-between mb-3">
+    <Card className={`p-6 ${className}`}>
+      <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
-            <ClockIcon className="h-4 w-4 text-primary" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+            <ClockIcon className="h-5 w-5 text-primary" />
           </div>
-          <div className="min-w-0">
-            <h3 className="font-semibold text-xs">Current Time</h3>
-            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-              <MapPin className="h-2.5 w-2.5" />
-              <span className="truncate">{location}</span>
+          <div>
+            <h3 className="font-semibold text-sm">Current Time</h3>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <MapPin className="h-3 w-3" />
+              <span>{location}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Time Display - Responsive */}
-      <div className="flex-1 flex flex-col justify-center space-y-1">
+      {/* Time Display */}
+      <div className="space-y-2">
         <div 
           className="font-light tabular-nums"
           style={{ 
             fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-            fontSize: 'clamp(2rem, 8vw, 3.5rem)', // Responsive: min 2rem, max 3.5rem
+            fontSize: '3.5rem',
             lineHeight: 1,
             letterSpacing: '-0.02em',
             fontWeight: 300
@@ -88,8 +88,15 @@ export function ClockWidget({ className, timezone = "auto" }: ClockWidgetProps) 
           {time}
         </div>
         
-        <p className="text-xs text-muted-foreground truncate">
+        <p className="text-sm text-muted-foreground">
           {date}
+        </p>
+      </div>
+
+      {/* Timezone indicator */}
+      <div className="mt-4 pt-4 border-t border-border">
+        <p className="text-xs text-muted-foreground">
+          {timezone === "auto" ? "Automatic timezone detection" : `Timezone: ${timezone}`}
         </p>
       </div>
     </Card>
