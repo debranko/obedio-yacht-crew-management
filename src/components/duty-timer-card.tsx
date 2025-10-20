@@ -73,7 +73,7 @@ function TickCountdownRing({
 
     const on = i < visibleTicks;
     const stroke = on ? color : 'hsl(0 0% 100% / 0.08)'; // elapsed nearly invisible
-    const width = on ? 6.5 : 4.5; // subtle weight contrast
+    const width = on ? 3.5 : 2.5; // Thinner tick lines
 
     return (
       <line
@@ -116,19 +116,29 @@ function TickCountdownRing({
       </svg>
 
       {/* Center Content - Countdown INSIDE circle */}
-      <div className="absolute inset-0 grid place-items-center pointer-events-none">
-        <div className="text-center max-w-[160px]">
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="text-center" style={{ maxWidth: '140px' }}>
           <div
             className="font-light tabular-nums tracking-tight text-foreground"
             style={{
-              fontSize: 'clamp(36px, 8vw, 52px)', // Smaller font for compact size
-              lineHeight: 0.95,
+              fontSize: '48px',
+              lineHeight: 1,
               fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
+              marginBottom: '4px'
             }}
           >
             {formatHm(remainSec)}
           </div>
-          <div className="mt-1.5 text-[9px] uppercase tracking-[0.15em] leading-tight text-muted-foreground/70 px-2">
+          <div 
+            className="uppercase text-muted-foreground/70"
+            style={{
+              fontSize: '8px',
+              letterSpacing: '0.12em',
+              lineHeight: 1.3,
+              paddingLeft: '8px',
+              paddingRight: '8px'
+            }}
+          >
             {isCritical ? 'shift change soon' : isUrgent ? 'shift ending' : 'hours between shifts'}
           </div>
         </div>
