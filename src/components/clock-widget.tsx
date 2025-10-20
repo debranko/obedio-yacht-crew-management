@@ -57,41 +57,47 @@ export function ClockWidget({ className, timezone = "auto" }: ClockWidgetProps) 
   const date = getFormattedDate();
 
   return (
-    <Card className={`p-3 h-full flex flex-col ${className}`}>
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-1.5">
-          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
-            <ClockIcon className="h-3 w-3 text-primary" />
+    <Card className={`p-2.5 h-full flex flex-col ${className}`}>
+      <div className="flex items-center justify-between mb-1.5 min-h-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
+            <ClockIcon className="h-2.5 w-2.5 text-primary" />
           </div>
-          <div className="min-w-0">
-            <h3 className="font-semibold text-[10px] leading-tight">Current Time</h3>
-            <div className="flex items-center gap-0.5 text-[9px] text-muted-foreground leading-tight">
-              <MapPin className="h-2 w-2" />
+          <div className="min-w-0 flex-1">
+            <h3 className="font-semibold text-[9px] leading-none truncate">Current Time</h3>
+            <div className="flex items-center gap-0.5 text-[8px] text-muted-foreground leading-none mt-0.5">
+              <MapPin className="h-1.5 w-1.5 flex-shrink-0" />
               <span className="truncate">{location}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Time Display - Responsive */}
-      <div className="flex-1 flex flex-col justify-center space-y-0.5 overflow-hidden">
+      {/* Time Display - Fills remaining space */}
+      <div className="flex-1 flex flex-col justify-center items-center min-h-0 overflow-hidden py-1">
         <div 
-          className="font-light tabular-nums w-full text-center"
+          className="font-light tabular-nums text-center"
           style={{ 
             fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-            fontSize: 'clamp(1.25rem, 6vw, 3rem)', // Better scaling for widget size
-            lineHeight: 0.95,
-            letterSpacing: '-0.02em',
+            fontSize: 'clamp(1.5rem, 8vmin, 4rem)', // Use vmin for better container scaling
+            lineHeight: 0.9,
+            letterSpacing: '-0.03em',
             fontWeight: 300,
-            whiteSpace: 'nowrap',
+            maxWidth: '100%',
             overflow: 'hidden',
-            textOverflow: 'ellipsis'
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
           }}
         >
           {time}
         </div>
         
-        <p className="text-[10px] text-muted-foreground truncate text-center">
+        <p 
+          className="text-muted-foreground truncate text-center mt-1 max-w-full"
+          style={{
+            fontSize: 'clamp(8px, 1.2vmin, 11px)'
+          }}
+        >
           {date}
         </p>
       </div>
