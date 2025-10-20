@@ -52,7 +52,7 @@ export default defineConfig({
     outDir: 'dist',
   },
   server: {
-    port: 5173,
+    port: 3000,
     open: true,
     hmr: {
       overlay: true,

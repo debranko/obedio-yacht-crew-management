@@ -6,7 +6,7 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { CameraDialog } from "../camera-dialog";
 import { useAppData } from "../../contexts/AppDataContext";
-import { DutyTimerWidget } from "../duty-timer-widget";
+import { DutyTimerCard } from "../duty-timer-card";
 import {
   Table,
   TableBody,
@@ -521,7 +521,9 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
   return (
     <div className="space-y-6">
         {/* Duty Timer Card - Unified Status View */}
-        <DutyTimerWidget />
+        <Card className="p-0 overflow-hidden">
+          <DutyTimerCard />
+        </Card>
 
         {/* Header Actions */}
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">

@@ -201,11 +201,6 @@ export class DatabaseService {
             isActive: true
           }
         },
-        assignments: {
-          include: {
-            shift: true
-          }
-        },
         deviceAssignments: {
           include: {
             device: true
@@ -604,51 +599,6 @@ export class DatabaseService {
     });
 
     return result;
-  }
-
-  // ===== DUTY ROSTER =====
-
-  async getAssignments(date?: string) {
-    const whereClause = date ? { date } : {};
-    
-    return this.prisma.assignment.findMany({
-      where: whereClause,
-      include: {
-        crew: true,
-        shift: true
-      },
-      orderBy: [
-        { date: 'asc' },
-        { shift: { startTime: 'asc' } }
-      ]
-    });
-  }
-
-  async createAssignment(data: any) {
-    return this.prisma.assignment.create({
-      data,
-      include: {
-        crew: true,
-        shift: true
-      }
-    });
-  }
-
-  async updateAssignment(id: string, data: any) {
-    return this.prisma.assignment.update({
-      where: { id },
-      data,
-      include: {
-        crew: true,
-        shift: true
-      }
-    });
-  }
-
-  async deleteAssignment(id: string) {
-    return this.prisma.assignment.delete({
-      where: { id }
-    });
   }
 
   // ===== ACTIVITY LOGS =====

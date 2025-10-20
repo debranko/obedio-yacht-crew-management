@@ -7,6 +7,7 @@ import { useState, useRef } from "react";
 import { useLocations } from "../../hooks/useLocations";
 import { useDND } from "../../hooks/useDND";
 import { useAppData } from "../../contexts/AppDataContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { Location, LOCATION_TYPES, LOCATION_STATUS_LABELS } from "../../domain/locations";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -26,9 +27,10 @@ export function LocationsPage() {
   const { locations, isLoading, createLocation, updateLocation, deleteLocation } = useLocations();
   const { dndLocations, hasDND } = useDND();
   const { guests, updateGuest, addActivityLog, getGuestByLocationId } = useAppData();
+  const { user } = useAuth();
   
-  // Mock current user role - will be replaced with actual auth context
-  const [currentUserRole] = useState<"admin" | "eto" | "chief_stewardess" | "stewardess">("admin");
+  // Get current user role from auth context
+  const currentUserRole = user?.role || "stewardess";
   
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);

@@ -1,6 +1,4 @@
 import { useEffect, useState } from "react";
-import { useAppData } from "../contexts/AppDataContext";
-import { getCrewAvatar } from "./crew-avatars";
 
 // ------------------------------------------------------------
 // Types (align this with your real app model if different)
@@ -104,7 +102,7 @@ function CrewRow({ person, actionLabel, onCall, compact }: { person: Crew; actio
 // ------------------------------------------------------------
 export function DutyPanel({ onDuty, backup, nextOnDuty, backupNextOnDuty, totalSec, remainSec, onCallBackup }: DutyPanelProps) {
   return (
-    <div className="w-full min-h-[460px] bg-gradient-to-r from-amber-100 to-cyan-100 p-6 rounded-2xl border" style={{ minWidth: "1200px" }}>
+    <div className="w-full min-h-[460px] bg-gradient-to-r from-amber-100 to-cyan-100 p-6 rounded-2xl border">
       <div className="grid grid-cols-12 gap-6 items-start">
         {/* Left rail - Currently on duty above, Backup below */}
         <div className="col-span-4">
@@ -139,7 +137,7 @@ export function DutyPanel({ onDuty, backup, nextOnDuty, backupNextOnDuty, totalS
           <ul>
             {nextOnDuty.map((c) => (
               <li key={c.id} className="flex items-center gap-3 py-2 justify-end">
-                <div className="text-right">
+                <div className="hidden sm:block text-right">
                   <div className="font-medium">{c.name}</div>
                   <div className="text-xs text-muted-foreground">{c.role}</div>
                 </div>
@@ -156,7 +154,7 @@ export function DutyPanel({ onDuty, backup, nextOnDuty, backupNextOnDuty, totalS
               <ul>
                 {backupNextOnDuty.map((c) => (
                   <li key={c.id} className="flex items-center gap-3 py-2 justify-end">
-                    <div className="text-right">
+                    <div className="hidden sm:block text-right">
                       <div className="font-medium">{c.name}</div>
                       <div className="text-xs text-muted-foreground">{c.role}</div>
                     </div>
@@ -173,157 +171,6 @@ export function DutyPanel({ onDuty, backup, nextOnDuty, backupNextOnDuty, totalS
 }
 
 // ------------------------------------------------------------
-// Calculate real shift countdown based on current shift end time
-// ------------------------------------------------------------
-function useShiftCountdown() {
-  const { shifts, getCurrentDutyStatus } = useAppData();
-  const [shiftTime, setShiftTime] = useState({ totalSec: 8 * 3600, remainSec: 1 * 3600 });
-
-  useEffect(() => {
-    const calculateShiftTime = () => {
-      const now = new Date();
-      const currentHour = now.getHours();
-      const currentMinutes = now.getMinutes();
-      const currentTime = currentHour * 60 + currentMinutes;
-
-      // Find current shift
-      const currentShift = shifts.find(shift => {
-        const [startHour, startMin] = shift.startTime.split(':').map(Number);
-        const [endHour, endMin] = shift.endTime.split(':').map(Number);
-        const startTime = startHour * 60 + startMin;
-        let endTime = endHour * 60 + endMin;
-        
-        // Handle overnight shifts
-        if (endTime < startTime) {
-          endTime += 24 * 60;
-        }
-        
-        let adjustedCurrentTime = currentTime;
-        if (currentTime < startTime && endTime > 24 * 60) {
-          adjustedCurrentTime += 24 * 60;
-        }
-        
-        return adjustedCurrentTime >= startTime && adjustedCurrentTime < endTime;
-      });
-
-      if (currentShift) {
-        const [endHour, endMin] = currentShift.endTime.split(':').map(Number);
-        let endTime = endHour * 60 + endMin;
-        
-        // Handle overnight shifts
-        if (endTime < currentTime) {
-          endTime += 24 * 60;
-        }
-        
-        const remainingMinutes = endTime - currentTime;
-        const remainSec = Math.max(0, remainingMinutes * 60);
-        
-        // Calculate total shift duration
-        const [startHour, startMin] = currentShift.startTime.split(':').map(Number);
-        const startTime = startHour * 60 + startMin;
-        let totalMinutes = endTime - startTime;
-        
-        if (totalMinutes < 0) {
-          totalMinutes += 24 * 60;
-        }
-        
-        const totalSec = totalMinutes * 60;
-
-        setShiftTime({ totalSec, remainSec });
-      } else {
-        // Default fallback - 8 hour shift with 1 hour remaining
-        setShiftTime({ totalSec: 8 * 3600, remainSec: 1 * 3600 });
-      }
-    };
-
-    // Calculate immediately
-    calculateShiftTime();
-    
-    // Update every minute
-    const interval = setInterval(calculateShiftTime, 60000);
-    
-    return () => clearInterval(interval);
-  }, [shifts]);
-
-  return shiftTime;
-}
-
-// ------------------------------------------------------------
-// Main Widget Component with Real Data Integration
-// ------------------------------------------------------------
-export function DutyTimerWidget() {
-  const { getCurrentDutyStatus, setCrewMembers, crewMembers } = useAppData();
-  const { totalSec, remainSec } = useShiftCountdown();
-
-  // Get real crew data from AppDataContext
-  const dutyStatus = getCurrentDutyStatus();
-
-  // Map crew data to Crew interface
-  const onDuty: Crew[] = dutyStatus.onDuty.map(c => ({
-    id: c.id,
-    name: c.name,
-    role: c.position || "Crew Member",
-    avatar: getCrewAvatar(c.name)
-  }));
-
-  const backup: Crew[] = dutyStatus.backup.map(c => ({
-    id: c.id,
-    name: c.name,
-    role: c.position || "Crew Member",
-    avatar: getCrewAvatar(c.name)
-  }));
-
-  // If no next shift data, add demo data to test layout
-  const nextOnDuty: Crew[] = dutyStatus.nextShift.length > 0
-    ? dutyStatus.nextShift.map(c => ({
-        id: c.id,
-        name: c.name,
-        role: c.position || "Crew Member",
-        avatar: getCrewAvatar(c.name)
-      }))
-    : [
-        { id: "demo-next-1", name: "Sarah Johnson", role: "Second Stewardess", avatar: getCrewAvatar("Sarah Johnson") },
-        { id: "demo-next-2", name: "Sophie Martin", role: "Stewardess", avatar: getCrewAvatar("Sophie Martin") },
-        { id: "demo-next-3", name: "Amelia Thompson", role: "Stewardess", avatar: getCrewAvatar("Amelia Thompson") }
-      ];
-
-  const backupNext: Crew[] = dutyStatus.nextBackup.length > 0
-    ? dutyStatus.nextBackup.map(c => ({
-        id: c.id,
-        name: c.name,
-        role: c.position || "Crew Member",
-        avatar: getCrewAvatar(c.name)
-      }))
-    : [
-        { id: "demo-backup-next-1", name: "Emma Wilson", role: "Stewardess", avatar: getCrewAvatar("Emma Wilson") }
-      ];
-
-  // Handle calling backup crew (move to active duty)
-  const handleCallBackup = (crew: Crew) => {
-    // Update crew member status to on-duty
-    const updatedCrew = crewMembers.map(c =>
-      c.id === crew.id ? { ...c, status: 'on-duty' as const } : c
-    );
-    setCrewMembers(updatedCrew);
-    
-    // Show confirmation
-    alert(`Backup crew activated: ${crew.name} is now on duty`);
-  };
-
-  return (
-    <DutyPanel
-      onDuty={onDuty}
-      backup={backup}
-      nextOnDuty={nextOnDuty}
-      backupNextOnDuty={backupNext}
-      totalSec={totalSec}
-      remainSec={remainSec}
-      onCallBackup={handleCallBackup}
-    />
-  );
-}
-
-// ------------------------------------------------------------
 // Simple dev tests (console) so regressions are obvious
 // ------------------------------------------------------------
 (function __devTests__() {
@@ -334,5 +181,67 @@ export function DutyTimerWidget() {
   console.assert(visibleTicks(3600, 7200, 72) === 72, "Over-remaining should clamp to full");
 })();
 
-// Export both components for compatibility
-export default DutyTimerWidget;
+// ------------------------------------------------------------
+// DEMO HARNESS – keeps the canvas preview working.
+// Replace with your real data by importing DutyPanel and passing props.
+// ------------------------------------------------------------
+const demoBackup: Crew[] = [
+  { id: "b1", name: "Emma Wilson", role: "Stewardess", avatar: "https://i.pravatar.cc/80?img=1" },
+  { id: "b2", name: "Grace Williams", role: "Junior Stewardess", avatar: "https://i.pravatar.cc/80?img=2" },
+  { id: "b3", name: "Isabella Rodriguez", role: "Sous Chef", avatar: "https://i.pravatar.cc/80?img=3" },
+];
+const demoOnDuty: Crew[] = [
+  { id: "d1", name: "Sophie Martin", role: "Stewardess", avatar: "https://i.pravatar.cc/80?img=11" },
+  { id: "d2", name: "Lana Cooper", role: "Housekeeper", avatar: "https://i.pravatar.cc/80?img=12" },
+  { id: "d3", name: "Mia Carter", role: "Bar Stewardess", avatar: "https://i.pravatar.cc/80?img=13" },
+];
+const demoNextOnDuty: Crew[] = [
+  { id: "n1", name: "Sarah Johnson", role: "Second Stewardess", avatar: "https://i.pravatar.cc/80?img=21" },
+  { id: "n2", name: "Sophie Martin", role: "Stewardess", avatar: "https://i.pravatar.cc/80?img=22" },
+  { id: "n3", name: "Amelia Thompson", role: "Stewardess", avatar: "https://i.pravatar.cc/80?img=23" },
+];
+const demoBackupNext: Crew[] = [demoBackup[0]];
+
+export default function DutyPanelDemo() {
+  const [remain, setRemain] = useState(100 * 60); // 1h40m remaining
+  const total = 8 * 3600; // 8h shift for math
+
+  useEffect(() => {
+    const id = setInterval(() => setRemain((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <DutyPanel
+      onDuty={demoOnDuty}
+      backup={demoBackup}
+      nextOnDuty={demoNextOnDuty}
+      backupNextOnDuty={demoBackupNext}
+      totalSec={total}
+      remainSec={remain}
+      onCallBackup={(c) => alert(`Calling backup: ${c.name}`)}
+    />
+  );
+}
+
+// ------------------------------------------------------------
+// OPTIONAL: Example adapter for real backend shape
+// Uncomment and adjust field names to match your API/store
+// ------------------------------------------------------------
+/*
+// Example real shape:
+// type AppUser = { id: string; fullName: string; position: string; avatarUrl?: string };
+// type Roster = { onDuty: AppUser[]; backup: AppUser[]; next: AppUser[]; backupNext: AppUser[]; shift: { totalSec: number; remainSec: number } }
+
+function mapRosterToProps(r: Roster): DutyPanelProps {
+  const map = (u: AppUser): Crew => ({ id: u.id, name: u.fullName, role: u.position, avatar: u.avatarUrl });
+  return {
+    onDuty: r.onDuty.map(map),
+    backup: r.backup.map(map),
+    nextOnDuty: r.next.map(map),
+    backupNextOnDuty: r.backupNext.map(map),
+    totalSec: r.shift.totalSec,
+    remainSec: r.shift.remainSec,
+  };
+}
+*/

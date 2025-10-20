@@ -14,9 +14,11 @@ import { SettingsPage } from "./components/pages/settings";
 import { Toaster } from "./components/ui/sonner";
 import { Button } from "./components/ui/button";
 import { AppDataProvider, useAppData } from "./contexts/AppDataContext";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { IncomingRequestDialog, useIncomingRequests } from "./components/incoming-request-dialog";
 import { EmergencyShakeDialog } from "./components/emergency-shake-dialog";
-import { websocketService, useWebSocket } from "./services/websocket";
+import { LoginPage } from "./components/pages/login";
+import { useWebSocket } from "./services/websocket";
 import { toast } from "sonner";
 
 // Initialize TanStack Query
@@ -30,13 +32,16 @@ const queryClient = new QueryClient({
   },
 });
 
-// Inner App component to access AppDataContext
+// Inner App component to access AppDataContext and AuthContext
 function AppContent() {
   const [isDark, setIsDark] = useState(false);
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [settingsTab, setSettingsTab] = useState<"general" | "roles" | "system">("general");
   const [isEditingDashboard, setIsEditingDashboard] = useState(false);
   const dashboardPageRef = useRef<DashboardPageHandle>(null);
+  
+  // Auth context
+  const { user } = useAuth();
   
   // Global incoming request handling
   const { getCurrentDutyStatus, assignments, shifts, acceptServiceRequest, crewMembers, guests, locations, getGuestByLocationId } = useAppData();
@@ -57,8 +62,10 @@ function AppContent() {
   useEffect(() => {
     const initWebSocket = async () => {
       try {
-        // Connect to WebSocket server
-        ws.connect('crew-member-1'); // TODO: Use actual user ID from auth
+        // Connect to WebSocket server with real user ID
+        if (user?.id) {
+          ws.connect(user.id);
+        }
         
         // Subscribe to real-time events
         const unsubscribeServiceRequests = ws.subscribe('service-request', (event) => {
@@ -322,13 +329,43 @@ function AppContent() {
   );
 }
 
+// Auth-aware router component
+function AuthRouter() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  console.log('🔄 AuthRouter render:', { isAuthenticated, isLoading });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    console.log('🔓 Not authenticated, showing login page');
+    return <LoginPage />;
+  }
+
+  console.log('✅ Authenticated, showing app');
+  return (
+    <AppDataProvider>
+      <AppContent />
+    </AppDataProvider>
+  );
+}
+
 // Main App wrapper with providers
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AppDataProvider>
-        <AppContent />
-      </AppDataProvider>
+      <AuthProvider>
+        <AuthRouter />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

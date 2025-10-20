@@ -1,7 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { createServer } from 'http';
 import { prisma } from './services/db';
+import { websocketService } from './services/websocket';
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -12,12 +14,15 @@ import guestRoutes from './routes/guests';
 dotenv.config();
 
 const app = express();
+const httpServer = createServer(app);
 const PORT = process.env.PORT || 8080;
 
-// Middleware
+// Middleware - Allow all origins for development
 app.use(cors({ 
-  origin: process.env.CORS_ORIGIN?.split(',') ?? '*', 
-  credentials: true 
+  origin: true, // Allow any origin in development
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 
@@ -49,7 +54,11 @@ async function startServer() {
     await prisma.$connect();
     console.log('✅ Database connected successfully');
     
-    app.listen(PORT, () => {
+    // Initialize WebSocket server
+    websocketService.initialize(httpServer);
+    console.log('✅ WebSocket server initialized');
+    
+    httpServer.listen(PORT, () => {
       console.log(`
 🚀 Obedio Server Started Successfully!
 
@@ -60,6 +69,7 @@ async function startServer() {
 🌐 Access URLs:
    • API Health: http://localhost:${PORT}/api/health
    • Auth: http://localhost:${PORT}/api/auth/login
+   • WebSocket: ws://localhost:${PORT}
    
 📊 Available Endpoints:
    • GET /api/crew - List crew members
@@ -69,6 +79,7 @@ async function startServer() {
    
 🔧 Development:
    • Database: PostgreSQL connected
+   • WebSocket: Real-time events enabled ⚡
    • Seed data: Use 'npm run db:seed'
    
 Ready to receive yacht crew management requests! 🛥️

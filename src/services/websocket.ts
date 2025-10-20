@@ -3,6 +3,8 @@
  * Handles all real-time events between frontend and backend
  */
 
+/// <reference types="vite/client" />
+
 import { io, Socket } from 'socket.io-client';
 
 export interface WebSocketEvent {
@@ -97,13 +99,15 @@ export class WebSocketService {
     }
 
     try {
-      this.socket = io('http://localhost:3001', {
-        transports: ['websocket'],
-        timeout: 5000,
-        auth: {
-          userId: userId || 'guest',
-          token: localStorage.getItem('obedio-auth-token'),
-        },
+      // Connect to Socket.IO server
+      const serverUrl = import.meta.env.VITE_WS_URL || 'http://localhost:3001';
+      
+      this.socket = io(serverUrl, {
+        auth: { userId },
+        reconnection: true,
+        reconnectionAttempts: this.maxReconnectAttempts,
+        reconnectionDelay: 1000,
+        timeout: 5000 // Add timeout to fail faster
       });
 
       this.setupEventHandlers();
@@ -160,7 +164,7 @@ export class WebSocketService {
     });
 
     this.socket.on('connect_error', (error: any) => {
-      console.error('WebSocket connection error:', error);
+      console.log('WebSocket connection error - server may not be ready yet');
       this.isConnected = false;
       this.handleReconnect();
     });
@@ -255,15 +259,14 @@ export class WebSocketService {
    */
   private handleReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('Max reconnection attempts reached');
+      console.log('WebSocket reconnection stopped - max attempts reached');
       return;
     }
 
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1); // Exponential backoff
 
-    console.log(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-
+    // Silent reconnection attempts
     setTimeout(() => {
       if (!this.isConnected) {
         this.connect();

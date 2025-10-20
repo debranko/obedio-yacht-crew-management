@@ -9,13 +9,14 @@ const router = Router();
 // Rate limiting for login endpoint (prevent brute force attacks)
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 attempts per window
+  max: 100, // 100 attempts per window (generous for development)
   message: { 
     success: false, 
     message: 'Too many login attempts. Please try again in 15 minutes.' 
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skipSuccessfulRequests: true, // Don't count successful logins
 });
 
 router.post('/login', loginLimiter, async (req, res) => {
@@ -79,15 +80,18 @@ router.post('/login', loginLimiter, async (req, res) => {
     res.json({
       success: true,
       message: 'Login successful',
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        firstName: user.firstName,
-        lastName: user.lastName
-      },
-      token
+      data: {
+        user: {
+          id: user.id,
+          username: user.username,
+          name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username,
+          email: user.email,
+          role: user.role,
+          avatar: null,
+          department: null,
+        },
+        token
+      }
     });
   } catch (error) {
     res.status(500).json({ 

@@ -3,6 +3,10 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import { useQueryClient } from '@tanstack/react-query';
 import { Assignment, CrewMember, ShiftConfig } from '../components/duty-roster/types';
 import { mockCrewMembers, defaultShiftConfig } from '../components/duty-roster/mock-data';
+import { useCrewMembers as useCrewMembersApi } from '../hooks/useCrewMembers';
+import { useGuestsApi } from '../hooks/useGuestsApi';
+import { useServiceRequestsApi } from '../hooks/useServiceRequestsApi';
+import { api, GuestDTO } from '../services/api';
 import { Location, LocationType } from '../domain/locations';
 import { locationsService } from '../services/locations';
 
@@ -390,14 +394,23 @@ function generateMockYachtLocations(): YachtLocation[] {
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   
-  // Initialize crew members with mock data and extended properties
+  // Fetch crew members from API
+  const { crewMembers: apiCrewMembers, isLoading: isLoadingCrew } = useCrewMembersApi();
+  
+  // Fetch guests from API
+  const { guests: apiGuests, isLoading: isLoadingGuests } = useGuestsApi();
+  
+  // Fetch service requests from API
+  const { serviceRequests: apiServiceRequests, isLoading: isLoadingServiceRequests } = useServiceRequestsApi();
+  
+  // Initialize crew members with API data or fallback to mock
   const [crewMembers, setCrewMembers] = useState<CrewMemberExtended[]>(() => {
     const stored = localStorage.getItem('obedio-crew-members');
     if (stored) {
       return JSON.parse(stored);
     }
     
-    // Map mock crew members to extended format
+    // Map mock crew members to extended format (fallback)
     return mockCrewMembers.map(member => ({
       ...member,
       role: member.position,
@@ -408,6 +421,28 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       joinDate: '2023-01-15',
     }));
   });
+  
+  // Update crew members when API data arrives
+  useEffect(() => {
+    if (apiCrewMembers.length > 0) {
+      const extendedCrew = apiCrewMembers.map(member => ({
+        ...member,
+        id: member.id,
+        name: member.name,
+        position: member.position,
+        department: member.department,
+        role: member.role || member.position,
+        status: (member.status as any) || 'off-duty',
+        shift: '08:00 - 20:00',
+        contact: member.contact || '+1 555 0100',
+        email: member.email || `${member.name.toLowerCase().replace(' ', '.')}@yacht.com`,
+        joinDate: member.joinDate || '2023-01-15',
+        nickname: member.name.split(' ')[0],
+      }));
+      setCrewMembers(extendedCrew);
+      localStorage.setItem('obedio-crew-members', JSON.stringify(extendedCrew));
+    }
+  }, [apiCrewMembers]);
 
   const [assignments, setAssignments] = useState<Assignment[]>(() => {
     const stored = localStorage.getItem('obedio-assignments');
@@ -515,38 +550,6 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return generateMockYachtLocations();
   });
 
-  // Service Requests - using imported generator
-  const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>(() => {
-    const stored = localStorage.getItem('obedio-service-requests');
-    if (stored) {
-      const parsed = JSON.parse(stored, (key, value) => 
-        key === 'timestamp' || key === 'acceptedAt' || key === 'completedAt' ? new Date(value) : value
-      );
-      
-      // INSTANT CLEANUP: Remove stale requests on app load
-      const now = new Date();
-      const staleThresholdMs = 60 * 60 * 1000; // 1 hour
-      
-      const cleaned = parsed.filter((req: ServiceRequest) => {
-        if (req.status === 'completed') return false;
-        
-        if (req.status === 'accepted' || req.status === 'delegated') {
-          const acceptedTime = req.acceptedAt instanceof Date ? req.acceptedAt : (req.acceptedAt ? new Date(req.acceptedAt) : null);
-          
-          if (acceptedTime && acceptedTime instanceof Date && !isNaN(acceptedTime.getTime())) {
-            const timeSinceAccepted = now.getTime() - acceptedTime.getTime();
-            if (timeSinceAccepted > staleThresholdMs) return false;
-          }
-        }
-        
-        return true;
-      });
-      
-      return cleaned;
-    }
-    return generateMockServiceRequests();
-  });
-
   // User Preferences
   const [userPreferences, setUserPreferences] = useState<UserPreferences>(() => {
     const stored = localStorage.getItem('obedio-user-preferences');
@@ -620,18 +623,129 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     };
   });
 
-  // Guest Management - using imported generator
+  // Guest Management - initialize with stored or empty
   const [guests, setGuests] = useState<Guest[]>(() => {
     const stored = localStorage.getItem('obedio-guests');
     if (stored) {
       try {
         return JSON.parse(stored);
       } catch (e) {
-        return generateMockGuests();
+        return generateMockGuests(); // Fallback to mock only if stored data is corrupt
       }
     }
-    return generateMockGuests();
+    return []; // Start empty, will be filled by API
   });
+  
+  // Sync guests from API when data arrives
+  useEffect(() => {
+    if (apiGuests.length > 0) {
+      // Map API DTO to app Guest type with all required fields
+      const mappedGuests: Guest[] = apiGuests.map(apiGuest => ({
+        id: apiGuest.id,
+        firstName: apiGuest.firstName,
+        lastName: apiGuest.lastName,
+        photo: apiGuest.photo || undefined,
+        preferredName: apiGuest.preferredName || undefined,
+        type: apiGuest.type as any,  // API type may differ, cast for now
+        status: apiGuest.status as any, // API has different status values
+        nationality: apiGuest.nationality || undefined,
+        languages: apiGuest.languages || [],
+        passportNumber: apiGuest.passportNumber || undefined,
+        locationId: undefined,
+        checkInDate: new Date().toISOString().split('T')[0], // Default to today
+        checkOutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Default +7 days
+        doNotDisturb: false,
+        allergies: [],
+        medicalConditions: [],
+        dietaryRestrictions: [],
+        foodDislikes: [],
+        favoriteFoods: [],
+        favoriteDrinks: [],
+        createdAt: apiGuest.createdAt,
+        updatedAt: apiGuest.updatedAt,
+        createdBy: 'system', // Default, should come from API eventually
+      }));
+      
+      setGuests(mappedGuests);
+      localStorage.setItem('obedio-guests', JSON.stringify(mappedGuests));
+    }
+  }, [apiGuests]);
+
+  // Service Requests - initialize with stored or empty (will be filled by API)
+  const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>(() => {
+    const stored = localStorage.getItem('obedio-service-requests');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored, (key, value) => 
+          key === 'timestamp' || key === 'acceptedAt' || key === 'completedAt' ? new Date(value) : value
+        );
+        
+        // Clean up stale requests
+        const now = new Date();
+        const staleThresholdMs = 60 * 60 * 1000; // 1 hour
+        
+        const cleaned = parsed.filter((req: ServiceRequest) => {
+          if (req.status === 'completed') return false;
+          
+          if (req.status === 'accepted' || req.status === 'delegated') {
+            const acceptedTime = req.acceptedAt instanceof Date ? req.acceptedAt : (req.acceptedAt ? new Date(req.acceptedAt) : null);
+            
+            if (acceptedTime && acceptedTime instanceof Date && !isNaN(acceptedTime.getTime())) {
+              const timeSinceAccepted = now.getTime() - acceptedTime.getTime();
+              if (timeSinceAccepted > staleThresholdMs) return false;
+            }
+          }
+          
+          return true;
+        });
+        
+        return cleaned;
+      } catch (e) {
+        return generateMockServiceRequests(); // Fallback only if corrupt
+      }
+    }
+    return []; // Start empty, will be filled by API
+  });
+  
+  // Sync service requests from API when data arrives
+  useEffect(() => {
+    if (apiServiceRequests.length > 0) {
+      // Map API DTO to app ServiceRequest type with all required fields
+      const mappedRequests: ServiceRequest[] = apiServiceRequests.map(apiReq => {
+        // Find guest to get name
+        const guest = guests.find(g => g.id === apiReq.guestId);
+        const guestName = guest ? `${guest.firstName} ${guest.lastName}` : 'Unknown Guest';
+        
+        // Find location/cabin
+        const location = locations.find(l => l.id === apiReq.locationId);
+        const cabinName = location?.name || 'Unknown Location';
+        
+        // Find assigned crew member
+        const assignedCrew = crewMembers.find(c => c.id === apiReq.assignedCrewId);
+        
+        return {
+          id: apiReq.id,
+          guestName,
+          guestCabin: cabinName,
+          cabinId: apiReq.locationId || '',
+          requestType: apiReq.priority === 'emergency' ? 'emergency' : 'call',
+          priority: apiReq.priority === 'low' ? 'normal' : apiReq.priority,
+          timestamp: new Date(apiReq.createdAt),
+          voiceTranscript: apiReq.voiceTranscript || undefined,
+          voiceAudioUrl: apiReq.voiceAudioUrl || undefined,
+          cabinImage: location?.image || undefined,
+          status: apiReq.status as any,
+          assignedTo: assignedCrew?.name || undefined,
+          acceptedAt: apiReq.assignedCrewId ? new Date(apiReq.updatedAt) : undefined,
+          completedAt: apiReq.completedAt ? new Date(apiReq.completedAt) : undefined,
+          notes: apiReq.message || undefined,
+        };
+      });
+      
+      setServiceRequests(mappedRequests);
+      localStorage.setItem('obedio-service-requests', JSON.stringify(mappedRequests));
+    }
+  }, [apiServiceRequests, guests, locations, crewMembers]);
 
   // Activity logs state
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);

@@ -16,28 +16,21 @@ export interface DashboardGridHandle {
   resetLayout: () => void;
   openManageWidgets: () => void;
 }
-import { KpiCard } from "./kpi-card";
-import { MiniChart } from "./mini-chart";
 import { Card } from "./ui/card";
 import { WidgetCard } from "./widget-card";
-import { DNDWidget } from "./dnd-widget";
 import { DNDGuestsWidget } from "./dnd-guests-widget";
 import { ServingNowWidget } from "./serving-now-widget";
 import { WeatherWidget } from "./weather-widget";
 import { WindyWidget } from "./windy-widget";
 import { GuestStatusWidget } from "./guest-status-widget";
-import { DutyTimerWidget } from "./duty-timer-widget";
 import { ClockWidget } from "./clock-widget";
 import { WeatherWindyWidget } from "./weather-windy-widget";
+import { DutyTimerCard } from "./duty-timer-card";
 import { useAppData } from "../contexts/AppDataContext";
 import { useDND } from "../hooks/useDND";
-import { Activity, Clock, Smartphone, BatteryLow, Users, BellOff, GripVertical, Bell } from "lucide-react";
+import { Activity, Clock, BatteryLow, Users, BellOff, GripVertical, Bell } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
-
-const requestsData = [12, 15, 10, 18, 22, 19, 25, 21, 24, 20, 26, 24];
-const responseData = [3.2, 2.8, 3.5, 2.9, 2.5, 2.7, 2.4, 2.6, 2.3, 2.5, 2.2, 2.4];
-const devicesData = [98, 98, 97, 99, 98, 99, 99, 98, 99, 99, 100, 100];
 
 interface WidgetLayout {
   i: string;
@@ -51,17 +44,18 @@ interface WidgetLayout {
 }
 
 const defaultLayout: WidgetLayout[] = [
-  // Professional layout optimized for DutyPanel - FULL WIDTH
-  { i: "duty-timer", x: 0, y: 0, w: 10, h: 4, minW: 8, minH: 3 },
-  { i: "serving-now", x: 0, y: 4, w: 5, h: 3, minW: 3, minH: 3 },
-  { i: "weather", x: 5, y: 4, w: 5, h: 3, minW: 3, minH: 3 },
-  { i: "clock", x: 0, y: 7, w: 2, h: 2, minW: 2, minH: 2 },
-  { i: "guest-status", x: 2, y: 7, w: 3, h: 2, minW: 2, minH: 2 },
+  // Clean 2x2 Grid Layout
+  { i: "clock", x: 0, y: 0, w: 2, h: 2, minW: 2, minH: 2 },
+  { i: "serving-now", x: 2, y: 0, w: 4, h: 4, minW: 2, minH: 3 },
+  { i: "weather", x: 0, y: 3, w: 4, h: 3, minW: 2, minH: 3 },
+  { i: "duty-timer", x: 6, y: 0, w: 6, h: 3, minW: 4, minH: 3 },
   // Additional widgets (if enabled via Manage Widgets)
-  { i: "weather-windy", x: 0, y: 9, w: 5, h: 5, minW: 3, minH: 4 },
-  { i: "windy", x: 5, y: 9, w: 5, h: 4, minW: 3, minH: 3 },
-  { i: "dnd-guests", x: 0, y: 14, w: 5, h: 3, minW: 2, minH: 2 },
-  // active-crew removed - redundant with DutyPanel "Currently on duty" section
+  { i: "weather-windy", x: 0, y: 6, w: 4, h: 5, minW: 3, minH: 4 },
+  { i: "guest-status", x: 4, y: 6, w: 2, h: 2, minW: 2, minH: 2 },
+  { i: "windy", x: 0, y: 11, w: 6, h: 4, minW: 3, minH: 3 },
+  // Auto-managed widgets (always active, auto-show/hide)
+  { i: "dnd-auto", x: 6, y: 11, w: 6, h: 3, minW: 4, minH: 3 },
+  // pending-requests and battery-alerts removed - hardcoded data
 ];
 
 interface DashboardGridProps {
@@ -75,8 +69,8 @@ interface DashboardGridProps {
 
 export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>(
   ({ isEditMode = false, onEditModeChange, activeWidgets = [], onActiveWidgetsChange, onOpenManageWidgets, onNavigate }, ref) => {
-  // Use the same source of truth for DND locations
-  const { dndLocations, hasDND } = useDND();
+  // Check if there are any DND active locations/guests
+  const { hasDND } = useDND();
   
   const [layout, setLayout] = useState<WidgetLayout[]>(() => {
     // Load saved layout from localStorage
@@ -157,26 +151,21 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
     }
   }));
 
-  // Widget wrapper with drag handle - special handling for duty-timer
-  const WidgetWrapper = ({ children, id }: { children: React.ReactNode; id: string }) => {
-    // Special handling for duty-timer to allow full width
-    const isDutyTimer = id === "duty-timer";
-    
-    return (
-      <div className={`relative ${isDutyTimer ? 'h-full overflow-visible' : 'h-full'}`}>
-        {isEditMode && (
-          <div className="absolute top-2 right-2 z-10 cursor-move drag-handle">
-            <Badge variant="secondary" className="cursor-move">
-              <GripVertical className="h-3 w-3" />
-            </Badge>
-          </div>
-        )}
-        <div className={`${isDutyTimer ? 'h-full w-full overflow-visible' : 'h-full'} ${isEditMode ? 'opacity-90' : ''}`}>
-          {children}
+  // Widget wrapper with drag handle
+  const WidgetWrapper = ({ children, id }: { children: React.ReactNode; id: string }) => (
+    <div className="relative h-full">
+      {isEditMode && (
+        <div className="absolute top-2 right-2 z-10 cursor-move drag-handle">
+          <Badge variant="secondary" className="cursor-move">
+            <GripVertical className="h-3 w-3" />
+          </Badge>
         </div>
+      )}
+      <div className={`h-full ${isEditMode ? 'opacity-90' : ''}`}>
+        {children}
       </div>
-    );
-  };
+    </div>
+  );
 
   return (
     <div className="space-y-4"
@@ -186,8 +175,8 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
       <ResponsiveGridLayout
         className="layout"
         layouts={{ lg: layout, md: layout, sm: layout, xs: layout }}
-        breakpoints={{ lg: 1400, md: 1200, sm: 768, xs: 480 }}
-        cols={{ lg: 10, md: 8, sm: 4, xs: 2 }}
+        breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480 }}
+        cols={{ lg: 8, md: 6, sm: 4, xs: 2 }}
         rowHeight={80}
         isDraggable={isEditMode}
         isResizable={isEditMode}
@@ -195,7 +184,6 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
         draggableHandle=".drag-handle"
         compactType="vertical"
         preventCollision={false}
-        margin={[16, 16]}
       >
         {activeWidgets.includes("guest-status") && (
           <div key="guest-status" className="dashboard-widget">
@@ -238,17 +226,10 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
           </div>
         )}
 
-        {hasDND && activeWidgets.includes("dnd") && (
-          <div key="dnd" className="dashboard-widget">
-            <WidgetWrapper id="dnd">
-              <DNDWidget dndList={dndLocations} />
-            </WidgetWrapper>
-          </div>
-        )}
-
-        {hasDND && activeWidgets.includes("dnd-guests") && (
-          <div key="dnd-guests" className="dashboard-widget">
-            <WidgetWrapper id="dnd-guests">
+        {/* DND Widget - Auto-managed (always active, auto-show/hide based on DND status) */}
+        {hasDND && (
+          <div key="dnd-auto" className="dashboard-widget">
+            <WidgetWrapper id="dnd-auto">
               <DNDGuestsWidget />
             </WidgetWrapper>
           </div>
@@ -264,7 +245,16 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
 
         {/* Pending Requests and Battery Alerts removed - hardcoded data */}
 
-        {/* duty-timer widget removed - now rendered outside grid in dashboard.tsx for full width */}
+        {/* Duty Timer Widget - Resizable in Grid */}
+        {activeWidgets.includes("duty-timer") && (
+          <div key="duty-timer" className="dashboard-widget">
+            <WidgetWrapper id="duty-timer">
+              <Card className="p-0 overflow-hidden h-full">
+                <DutyTimerCard />
+              </Card>
+            </WidgetWrapper>
+          </div>
+        )}
 
         {/* Clock Widget */}
         {activeWidgets.includes("clock") && (
@@ -275,48 +265,7 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
           </div>
         )}
 
-        {/* Active Crew widget removed - redundant with DutyPanel "Currently on duty" section */}
-
-        {activeWidgets.includes("active-devices") && (
-          <div key="active-devices" className="dashboard-widget">
-            <WidgetWrapper id="active-devices">
-              <KpiCard
-                icon={Smartphone}
-                title="Active Devices"
-                value="100"
-                trend="up"
-                trendValue="+2%"
-                chart={<MiniChart data={devicesData} color="#4A4F57" />}
-              />
-            </WidgetWrapper>
-          </div>
-        )}
-
-        {activeWidgets.includes("requests-chart") && (
-          <div key="requests-chart" className="dashboard-widget">
-            <WidgetWrapper id="requests-chart">
-              <Card className="p-4 h-full">
-                <h3 className="text-sm mb-3">Service Requests Trend</h3>
-                <div className="h-[calc(100%-36px)]">
-                  <MiniChart data={requestsData} color="#C8A96B" height={120} />
-                </div>
-              </Card>
-            </WidgetWrapper>
-          </div>
-        )}
-
-        {activeWidgets.includes("response-time-chart") && (
-          <div key="response-time-chart" className="dashboard-widget">
-            <WidgetWrapper id="response-time-chart">
-              <Card className="p-4 h-full">
-                <h3 className="text-sm mb-3">Avg Response Time (min)</h3>
-                <div className="h-[calc(100%-36px)]">
-                  <MiniChart data={responseData} color="#2E7D32" height={120} />
-                </div>
-              </Card>
-            </WidgetWrapper>
-          </div>
-        )}
+        {/* Mock/hardcoded widgets removed: Active Devices, Service Requests Chart, Response Time Chart */}
       </ResponsiveGridLayout>
     </div>
   );

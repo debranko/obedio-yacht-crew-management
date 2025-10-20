@@ -16,14 +16,7 @@ import { Checkbox } from "./ui/checkbox";
 import { Label } from "./ui/label";
 import { Card } from "./ui/card";
 import {
-  BellOff,
   Clock,
-  Users,
-  Bell,
-  BatteryLow,
-  Smartphone,
-  TrendingUp,
-  Timer,
   Cloud,
   Wind,
   UserCheck,
@@ -80,22 +73,7 @@ export const availableWidgets: WidgetConfig[] = [
     defaultSize: { w: 4, h: 4, minW: 3, minH: 3 },
     category: "status",
   },
-  {
-    id: "dnd",
-    name: "Do Not Disturb",
-    description: "Shows locations with DND active",
-    icon: BellOff,
-    defaultSize: { w: 4, h: 2, minW: 2, minH: 2 },
-    category: "status",
-  },
-  {
-    id: "dnd-guests",
-    name: "DND Guests",
-    description: "Shows which guests have DND active and their locations",
-    icon: BellOff,
-    defaultSize: { w: 4, h: 3, minW: 2, minH: 2 },
-    category: "status",
-  },
+  // DND widget removed from here - it's now auto-managed (always active, auto-show/hide)
   {
     id: "serving-now",
     name: "Serving Now",
@@ -106,37 +84,14 @@ export const availableWidgets: WidgetConfig[] = [
   },
   {
     id: "duty-timer",
-    name: "Duty Panel",
-    description: "Comprehensive duty status with countdown timer, current crew, backup crew, and next shift",
-    icon: Timer,
-    defaultSize: { w: 8, h: 4, minW: 6, minH: 3 },
+    name: "Duty Status",
+    description: "Current shift status with countdown timer and crew roster",
+    icon: Clock,
+    defaultSize: { w: 6, h: 3, minW: 4, minH: 3 },
     category: "status",
   },
-  // Pending Requests and Battery Alerts removed - hardcoded data, not production-ready
-  {
-    id: "active-devices",
-    name: "Active Devices",
-    description: "Total devices online",
-    icon: Smartphone,
-    defaultSize: { w: 2, h: 2, minW: 1, minH: 2 },
-    category: "kpi",
-  },
-  {
-    id: "requests-chart",
-    name: "Service Requests Chart",
-    description: "Request volume over time",
-    icon: TrendingUp,
-    defaultSize: { w: 4, h: 3, minW: 2, minH: 2 },
-    category: "chart",
-  },
-  {
-    id: "response-time-chart",
-    name: "Response Time Chart",
-    description: "Average response time trends",
-    icon: TrendingUp,
-    defaultSize: { w: 4, h: 3, minW: 2, minH: 2 },
-    category: "chart",
-  },
+  // Mock/hardcoded widgets removed: Active Devices, Service Requests Chart, Response Time Chart
+  // These had fake data and are not production-ready
 ];
 
 interface ManageWidgetsDialogProps {

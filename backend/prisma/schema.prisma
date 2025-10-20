@@ -38,7 +38,6 @@ model CrewMember {
   updatedAt  DateTime @updatedAt
   
   user              User?               @relation(fields: [userId], references: [id])
-  assignments       Assignment[]
   deviceAssignments DeviceAssignment[]
 }
 
@@ -117,32 +116,7 @@ model DeviceAssignment {
   @@unique([deviceId, crewMemberId])
 }
 
-model Assignment {
-  id           String   @id @default(cuid())
-  crewMemberId String
-  shiftId      String
-  date         DateTime
-  role         String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
-  crewMember CrewMember  @relation(fields: [crewMemberId], references: [id])
-  shift      ShiftConfig @relation(fields: [shiftId], references: [id])
-  
-  @@unique([crewMemberId, shiftId, date])
-}
-
-model ShiftConfig {
-  id          String   @id @default(cuid())
-  name        String
-  startTime   String
-  endTime     String
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  assignments Assignment[]
-}
+// Assignment and ShiftConfig models removed - user requested complete removal of duty timer functionality
 
 model ActivityLog {
   id         String   @id @default(cuid())

@@ -1,12 +1,6 @@
-import { Activity, Users, Clock, Smartphone } from "lucide-react";
-import { Card } from "../ui/card";
-import { Button } from "../ui/button";
-import { StatusChip } from "../status-chip";
-import { useAppData } from "../../contexts/AppDataContext";
 import { DashboardGrid, DashboardGridHandle } from "../dashboard-grid";
 import { forwardRef, useImperativeHandle, useRef, useState, useEffect } from "react";
 import { ManageWidgetsDialog } from "../manage-widgets-dialog";
-import { DutyTimerWidget } from "../duty-timer-widget";
 
 export interface DashboardPageHandle {
   resetLayout: () => void;
@@ -23,6 +17,7 @@ interface DashboardPageProps {
 const DEFAULT_ACTIVE_WIDGETS = [
   "serving-now",
   "weather",
+  "clock",
   "duty-timer",
 ];
 
@@ -61,19 +56,12 @@ export const DashboardPage = forwardRef<DashboardPageHandle, DashboardPageProps>
       />
       
       <div className="space-y-6">
-        {/* Full-Width Duty Panel - Outside Grid */}
-        {activeWidgets.includes("duty-timer") && (
-          <div className="w-full overflow-x-auto">
-            <DutyTimerWidget />
-          </div>
-        )}
-
-        {/* Draggable Dashboard Grid */}
+        {/* Draggable Dashboard Grid - Duty Timer now inside grid as resizable widget */}
         <DashboardGrid
           ref={dashboardGridRef}
           isEditMode={isEditMode}
           onEditModeChange={onEditModeChange}
-          activeWidgets={activeWidgets.filter(w => w !== "duty-timer")} // Remove duty-timer from grid
+          activeWidgets={activeWidgets}
           onActiveWidgetsChange={setActiveWidgets}
           onOpenManageWidgets={() => setShowManageWidgets(true)}
           onNavigate={onNavigate}

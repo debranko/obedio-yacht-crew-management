@@ -1,0 +1,164 @@
+/**
+ * WebSocket Service - Backend
+ * Handles real-time communication using Socket.IO
+ */
+
+import { Server as SocketIOServer } from 'socket.io';
+import { Server as HTTPServer } from 'http';
+import { Logger } from '../utils/logger';
+
+const logger = new Logger();
+
+export class WebSocketService {
+  private static instance: WebSocketService;
+  private io: SocketIOServer | null = null;
+  private connectedClients: Map<string, any> = new Map();
+
+  private constructor() {}
+
+  static getInstance(): WebSocketService {
+    if (!WebSocketService.instance) {
+      WebSocketService.instance = new WebSocketService();
+    }
+    return WebSocketService.instance;
+  }
+
+  /**
+   * Initialize WebSocket server
+   */
+  initialize(httpServer: HTTPServer): void {
+    this.io = new SocketIOServer(httpServer, {
+      cors: {
+        origin: process.env.CORS_ORIGIN?.split(',') || '*',
+        methods: ['GET', 'POST'],
+        credentials: true
+      },
+      pingTimeout: 60000,
+      pingInterval: 25000
+    });
+
+    this.setupEventHandlers();
+    logger.info('✅ WebSocket server initialized');
+  }
+
+  /**
+   * Setup Socket.IO event handlers
+   */
+  private setupEventHandlers(): void {
+    if (!this.io) return;
+
+    this.io.on('connection', (socket) => {
+      const userId = socket.handshake.auth.userId || socket.id;
+      
+      logger.info(`Client connected: ${userId} (${socket.id})`);
+      this.connectedClients.set(socket.id, { userId, socket });
+
+      // Handle disconnection
+      socket.on('disconnect', (reason) => {
+        logger.info(`Client disconnected: ${userId} (${reason})`);
+        this.connectedClients.delete(socket.id);
+      });
+
+      // Handle client errors
+      socket.on('error', (error) => {
+        logger.error('Socket error:', error);
+      });
+
+      // Join user-specific room for targeted messages
+      socket.join(`user:${userId}`);
+      
+      logger.info(`User ${userId} joined room: user:${userId}`);
+    });
+  }
+
+  /**
+   * Broadcast event to all connected clients
+   */
+  broadcast(eventName: string, data: any): void {
+    if (!this.io) {
+      logger.warn('WebSocket not initialized, cannot broadcast');
+      return;
+    }
+
+    this.io.emit(eventName, data);
+    logger.info(`Broadcasted event: ${eventName}`);
+  }
+
+  /**
+   * Send event to specific user
+   */
+  sendToUser(userId: string, eventName: string, data: any): void {
+    if (!this.io) {
+      logger.warn('WebSocket not initialized, cannot send to user');
+      return;
+    }
+
+    this.io.to(`user:${userId}`).emit(eventName, data);
+    logger.info(`Sent ${eventName} to user ${userId}`);
+  }
+
+  /**
+   * Send event to multiple users
+   */
+  sendToUsers(userIds: string[], eventName: string, data: any): void {
+    userIds.forEach(userId => this.sendToUser(userId, eventName, data));
+  }
+
+  /**
+   * Emit service request created event
+   */
+  emitServiceRequestCreated(request: any): void {
+    this.broadcast('service-request:created', request);
+  }
+
+  /**
+   * Emit service request updated event
+   */
+  emitServiceRequestUpdated(request: any): void {
+    this.broadcast('service-request:updated', request);
+  }
+
+  /**
+   * Emit service request completed event
+   */
+  emitServiceRequestCompleted(request: any): void {
+    this.broadcast('service-request:completed', request);
+  }
+
+  /**
+   * Emit emergency alert
+   */
+  emitEmergencyAlert(emergency: any): void {
+    this.broadcast('emergency:alert', emergency);
+  }
+
+  /**
+   * Emit crew status changed
+   */
+  emitCrewStatusChanged(crew: any): void {
+    this.broadcast('crew:status-changed', crew);
+  }
+
+  /**
+   * Emit guest event
+   */
+  emitGuestEvent(event: 'created' | 'updated' | 'deleted', guest: any): void {
+    this.broadcast(`guest:${event}`, guest);
+  }
+
+  /**
+   * Get number of connected clients
+   */
+  getConnectedClientsCount(): number {
+    return this.connectedClients.size;
+  }
+
+  /**
+   * Get connected client info
+   */
+  getConnectedClients(): any[] {
+    return Array.from(this.connectedClients.values()).map(({ userId }) => ({ userId }));
+  }
+}
+
+export const websocketService = WebSocketService.getInstance();

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { cn } from './ui/utils';
 import { useYachtSettings } from '../hooks/useYachtSettings';
+import { useSizeMode } from '../hooks/useSizeMode';
 
 interface WeatherData {
   temp: number;
@@ -40,6 +41,7 @@ interface WeatherWidgetProps {
 
 export function WeatherWidget({ className }: WeatherWidgetProps) {
   const { getCurrentCoordinates, settings } = useYachtSettings();
+  const { ref, mode } = useSizeMode();
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,8 +106,14 @@ export function WeatherWidget({ className }: WeatherWidgetProps) {
     return { main: 'Thunderstorm', description: 'Stormy', icon: 'rain' };
   };
 
-  const getWeatherIcon = (iconType: string) => {
-    const iconClass = "h-16 w-16";
+  const getWeatherIcon = (iconType: string, size: 'sm' | 'md' | 'lg' = 'lg') => {
+    const sizeClasses = {
+      sm: "h-8 w-8",
+      md: "h-12 w-12",
+      lg: "h-16 w-16"
+    };
+    const iconClass = sizeClasses[size];
+    
     switch (iconType) {
       case 'sun':
         return <Sun className={cn(iconClass, "text-yellow-400")} />;
@@ -159,7 +167,7 @@ export function WeatherWidget({ className }: WeatherWidgetProps) {
   }
 
   return (
-    <Card className={cn("p-0 h-full relative overflow-hidden group", className)}>
+    <Card ref={ref} className={cn("p-0 h-full relative overflow-hidden group", className)}>
       {/* Animated Gradient Background */}
       <div className={cn(
         "absolute inset-0 bg-gradient-to-br opacity-10 dark:opacity-20 transition-opacity duration-500",
@@ -169,76 +177,140 @@ export function WeatherWidget({ className }: WeatherWidgetProps) {
       {/* Glass morphism overlay */}
       <div className="absolute inset-0 backdrop-blur-3xl bg-background/40" />
 
-      {/* Content */}
-      <div className="relative p-6 h-full flex flex-col">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h3 className="text-sm font-medium text-muted-foreground">Current Weather</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">{weather.location}</p>
-          </div>
-          {getWeatherIcon(weather.weather.icon)}
-        </div>
-
-        {/* Temperature - Large Display */}
-        <div className="flex-1 flex flex-col justify-center">
-          <div className="flex items-baseline gap-2">
-            <span className="text-6xl font-bold tracking-tight">
-              {weather.temp}°
-            </span>
-            <span className="text-2xl text-muted-foreground">C</span>
-          </div>
-          <p className="text-lg font-medium mt-2 capitalize">
-            {weather.weather.description}
-          </p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Feels like {weather.feels_like}°C
-          </p>
-        </div>
-
-        {/* Weather Details Grid */}
-        <div className="grid grid-cols-2 gap-3 mt-6 pt-6 border-t border-border/50">
-          {/* Humidity */}
-          <div className="flex items-center gap-2">
-            <Droplets className="h-4 w-4 text-blue-500" />
-            <div>
-              <p className="text-xs text-muted-foreground">Humidity</p>
-              <p className="text-sm font-semibold">{weather.humidity}%</p>
+      {/* Content - Responsive based on size */}
+      <div className="relative h-full flex flex-col">
+        {/* COMPACT MODE - Minimal display */}
+        {mode === "compact" && (
+          <div className="p-3 h-full flex flex-col justify-center items-center">
+            <div className="flex items-center justify-center mb-1">
+              {getWeatherIcon(weather.weather.icon, 'sm')}
+            </div>
+            <div className="text-2xl font-bold">{weather.temp}°C</div>
+            <div className="text-xs text-muted-foreground truncate max-w-full">
+              {weather.location}
             </div>
           </div>
+        )}
 
-          {/* Wind */}
-          <div className="flex items-center gap-2">
-            <Wind className="h-4 w-4 text-cyan-500" />
-            <div>
-              <p className="text-xs text-muted-foreground">Wind</p>
-              <p className="text-sm font-semibold">{weather.wind_speed} km/h</p>
+        {/* MEDIUM MODE - Balanced display */}
+        {mode === "medium" && (
+          <div className="p-4 h-full flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-xs font-medium text-muted-foreground">Current Weather</h3>
+                <p className="text-xs text-muted-foreground truncate">{weather.location}</p>
+              </div>
+              {getWeatherIcon(weather.weather.icon, 'md')}
+            </div>
+
+            {/* Temperature */}
+            <div className="flex-1 flex flex-col justify-center">
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-bold tracking-tight">{weather.temp}°</span>
+                <span className="text-xl text-muted-foreground">C</span>
+              </div>
+              <p className="text-sm font-medium mt-1 capitalize truncate">
+                {weather.weather.description}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Feels like {weather.feels_like}°C
+              </p>
+            </div>
+
+            {/* Key Stats - 2 columns */}
+            <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-border/50">
+              <div className="flex items-center gap-1.5">
+                <Droplets className="h-3 w-3 text-blue-500 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground">Humidity</p>
+                  <p className="text-xs font-semibold truncate">{weather.humidity}%</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Wind className="h-3 w-3 text-cyan-500 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground">Wind</p>
+                  <p className="text-xs font-semibold truncate">{weather.wind_speed} km/h</p>
+                </div>
+              </div>
             </div>
           </div>
+        )}
 
-          {/* Pressure */}
-          <div className="flex items-center gap-2">
-            <Gauge className="h-4 w-4 text-purple-500" />
-            <div>
-              <p className="text-xs text-muted-foreground">Pressure</p>
-              <p className="text-sm font-semibold">{weather.pressure} hPa</p>
+        {/* EXPANDED MODE - Full details */}
+        {mode === "expanded" && (
+          <div className="p-6 h-full flex flex-col">
+            {/* Header */}
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground">Current Weather</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">{weather.location}</p>
+              </div>
+              {getWeatherIcon(weather.weather.icon, 'lg')}
+            </div>
+
+            {/* Temperature - Large Display */}
+            <div className="flex-1 flex flex-col justify-center">
+              <div className="flex items-baseline gap-2">
+                <span className="text-6xl font-bold tracking-tight">
+                  {weather.temp}°
+                </span>
+                <span className="text-2xl text-muted-foreground">C</span>
+              </div>
+              <p className="text-lg font-medium mt-2 capitalize">
+                {weather.weather.description}
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Feels like {weather.feels_like}°C
+              </p>
+            </div>
+
+            {/* Weather Details Grid - Full */}
+            <div className="grid grid-cols-2 gap-3 mt-6 pt-6 border-t border-border/50">
+              {/* Humidity */}
+              <div className="flex items-center gap-2">
+                <Droplets className="h-4 w-4 text-blue-500" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Humidity</p>
+                  <p className="text-sm font-semibold">{weather.humidity}%</p>
+                </div>
+              </div>
+
+              {/* Wind */}
+              <div className="flex items-center gap-2">
+                <Wind className="h-4 w-4 text-cyan-500" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Wind</p>
+                  <p className="text-sm font-semibold">{weather.wind_speed} km/h</p>
+                </div>
+              </div>
+
+              {/* Pressure */}
+              <div className="flex items-center gap-2">
+                <Gauge className="h-4 w-4 text-purple-500" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Pressure</p>
+                  <p className="text-sm font-semibold">{weather.pressure} hPa</p>
+                </div>
+              </div>
+
+              {/* Visibility */}
+              <div className="flex items-center gap-2">
+                <Eye className="h-4 w-4 text-green-500" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Visibility</p>
+                  <p className="text-sm font-semibold">{weather.visibility} km</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Last Updated */}
+            <div className="mt-4 text-xs text-muted-foreground text-center">
+              Updated just now
             </div>
           </div>
-
-          {/* Visibility */}
-          <div className="flex items-center gap-2">
-            <Eye className="h-4 w-4 text-green-500" />
-            <div>
-              <p className="text-xs text-muted-foreground">Visibility</p>
-              <p className="text-sm font-semibold">{weather.visibility} km</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Last Updated */}
-        <div className="mt-4 text-xs text-muted-foreground text-center">
-          Updated just now
-        </div>
+        )}
       </div>
     </Card>
   );

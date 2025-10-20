@@ -1,8 +1,10 @@
-import { Search, Bell, Moon, Sun, User, Users, Ship, UserX, ChevronDown } from "lucide-react";
+import { Search, Bell, Moon, Sun, User, Users, Ship, UserX, ChevronDown, LogOut } from "lucide-react";
 import { ObedioLogo } from "./obedio-logo";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Avatar, AvatarFallback } from "./ui/avatar";
+import { useAuth } from "../contexts/AuthContext";
+import { Badge } from "./ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +23,8 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ onThemeToggle, isDark, guestStatus = 'onboard', onGuestStatusChange }: AppHeaderProps) {
+  const { user, logout } = useAuth();
+
   const getStatusConfig = (status: GuestStatus) => {
     switch (status) {
       case 'onboard':
@@ -126,19 +130,37 @@ export function AppHeader({ onThemeToggle, isDark, guestStatus = 'onboard', onGu
           {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-muted">
-                    <User className="h-4 w-4" />
+              <Button variant="ghost" className="h-9 px-3 gap-2">
+                <Avatar className="h-6 w-6">
+                  <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                    {user?.name ? user.name.substring(0, 2).toUpperCase() : 'U'}
                   </AvatarFallback>
                 </Avatar>
+                <div className="flex flex-col items-start">
+                  <span className="text-sm font-medium">{user?.name || 'User'}</span>
+                  <span className="text-xs text-muted-foreground">{user?.role || 'crew'}</span>
+                </div>
+                <ChevronDown className="h-3 w-3 opacity-50" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-56">
+              <div className="px-2 py-1.5">
+                <p className="text-sm font-medium">{user?.name}</p>
+                <p className="text-xs text-muted-foreground">{user?.email}</p>
+                {user?.role && (
+                  <Badge variant="secondary" className="mt-1 text-xs">
+                    {user.role.replace('-', ' ').toUpperCase()}
+                  </Badge>
+                )}
+              </div>
+              <DropdownMenuSeparator />
               <DropdownMenuItem>Profile</DropdownMenuItem>
               <DropdownMenuItem>Settings</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Sign Out</DropdownMenuItem>
+              <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
