@@ -248,9 +248,18 @@ export function ButtonSimulatorWidget() {
       return;
     }
     
+    // Environmental controls (Crestron integration) - Direct actions, no service request
+    if (button.function === 'lights') {
+      toast.success('💡 Lights toggled', {
+        description: 'Crestron command sent'
+      });
+      return;
+    }
+    
+    // Service requests for crew
     const labels: Record<ButtonFunction, string> = {
-      dnd: "Do Not Disturb Toggle",
-      lights: "Lights Control",
+      dnd: "Do Not Disturb Toggle", // Won't reach here
+      lights: "Lights Control", // Won't reach here
       prepare_food: "Prepare Food",
       bring_drinks: "Bring Drinks"
     };

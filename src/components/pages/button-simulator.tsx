@@ -239,11 +239,27 @@ export function ButtonSimulatorPage() {
 
   // Auxiliary button press
   const handleAuxButtonClick = (button: AuxButton) => {
+    // Environmental controls (Crestron integration) - Direct actions, no service request
+    if (button.function === 'lights_toggle') {
+      toast.success('💡 Lights toggled', {
+        description: 'Crestron command sent'
+      });
+      return;
+    }
+    
+    if (button.function === 'ac_control') {
+      toast.success('❄️ Climate control adjusted', {
+        description: 'Crestron command sent'
+      });
+      return;
+    }
+    
+    // Service requests - Create actual service request for crew
     const labels: Record<ButtonFunction, string> = {
       call_service: "Service Call",
       request_drink: "Drink Request",
-      lights_toggle: "Lights Control",
-      ac_control: "Climate Control",
+      lights_toggle: "Lights Control", // Won't reach here
+      ac_control: "Climate Control", // Won't reach here
       call_housekeeping: "Housekeeping Request",
       need_assistance: "Need Assistance"
     };
