@@ -21,7 +21,6 @@ import {
   Wine,
   Waves,
   Wrench,
-  Gauge,
   Cog,
   ChevronDown,
   ChevronUp
@@ -30,16 +29,7 @@ import { motion } from "motion/react";
 import { ServiceRequest, InteriorTeam } from "../contexts/AppDataContext";
 import { useAppData } from "../contexts/AppDataContext";
 import { Button } from "./ui/button";
-import { Badge } from "./ui/badge";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "./ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
-import { Label } from "./ui/label";
 import { toast } from "sonner";
 
 interface IncomingRequestDialogProps {
@@ -57,22 +47,19 @@ export function IncomingRequestDialog({
   const [timeAgo, setTimeAgo] = useState<string>("Just now");
   const [showDelegateDropdown, setShowDelegateDropdown] = useState(false);
   const [showAvailableCrew, setShowAvailableCrew] = useState(false);
-  const [showForwardDialog, setShowForwardDialog] = useState(false);
-  const [selectedCrewMember, setSelectedCrewMember] = useState("");
-  const [selectedForwardTeam, setSelectedForwardTeam] = useState("");
+  const [showForwardDropdown, setShowForwardDropdown] = useState(false);
   const [playingAudio, setPlayingAudio] = useState(false);
   
   // Department/Team options for forwarding
   const forwardOptions = [
-    // Interior Teams
-    { value: 'Galley', label: 'Galley (Kitchen)', icon: UtensilsCrossed },
-    { value: 'Pantry', label: 'Pantry (Provisions)', icon: Package },
-    { value: 'Housekeeping', label: 'Housekeeping', icon: Home },
+    { value: 'Galley', label: 'Galley', icon: UtensilsCrossed },
     { value: 'Laundry', label: 'Laundry', icon: Shirt },
+    { value: 'Engineering', label: 'Engineering', icon: Wrench },
+    { value: 'ETO', label: 'ETO (Technical)', icon: Cog },
+    { value: 'Housekeeping', label: 'Housekeeping', icon: Home },
+    { value: 'Pantry', label: 'Pantry', icon: Package },
     { value: 'Bar Service', label: 'Bar Service', icon: Wine },
     { value: 'Deck Service', label: 'Deck Service', icon: Waves },
-    // Other Departments (Extended options)
-    // Note: These map to InteriorTeam for now, but can be expanded
   ];
   
   // Get crew organized by duty status
@@ -99,11 +86,12 @@ export function IncomingRequestDialog({
     return () => clearInterval(interval);
   }, [request]);
 
-  // Reset dropdown when dialog closes or request changes
+  // Reset dropdowns when dialog closes or request changes
   useEffect(() => {
     if (!isOpen) {
       setShowDelegateDropdown(false);
       setShowAvailableCrew(false);
+      setShowForwardDropdown(false);
     }
   }, [isOpen, request]);
 
@@ -127,33 +115,38 @@ export function IncomingRequestDialog({
     delegateServiceRequest(request.id, crewName);
     toast.success(`Request delegated to ${crewName}`);
     setShowDelegateDropdown(false);
-    setSelectedCrewMember("");
     onClose();
   };
 
   const handleForwardClick = () => {
     setShowDelegateDropdown(false); // Close delegate if open
-    setShowForwardDialog(true);
+    setShowForwardDropdown(!showForwardDropdown);
   };
 
-  const confirmForward = () => {
-    if (!request || !selectedForwardTeam) return;
+  const handleSelectTeam = (teamValue: string) => {
+    if (!request) return;
     
-    forwardServiceRequest(request.id, selectedForwardTeam as InteriorTeam);
-    toast.success(`Request forwarded to ${selectedForwardTeam}`);
-    setShowForwardDialog(false);
-    setSelectedForwardTeam('');
+    forwardServiceRequest(request.id, teamValue as InteriorTeam);
+    toast.success(`Request forwarded to ${teamValue}`);
+    setShowForwardDropdown(false);
     onClose();
   };
 
-  const handleListenMessage = () => {
-    if (!request?.voiceTranscript) return;
+  const handlePlayAudio = () => {
+    if (!request?.voiceTranscript && !request?.voiceAudioUrl) return;
     
     setPlayingAudio(true);
-    // Simulate playing audio (in production, would play actual audio file)
-    toast.info('Playing voice message...', { 
-      description: request.voiceTranscript 
-    });
+    
+    // In production: play actual audio file from voiceAudioUrl
+    if (request.voiceAudioUrl) {
+      // const audio = new Audio(request.voiceAudioUrl);
+      // audio.play();
+      toast.info('Playing audio message...');
+    } else {
+      toast.info('Playing voice message...', { 
+        description: request.voiceTranscript 
+      });
+    }
     
     setTimeout(() => {
       setPlayingAudio(false);
@@ -309,7 +302,7 @@ export function IncomingRequestDialog({
             </Button>
           </div>
 
-          {/* Delegate Dropdown List */}
+          {/* Delegate Dropdown */}
           {showDelegateDropdown && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
@@ -390,6 +383,35 @@ export function IncomingRequestDialog({
               )}
             </motion.div>
           )}
+
+          {/* Forward Dropdown */}
+          {showForwardDropdown && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mb-3 rounded-lg border border-border bg-card overflow-hidden"
+            >
+              <div className="px-3 py-2 bg-muted/30">
+                <p className="text-xs font-medium text-muted-foreground">Forward to Team</p>
+              </div>
+              <div className="divide-y divide-border max-h-64 overflow-y-auto">
+                {forwardOptions.map((option) => {
+                  const Icon = option.icon;
+                  return (
+                    <button
+                      key={option.value}
+                      onClick={() => handleSelectTeam(option.value)}
+                      className="w-full px-3 py-2.5 flex items-center gap-3 hover:bg-muted/50 transition-colors text-left"
+                    >
+                      <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <span className="font-medium">{option.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
           
           {/* Secondary Actions */}
           <div className="flex gap-2">
@@ -402,98 +424,21 @@ export function IncomingRequestDialog({
               <Forward className="h-4 w-4 mr-2" />
               Forward
             </Button>
-            {request.voiceTranscript && (
+            {(request.voiceTranscript || request.voiceAudioUrl) && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleListenMessage}
+                onClick={handlePlayAudio}
                 disabled={playingAudio}
                 className="flex-1"
               >
                 <Volume2 className="h-4 w-4 mr-2" />
-                {playingAudio ? 'Playing...' : 'Listen'}
+                {playingAudio ? 'Playing...' : 'Play'}
               </Button>
             )}
           </div>
         </div>
       </DialogContent>
-
-      {/* Forward Dialog */}
-      <Dialog open={showForwardDialog} onOpenChange={setShowForwardDialog}>
-        <DialogContent className="max-w-md">
-          <DialogTitle>Forward Request</DialogTitle>
-          <DialogDescription>
-            Forward this request to another department or team
-          </DialogDescription>
-          
-          <div className="space-y-4 py-4">
-            {/* Request Summary */}
-            {request && (
-              <div className="p-3 bg-muted/30 rounded-lg border border-border">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">
-                      {request.guestName} - {request.guestCabin}
-                    </p>
-                    {request.voiceTranscript && (
-                      <p className="text-xs text-muted-foreground italic mt-1">
-                        "{request.voiceTranscript.substring(0, 100)}..."
-                      </p>
-                    )}
-                  </div>
-                  <Badge variant={request.priority === 'emergency' ? 'destructive' : 'default'}>
-                    {request.priority}
-                  </Badge>
-                </div>
-              </div>
-            )}
-
-            {/* Department/Team Selection */}
-            <div className="space-y-2">
-              <Label>Forward to Department/Team</Label>
-              <Select value={selectedForwardTeam} onValueChange={setSelectedForwardTeam}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select department or team..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {forwardOptions.map((option) => {
-                    const Icon = option.icon;
-                    return (
-                      <SelectItem key={option.value} value={option.value}>
-                        <div className="flex items-center gap-2">
-                          <Icon className="h-4 w-4" />
-                          <span>{option.label}</span>
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowForwardDialog(false);
-                setSelectedForwardTeam("");
-              }}
-              className="flex-1"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={confirmForward}
-              disabled={!selectedForwardTeam}
-              className="flex-1"
-            >
-              <Forward className="h-4 w-4 mr-2" />
-              Forward
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </Dialog>
   );
 }
