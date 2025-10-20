@@ -270,9 +270,9 @@ export function LocationsPage() {
     location.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Group locations by floor/deck
+  // Group locations by deck
   const locationsByFloor = filteredLocations.reduce((acc, location) => {
-    const floor = location.floor || "No Floor/Deck";
+    const floor = location.floor || "No Deck";
     if (!acc[floor]) {
       acc[floor] = [];
     }
@@ -280,8 +280,8 @@ export function LocationsPage() {
     return acc;
   }, {} as Record<string, Location[]>);
 
-  // Sort floors in a logical order (Sun Deck, Upper Deck, Main Deck, Lower Deck, etc.)
-  const floorOrder = ["Sun Deck", "Upper Deck", "Main Deck", "Lower Deck", "No Floor/Deck"];
+  // Sort decks in a logical order (Sun Deck, Bridge Deck, Owner's Deck, Main Deck, Lower Deck, Tank Deck, etc.)
+  const floorOrder = ["Sun Deck", "Bridge Deck", "Owner's Deck", "Main Deck", "Lower Deck", "Tank Deck", "No Deck"];
   const sortedFloors = Object.keys(locationsByFloor).sort((a, b) => {
     const aIndex = floorOrder.indexOf(a);
     const bIndex = floorOrder.indexOf(b);
