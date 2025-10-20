@@ -1,14 +1,16 @@
-import { Search, Bell, Moon, Sun, User, Users, Ship, UserX, ChevronDown, LogOut } from "lucide-react";
+import { Search, Bell, Moon, Sun, Users, Ship, UserX, ChevronDown, LogOut, Shield } from "lucide-react";
 import { ObedioLogo } from "./obedio-logo";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { useAuth } from "../contexts/AuthContext";
 import { Badge } from "./ui/badge";
+import { ROLE_NAMES } from "../config/permissions";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
@@ -138,21 +140,26 @@ export function AppHeader({ onThemeToggle, isDark, guestStatus = 'onboard', onGu
                 </Avatar>
                 <div className="flex flex-col items-start">
                   <span className="text-sm font-medium">{user?.name || 'User'}</span>
-                  <span className="text-xs text-muted-foreground">{user?.role || 'crew'}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {user?.role ? ROLE_NAMES[user.role] : 'Crew Member'}
+                  </span>
                 </div>
                 <ChevronDown className="h-3 w-3 opacity-50" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <div className="px-2 py-1.5">
-                <p className="text-sm font-medium">{user?.name}</p>
-                <p className="text-xs text-muted-foreground">{user?.email}</p>
-                {user?.role && (
-                  <Badge variant="secondary" className="mt-1 text-xs">
-                    {user.role.replace('-', ' ').toUpperCase()}
-                  </Badge>
-                )}
-              </div>
+              <DropdownMenuLabel>
+                <div className="flex flex-col gap-1">
+                  <p className="text-sm font-medium">{user?.name}</p>
+                  <p className="text-xs text-muted-foreground font-normal">{user?.email}</p>
+                  {user?.role && (
+                    <Badge variant="secondary" className="mt-1 text-xs w-fit">
+                      <Shield className="h-3 w-3 mr-1" />
+                      {ROLE_NAMES[user.role]}
+                    </Badge>
+                  )}
+                </div>
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem>Profile</DropdownMenuItem>
               <DropdownMenuItem>Settings</DropdownMenuItem>
