@@ -44,18 +44,18 @@ interface WidgetLayout {
 }
 
 const defaultLayout: WidgetLayout[] = [
-  // Clean 2x2 Grid Layout
-  { i: "clock", x: 0, y: 0, w: 2, h: 2, minW: 2, minH: 2 },
-  { i: "serving-now", x: 2, y: 0, w: 4, h: 4, minW: 2, minH: 3 },
-  { i: "weather", x: 0, y: 3, w: 4, h: 3, minW: 2, minH: 3 },
-  { i: "duty-timer", x: 6, y: 0, w: 6, h: 3, minW: 4, minH: 3 },
-  // Additional widgets (if enabled via Manage Widgets)
-  { i: "weather-windy", x: 0, y: 6, w: 4, h: 5, minW: 3, minH: 4 },
-  { i: "guest-status", x: 4, y: 6, w: 2, h: 2, minW: 2, minH: 2 },
-  { i: "windy", x: 0, y: 11, w: 6, h: 4, minW: 3, minH: 3 },
-  // Auto-managed widgets (always active, auto-show/hide)
-  { i: "dnd-auto", x: 6, y: 11, w: 6, h: 3, minW: 4, minH: 3 },
-  // pending-requests and battery-alerts removed - hardcoded data
+  // Priority widgets - Always on top
+  { i: "serving-now", x: 0, y: 0, w: 4, h: 4, minW: 2, minH: 3 },
+  { i: "dnd-auto", x: 4, y: 0, w: 4, h: 3, minW: 3, minH: 3 },
+  // Main widgets - Second row
+  { i: "guest-status", x: 0, y: 4, w: 3, h: 3, minW: 2, minH: 2 },
+  { i: "duty-timer", x: 3, y: 4, w: 5, h: 3, minW: 4, minH: 3 },
+  // Utility widgets
+  { i: "clock", x: 0, y: 7, w: 2, h: 2, minW: 2, minH: 2 },
+  { i: "weather", x: 2, y: 7, w: 3, h: 3, minW: 2, minH: 3 },
+  // Optional widgets (if enabled via Manage Widgets)
+  { i: "weather-windy", x: 0, y: 10, w: 4, h: 5, minW: 3, minH: 4 },
+  { i: "windy", x: 4, y: 10, w: 4, h: 4, minW: 3, minH: 3 },
 ];
 
 interface DashboardGridProps {
