@@ -60,6 +60,11 @@ import { CrewMember } from "../duty-roster/types";
 import { SendMessageDialog } from "../send-message-dialog";
 import { NotificationSettingsDialog, NotificationSettings } from "../notification-settings-dialog";
 import { CrewCardView } from "../crew-card-view";
+import { CredentialsDialog } from "../CredentialsDialog";
+import { PermissionGuard } from "../PermissionGuard";
+import { usePermissions } from "../../hooks/usePermissions";
+import { ROLE_NAMES } from "../../config/permissions";
+import { Role } from "../../types/crew";
 
 interface DutyInfo {
   shift: string;
@@ -97,6 +102,15 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
   const [isCameraDialogOpen, setIsCameraDialogOpen] = useState(false);
   const [cameraDialogMode, setCameraDialogMode] = useState<'add' | 'edit'>('add');
   const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState(false);
+  const [showCredentialsDialog, setShowCredentialsDialog] = useState(false);
+  const [newCredentials, setNewCredentials] = useState<{
+    username: string;
+    password: string;
+    crewMemberName: string;
+  } | null>(null);
+  
+  // Permissions
+  const { can } = usePermissions();
   
   // Selected items state
   const [selectedCrew, setSelectedCrew] = useState<CrewMember | null>(null);
@@ -115,6 +129,7 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
     nickname: "",
     position: "",
     department: "Interior",
+    role: "crew" as Role,
     status: "off-duty" as "on-duty" | "off-duty" | "on-leave",
     contact: "",
     phone: "",
@@ -186,39 +201,80 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
     });
   };
 
-  const handleAddCrew = () => {
-    if (!formData.name || !formData.position || !formData.email) {
-      toast.error("Please fill in all required fields (Name, Position, Email)");
+  const handleAddCrew = async () => {
+    if (!formData.name || !formData.position || !formData.email || !formData.role) {
+      toast.error("Please fill in all required fields (Name, Position, Email, Role)");
       return;
     }
 
-    const newCrew: CrewMember = {
-      id: `crew-${Date.now()}`, // Generate unique ID
-      name: formData.name,
-      nickname: formData.nickname || undefined,
-      position: formData.position,
-      department: formData.department,
-      color: formData.color,
-      email: formData.email || undefined,
-      phone: formData.phone || formData.contact || undefined,
-      onBoardContact: formData.onBoardContact || formData.contact || undefined,
-      status: formData.status,
-      avatar: formData.avatar || undefined,
-      languages: formData.languages.length > 0 ? formData.languages : undefined,
-      skills: formData.skills.length > 0 ? formData.skills : undefined,
-      notes: formData.notes || undefined,
-      leaveStart: formData.leaveStart || undefined,
-      leaveEnd: formData.leaveEnd || undefined
-    };
+    try {
+      // Call backend API to create crew member + user account
+      const response = await fetch('http://localhost:3001/api/crew', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          position: formData.position,
+          department: formData.department,
+          role: formData.role,
+          status: formData.status,
+          contact: formData.phone || formData.contact || null,
+          email: formData.email,
+          joinDate: new Date().toISOString(),
+        }),
+      });
 
-    setContextCrewMembers([...contextCrewMembers, newCrew]);
-    setIsAddDialogOpen(false);
-    setNewlyAddedCrewName(formData.name);
-    resetForm();
-    toast.success(`${formData.name} has been added to the crew`);
-    
-    // Show permissions prompt dialog
-    setIsPermissionsPromptOpen(true);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create crew member');
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        // Update local state
+        const newCrew: CrewMember = {
+          id: data.data.id,
+          name: data.data.name,
+          nickname: formData.nickname || undefined,
+          position: data.data.position,
+          department: data.data.department,
+          color: formData.color,
+          email: data.data.email || undefined,
+          phone: formData.phone || formData.contact || undefined,
+          onBoardContact: formData.onBoardContact || formData.contact || undefined,
+          status: data.data.status,
+          avatar: formData.avatar || undefined,
+          languages: formData.languages.length > 0 ? formData.languages : undefined,
+          skills: formData.skills.length > 0 ? formData.skills : undefined,
+          notes: formData.notes || undefined,
+          leaveStart: formData.leaveStart || undefined,
+          leaveEnd: formData.leaveEnd || undefined
+        };
+
+        setContextCrewMembers([...contextCrewMembers, newCrew]);
+        
+        // Show credentials dialog if credentials were generated
+        if (data.data.credentials) {
+          setNewCredentials({
+            username: data.data.credentials.username,
+            password: data.data.credentials.password,
+            crewMemberName: data.data.name
+          });
+          setShowCredentialsDialog(true);
+        }
+        
+        setIsAddDialogOpen(false);
+        setNewlyAddedCrewName(formData.name);
+        resetForm();
+        toast.success(`${formData.name} has been added to the crew`);
+      }
+    } catch (error: any) {
+      console.error('Error creating crew member:', error);
+      toast.error(error.message || 'Failed to create crew member');
+    }
   };
 
   const handleEditCrew = () => {
@@ -569,17 +625,19 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
-            <Button 
-              size="sm" 
-              onClick={() => {
-                resetForm();
-                setIsAddDialogOpen(true);
-              }}
-              className="flex-1 sm:flex-none"
-            >
-              <UserPlus className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Add Crew</span>
-            </Button>
+            <PermissionGuard permission="crew.add">
+              <Button 
+                size="sm" 
+                onClick={() => {
+                  resetForm();
+                  setIsAddDialogOpen(true);
+                }}
+                className="flex-1 sm:flex-none"
+              >
+                <UserPlus className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Add Crew</span>
+              </Button>
+            </PermissionGuard>
           </div>
         </div>
 
@@ -955,6 +1013,44 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
                     <SelectItem value="Galley">Galley</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="col-span-2 grid gap-2">
+                <Label htmlFor="role">
+                  User Role * 
+                  <span className="ml-2 text-xs text-muted-foreground">(Login permissions)</span>
+                </Label>
+                <Select
+                  value={formData.role}
+                  onValueChange={(value: Role) => setFormData({ ...formData, role: value })}
+                >
+                  <SelectTrigger id="role">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4" />
+                        {ROLE_NAMES.admin}
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="chief-stewardess">
+                      {ROLE_NAMES['chief-stewardess']}
+                    </SelectItem>
+                    <SelectItem value="stewardess">
+                      {ROLE_NAMES.stewardess}
+                    </SelectItem>
+                    <SelectItem value="crew">
+                      {ROLE_NAMES.crew}
+                    </SelectItem>
+                    <SelectItem value="eto">
+                      {ROLE_NAMES.eto}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  This determines what they can access in Obedio. A user account will be created automatically.
+                </p>
               </div>
 
               <div className="grid gap-2">
@@ -1730,6 +1826,18 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
         onSave={updateNotificationSettings}
         initialSettings={notificationSettings}
       />
+
+      {/* Credentials Dialog - Shows generated username/password */}
+      {newCredentials && (
+        <CredentialsDialog
+          open={showCredentialsDialog}
+          onClose={() => {
+            setShowCredentialsDialog(false);
+            setNewCredentials(null);
+          }}
+          credentials={newCredentials}
+        />
+      )}
     </div>
   );
 }
