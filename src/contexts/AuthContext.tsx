@@ -34,25 +34,47 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Debug: Log state changes
+  useEffect(() => {
+    console.log('📊 AuthProvider state changed:', { 
+      user: user ? `${user.name} (${user.role})` : 'null', 
+      isLoading,
+      isAuthenticated: !!user
+    });
+  }, [user, isLoading]);
+
   // Check for existing session on mount
   useEffect(() => {
     const checkAuth = async () => {
+      console.log('🔍 Checking for existing session...');
       try {
         const storedUser = localStorage.getItem('obedio-auth-user');
         const storedToken = localStorage.getItem('obedio-auth-token');
 
+        console.log('📦 localStorage check:', { 
+          hasUser: !!storedUser, 
+          hasToken: !!storedToken 
+        });
+
         if (storedUser && storedToken) {
+          console.log('✅ Found stored session, restoring...');
           // In production, verify token with backend
           // For now, restore from localStorage
           const userData = JSON.parse(storedUser);
+          console.log('👤 Restored user:', userData);
           setUser(userData);
+          console.log('✅ Session restored successfully!');
+        } else {
+          console.log('❌ No stored session found');
         }
       } catch (error) {
-        console.error('Auth check failed:', error);
+        console.error('❌ Auth check failed:', error);
         // Clear invalid session
         localStorage.removeItem('obedio-auth-user');
         localStorage.removeItem('obedio-auth-token');
+        console.log('🗑️ Cleared invalid session');
       } finally {
+        console.log('🏁 Auth check complete, setting isLoading = false');
         setIsLoading(false);
       }
     };
