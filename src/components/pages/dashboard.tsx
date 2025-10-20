@@ -6,6 +6,7 @@ import { useAppData } from "../../contexts/AppDataContext";
 import { DashboardGrid, DashboardGridHandle } from "../dashboard-grid";
 import { forwardRef, useImperativeHandle, useRef, useState, useEffect } from "react";
 import { ManageWidgetsDialog } from "../manage-widgets-dialog";
+import { DutyTimerWidget } from "../duty-timer-widget";
 
 export interface DashboardPageHandle {
   resetLayout: () => void;
@@ -23,7 +24,6 @@ const DEFAULT_ACTIVE_WIDGETS = [
   "serving-now",
   "weather",
   "duty-timer",
-  "active-crew",
 ];
 
 export const DashboardPage = forwardRef<DashboardPageHandle, DashboardPageProps>(
@@ -61,12 +61,19 @@ export const DashboardPage = forwardRef<DashboardPageHandle, DashboardPageProps>
       />
       
       <div className="space-y-6">
+        {/* Full-Width Duty Panel - Outside Grid */}
+        {activeWidgets.includes("duty-timer") && (
+          <div className="w-full overflow-x-auto">
+            <DutyTimerWidget />
+          </div>
+        )}
+
         {/* Draggable Dashboard Grid */}
-        <DashboardGrid 
+        <DashboardGrid
           ref={dashboardGridRef}
-          isEditMode={isEditMode} 
+          isEditMode={isEditMode}
           onEditModeChange={onEditModeChange}
-          activeWidgets={activeWidgets}
+          activeWidgets={activeWidgets.filter(w => w !== "duty-timer")} // Remove duty-timer from grid
           onActiveWidgetsChange={setActiveWidgets}
           onOpenManageWidgets={() => setShowManageWidgets(true)}
           onNavigate={onNavigate}

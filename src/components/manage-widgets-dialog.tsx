@@ -106,19 +106,11 @@ export const availableWidgets: WidgetConfig[] = [
   },
   {
     id: "duty-timer",
-    name: "Duty Timer",
-    description: "Your current shift timer",
+    name: "Duty Panel",
+    description: "Comprehensive duty status with countdown timer, current crew, backup crew, and next shift",
     icon: Timer,
-    defaultSize: { w: 2, h: 2, minW: 1, minH: 2 },
-    category: "kpi",
-  },
-  {
-    id: "active-crew",
-    name: "Active Crew",
-    description: "Number of crew members on duty",
-    icon: Users,
-    defaultSize: { w: 2, h: 2, minW: 1, minH: 2 },
-    category: "kpi",
+    defaultSize: { w: 8, h: 4, minW: 6, minH: 3 },
+    category: "status",
   },
   // Pending Requests and Battery Alerts removed - hardcoded data, not production-ready
   {
