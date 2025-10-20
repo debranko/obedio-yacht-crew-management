@@ -121,11 +121,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Store in localStorage
       localStorage.setItem('obedio-auth-user', JSON.stringify(user));
       localStorage.setItem('obedio-auth-token', token);
+      console.log('📦 Stored user:', user);
+      console.log('🔑 Stored token:', token.substring(0, 20) + '...');
 
       console.log('✅ Setting user state...');
       // Update state
       setUser(user);
-      console.log('🎉 Login complete!');
+      console.log('👤 User state set:', user);
+      console.log('🎉 Login complete! isAuthenticated should be:', !!user);
     } catch (error) {
       console.error('Login error:', error);
       

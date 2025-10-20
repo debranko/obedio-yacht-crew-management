@@ -331,11 +331,16 @@ function AppContent() {
 
 // Auth-aware router component
 function AuthRouter() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
-  console.log('🔄 AuthRouter render:', { isAuthenticated, isLoading });
+  console.log('🔄 AuthRouter render:', { 
+    isAuthenticated, 
+    isLoading, 
+    user: user ? `${user.name} (${user.role})` : 'null' 
+  });
 
   if (isLoading) {
+    console.log('⏳ Loading state - showing loading screen');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -347,11 +352,11 @@ function AuthRouter() {
   }
 
   if (!isAuthenticated) {
-    console.log('🔓 Not authenticated, showing login page');
+    console.log('🔓 Not authenticated (user:', user, ') - showing login page');
     return <LoginPage />;
   }
 
-  console.log('✅ Authenticated, showing app');
+  console.log('✅ Authenticated - showing app content');
   return (
     <AppDataProvider>
       <AppContent />
