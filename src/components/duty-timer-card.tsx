@@ -54,11 +54,11 @@ function TickCountdownRing({
   };
 
   const color = getColor();
-  const size = 240; // Reduced from 320 for more compact size
+  const size = 150; // Compact size (~60% of original 240px)
   const cx = size / 2;
   const cy = size / 2;
-  const innerR = 78; // inner radius (scaled down proportionally)
-  const outerR = 92; // outer radius (tick thickness ≈ 14px)
+  const innerR = 49; // inner radius (scaled down proportionally)
+  const outerR = 58; // outer radius (tick thickness ≈ 9px)
 
   const pct = Math.max(0, Math.min(1, remainSec / Math.max(1, totalSec)));
   const visibleTicks = Math.round(ticks * pct);
@@ -73,7 +73,7 @@ function TickCountdownRing({
 
     const on = i < visibleTicks;
     const stroke = on ? color : 'hsl(0 0% 100% / 0.08)'; // elapsed nearly invisible
-    const width = on ? 3.5 : 2.5; // Thinner tick lines
+    const width = on ? 2.5 : 1.8; // Scaled thin tick lines
 
     return (
       <line
@@ -117,14 +117,14 @@ function TickCountdownRing({
 
       {/* Center Content - Countdown INSIDE circle */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="text-center" style={{ maxWidth: '140px' }}>
+        <div className="text-center" style={{ maxWidth: '90px' }}>
           <div
             className="font-light tabular-nums tracking-tight text-foreground"
             style={{
-              fontSize: '48px',
+              fontSize: '30px', // Scaled down from 48px
               lineHeight: 1,
               fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-              marginBottom: '4px'
+              marginBottom: '2px'
             }}
           >
             {formatHm(remainSec)}
@@ -132,11 +132,11 @@ function TickCountdownRing({
           <div 
             className="uppercase text-muted-foreground/70"
             style={{
-              fontSize: '8px',
-              letterSpacing: '0.12em',
-              lineHeight: 1.3,
-              paddingLeft: '8px',
-              paddingRight: '8px'
+              fontSize: '6.5px', // Scaled down from 8px
+              letterSpacing: '0.1em',
+              lineHeight: 1.2,
+              paddingLeft: '4px',
+              paddingRight: '4px'
             }}
           >
             {isCritical ? 'shift change soon' : isUrgent ? 'shift ending' : 'hours between shifts'}
@@ -165,9 +165,9 @@ function CrewItem({
   );
 
   const avatar = (
-    <Avatar className="h-10 w-10 flex-shrink-0">
+    <Avatar className="h-8 w-8 flex-shrink-0">
       <AvatarImage src={getCrewAvatar(name)} alt={name} />
-      <AvatarFallback className="bg-primary/10 text-primary text-sm">
+      <AvatarFallback className="bg-primary/10 text-primary text-xs">
         {initials}
       </AvatarFallback>
     </Avatar>
@@ -175,8 +175,8 @@ function CrewItem({
 
   const info = (
     <div className={`flex-1 min-w-0 ${align === "right" ? "text-right" : ""}`}>
-      <p className="font-medium text-sm truncate">{name}</p>
-      <p className="text-xs text-muted-foreground truncate">{position}</p>
+      <p className="font-medium text-xs truncate">{name}</p>
+      <p className="text-[10px] text-muted-foreground truncate">{position}</p>
     </div>
   );
 
@@ -192,7 +192,7 @@ function CrewItem({
 
   return (
     <div 
-      className={`flex items-center gap-3 transition-opacity ${isBackup ? "opacity-55" : ""}`}
+      className={`flex items-center gap-2 transition-opacity ${isBackup ? "opacity-55" : ""}`}
     >
       {align === "right" ? (
         <>
@@ -363,34 +363,34 @@ export function DutyTimerCard() {
         <div className="flex items-stretch">
         {/* Left: Currently on duty - Gradient fades towards center */}
         <div
-          className="flex-1 p-4 pl-6 relative"
+          className="flex-1 p-3 pl-4 relative"
           style={{
             background: `linear-gradient(to right, ${hexToRgba(currentShiftColor, 0.12)}, ${hexToRgba(currentShiftColor, 0.04)} 70%, transparent)`,
           }}
         >
-          <div className="flex items-center justify-between mb-2.5">
-            <p className="text-sm font-medium text-muted-foreground">Currently on duty</p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-medium text-muted-foreground">Currently on duty</p>
             {dutyStatus.backup.length > 0 && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 px-2 text-[10px] gap-1 bg-warning/10 hover:bg-warning/20 text-warning border border-warning/30"
+                className="h-5 px-1.5 text-[9px] gap-1 bg-warning/10 hover:bg-warning/20 text-warning border border-warning/30"
                 onClick={() => setCallBackupOpen(true)}
               >
-                <Bell className="h-3 w-3" />
+                <Bell className="h-2.5 w-2.5" />
                 Call Backup ({dutyStatus.backup.length})
               </Button>
             )}
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {onDutyCrew.length > 0 ? (
               onDutyCrew.map((crew, i) => (
                 <CrewItem key={`on-${i}`} {...crew} align="left" />
               ))
             ) : (
-              <div className="text-center py-4">
-                <p className="text-sm text-muted-foreground mb-1">No crew assigned</p>
-                <p className="text-xs text-muted-foreground/70">Check Duty Roster</p>
+              <div className="text-center py-3">
+                <p className="text-xs text-muted-foreground mb-0.5">No crew assigned</p>
+                <p className="text-[10px] text-muted-foreground/70">Check Duty Roster</p>
               </div>
             )}
           </div>
@@ -403,13 +403,13 @@ export function DutyTimerCard() {
 
         {/* Right: Next on duty - Gradient fades towards center */}
         <div
-          className="flex-1 p-4 pr-6 relative"
+          className="flex-1 p-3 pr-4 relative"
           style={{
             background: `linear-gradient(to left, ${hexToRgba(nextShiftColor, 0.12)}, ${hexToRgba(nextShiftColor, 0.04)} 70%, transparent)`,
           }}
         >
-          <p className="text-sm font-medium text-muted-foreground mb-2.5 lg:text-right">Next on duty</p>
-          <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground mb-2 lg:text-right">Next on duty</p>
+          <div className="space-y-1.5">
             {nextDutyCrew.length > 0 ? (
               nextDutyCrew.map((crew, i) => (
                 <CrewItem key={`next-${i}`} {...crew} align="right" />
