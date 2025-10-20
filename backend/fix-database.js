@@ -53,6 +53,34 @@ async function fixDatabase() {
     `);
     console.log('✅ Added createdAt to User table');
     
+    // Add userId column to CrewMember table
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "CrewMember" 
+      ADD COLUMN IF NOT EXISTS "userId" TEXT UNIQUE;
+    `);
+    console.log('✅ Added userId to CrewMember table');
+    
+    // Add createdAt column to CrewMember table if missing
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "CrewMember" 
+      ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3) NOT NULL DEFAULT NOW();
+    `);
+    console.log('✅ Added createdAt to CrewMember table');
+    
+    // Add createdAt column to Guest table if missing
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "Guest" 
+      ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3) NOT NULL DEFAULT NOW();
+    `);
+    console.log('✅ Added createdAt to Guest table');
+    
+    // Add createdAt column to Location table if missing
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "Location" 
+      ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3) NOT NULL DEFAULT NOW();
+    `);
+    console.log('✅ Added createdAt to Location table');
+    
     console.log('\n🎉 Database schema fixed successfully!');
     process.exit(0);
   } catch (error) {
