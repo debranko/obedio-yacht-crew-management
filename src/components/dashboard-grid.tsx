@@ -168,7 +168,7 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
   );
 
   return (
-    <div className="space-y-4"
+    <div className="space-y-3"
 >
 
       {/* Grid Layout */}
@@ -177,7 +177,7 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
         layouts={{ lg: layout, md: layout, sm: layout, xs: layout }}
         breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480 }}
         cols={{ lg: 8, md: 6, sm: 4, xs: 2 }}
-        rowHeight={80}
+        rowHeight={70}
         isDraggable={isEditMode}
         isResizable={isEditMode}
         onLayoutChange={handleLayoutChange}

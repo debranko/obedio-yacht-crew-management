@@ -276,9 +276,9 @@ function AppContent() {
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Page Header - Conditional */}
             {showPageHeader && (
-              <div className="border-b border-border bg-muted/30 px-6 lg:px-8 py-4">
+              <div className="border-b border-border bg-muted/30 px-6 lg:px-8 py-2.5">
                 <div className="flex items-center justify-between">
-                  <h1>{config.title}</h1>
+                  <h1 className="text-lg font-semibold">{config.title}</h1>
                   
                   {/* Dashboard Edit Layout Buttons */}
                   {currentPage === "dashboard" && (
@@ -316,7 +316,7 @@ function AppContent() {
 
             {/* Main Content */}
             <main className="flex-1 overflow-y-auto bg-background">
-              <div className="p-6 lg:p-8">
+              <div className="p-4 lg:p-5">
                 {renderPage()}
               </div>
             </main>
