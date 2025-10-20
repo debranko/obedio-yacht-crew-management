@@ -170,14 +170,15 @@ function CrewItem({
     </div>
   );
 
-  const badge = (
+  // Only show badge for backup crew
+  const badge = isBackup ? (
     <Badge 
-      variant={isBackup ? "outline" : "secondary"}
-      className={`text-[10px] px-2 py-0.5 flex-shrink-0 ${isBackup ? "bg-warning/10 border-warning/30 text-warning" : ""}`}
+      variant="outline"
+      className="text-[10px] px-2 py-0.5 flex-shrink-0 bg-warning/10 border-warning/30 text-warning"
     >
-      {isBackup ? "Backup" : "Interior"}
+      Backup
     </Badge>
-  );
+  ) : null;
 
   return (
     <div 
