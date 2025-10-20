@@ -24,6 +24,7 @@ import { WeatherWidget } from "./weather-widget";
 import { WindyWidget } from "./windy-widget";
 import { GuestStatusWidget } from "./guest-status-widget";
 import { ClockWidget } from "./clock-widget";
+import { ClockWidget2 } from "./clock-widget-2";
 import { WeatherWindyWidget } from "./weather-windy-widget";
 import { DutyTimerCard } from "./duty-timer-card";
 import { useAppData } from "../contexts/AppDataContext";
@@ -52,6 +53,7 @@ const defaultLayout: WidgetLayout[] = [
   { i: "duty-timer", x: 3, y: 4, w: 5, h: 3, minW: 4, minH: 3 },
   // Utility widgets
   { i: "clock", x: 0, y: 7, w: 2, h: 2, minW: 2, minH: 2 },
+  { i: "clock2", x: 5, y: 7, w: 2, h: 2, minW: 2, minH: 2 },
   { i: "weather", x: 2, y: 7, w: 3, h: 3, minW: 2, minH: 3 },
   // Optional widgets (if enabled via Manage Widgets)
   { i: "weather-windy", x: 0, y: 10, w: 4, h: 5, minW: 3, minH: 4 },
@@ -252,6 +254,15 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
           <div key="clock" className="dashboard-widget">
             <WidgetWrapper id="clock">
               <ClockWidget timezone="auto" />
+            </WidgetWrapper>
+          </div>
+        )}
+
+        {/* Clock Widget 2 (Minimal) */}
+        {activeWidgets.includes("clock2") && (
+          <div key="clock2" className="dashboard-widget">
+            <WidgetWrapper id="clock2">
+              <ClockWidget2 timezone="auto" />
             </WidgetWrapper>
           </div>
         )}

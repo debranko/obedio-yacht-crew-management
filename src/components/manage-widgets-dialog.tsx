@@ -42,6 +42,14 @@ export const availableWidgets: WidgetConfig[] = [
     category: "status",
   },
   {
+    id: "clock2",
+    name: "Clock (Minimal)",
+    description: "Simple, clean time display",
+    icon: Clock,
+    defaultSize: { w: 2, h: 2, minW: 2, minH: 2 },
+    category: "status",
+  },
+  {
     id: "guest-status",
     name: "Guest Status",
     description: "Guests onboard status with service mode",
