@@ -74,15 +74,18 @@ export function ClockWidget({ className, timezone = "auto" }: ClockWidgetProps) 
       </div>
 
       {/* Time Display - Responsive */}
-      <div className="flex-1 flex flex-col justify-center space-y-1">
+      <div className="flex-1 flex flex-col justify-center space-y-1 overflow-hidden px-1">
         <div 
-          className="font-light tabular-nums"
+          className="font-light tabular-nums w-full"
           style={{ 
             fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-            fontSize: 'clamp(2rem, 8vw, 3.5rem)', // Responsive: min 2rem, max 3.5rem
+            fontSize: 'clamp(1.5rem, 5.5vw, 3.5rem)', // Tighter range for better scaling
             lineHeight: 1,
             letterSpacing: '-0.02em',
-            fontWeight: 300
+            fontWeight: 300,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
           }}
         >
           {time}
