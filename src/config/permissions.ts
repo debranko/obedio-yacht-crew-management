@@ -1,66 +1,56 @@
 /**
  * Role-Based Access Control (RBAC) Configuration
  * Defines permissions for each role in the system
+ * 
+ * INTEGRATED WITH SETTINGS UI MATRIX
+ * Format: category.action (matches Settings page format)
  */
 
 import { Role } from '../types/crew';
 
 export type Permission =
-  // Crew Management
-  | 'crew:view'
-  | 'crew:create'
-  | 'crew:edit'
-  | 'crew:delete'
-  | 'crew:assign-devices'
+  // Crew Management (matches Settings: crew.*)
+  | 'crew.view'
+  | 'crew.add'
+  | 'crew.edit'
+  | 'crew.delete'
+  | 'crew.create-account'
+  | 'crew.assign-devices'
   
-  // Guest Management
-  | 'guests:view'
-  | 'guests:create'
-  | 'guests:edit'
-  | 'guests:delete'
-  | 'guests:view-details'
+  // Guest Management (matches Settings: guests.*)
+  | 'guests.view'
+  | 'guests.add'
+  | 'guests.edit'
+  | 'guests.delete'
   
-  // Service Requests
-  | 'requests:view'
-  | 'requests:create'
-  | 'requests:accept'
-  | 'requests:complete'
-  | 'requests:cancel'
-  | 'requests:delete'
-  | 'requests:assign'
+  // Duty Roster (matches Settings: duty.*)
+  | 'duty.view'
+  | 'duty.manage'
+  | 'duty.configure'
   
-  // Locations
-  | 'locations:view'
-  | 'locations:create'
-  | 'locations:edit'
-  | 'locations:delete'
+  // Device Management (matches Settings: devices.*)
+  | 'devices.view'
+  | 'devices.add'
+  | 'devices.edit'
+  | 'devices.delete'
+  | 'devices.assign'
   
-  // Devices & Buttons
-  | 'devices:view'
-  | 'devices:manage'
-  | 'devices:configure'
-  | 'buttons:view'
-  | 'buttons:manage'
+  // Location Management (matches Settings: locations.*)
+  | 'locations.view'
+  | 'locations.add'
+  | 'locations.edit'
+  | 'locations.delete'
   
-  // Settings
-  | 'settings:view'
-  | 'settings:edit-general'
-  | 'settings:edit-roles'
-  | 'settings:edit-system'
-  | 'settings:edit-integrations'
+  // Communication (matches Settings: communication.*)
+  | 'communication.send'
+  | 'communication.broadcast'
+  | 'communication.emergency'
   
-  // Activity Logs
-  | 'logs:view'
-  | 'logs:export'
-  
-  // Dashboard
-  | 'dashboard:view'
-  | 'dashboard:customize'
-  
-  // System
-  | 'system:admin'
-  | 'system:backup'
-  | 'system:users-manage';
+  // System (matches Settings: system.*)
+  | 'system.view-logs'
+  | 'system.settings'
+  | 'system.roles'
+  | 'system.backup';
 
 /**
  * Role Permissions Matrix
@@ -72,50 +62,42 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
    * Can do everything
    */
   'admin': [
-    // All permissions
-    'crew:view', 'crew:create', 'crew:edit', 'crew:delete', 'crew:assign-devices',
-    'guests:view', 'guests:create', 'guests:edit', 'guests:delete', 'guests:view-details',
-    'requests:view', 'requests:create', 'requests:accept', 'requests:complete', 'requests:cancel', 'requests:delete', 'requests:assign',
-    'locations:view', 'locations:create', 'locations:edit', 'locations:delete',
-    'devices:view', 'devices:manage', 'devices:configure',
-    'buttons:view', 'buttons:manage',
-    'settings:view', 'settings:edit-general', 'settings:edit-roles', 'settings:edit-system', 'settings:edit-integrations',
-    'logs:view', 'logs:export',
-    'dashboard:view', 'dashboard:customize',
-    'system:admin', 'system:backup', 'system:users-manage',
+    // All permissions (admin has everything)
+    'crew.view', 'crew.add', 'crew.edit', 'crew.delete', 'crew.create-account', 'crew.assign-devices',
+    'guests.view', 'guests.add', 'guests.edit', 'guests.delete',
+    'duty.view', 'duty.manage', 'duty.configure',
+    'devices.view', 'devices.add', 'devices.edit', 'devices.delete', 'devices.assign',
+    'locations.view', 'locations.add', 'locations.edit', 'locations.delete',
+    'communication.send', 'communication.broadcast', 'communication.emergency',
+    'system.view-logs', 'system.settings', 'system.roles', 'system.backup',
   ],
 
   /**
    * CHIEF STEWARDESS - Interior Department Manager
    * Manages crew, guests, service requests, and interior operations
+   * Can create new crew members (with user accounts)
    */
   'chief-stewardess': [
-    // Crew Management (view, edit, assign)
-    'crew:view', 'crew:edit', 'crew:assign-devices',
+    // Crew Management (can create accounts, edit, but not delete)
+    'crew.view', 'crew.add', 'crew.edit', 'crew.create-account', 'crew.assign-devices',
     
     // Guest Management (full access)
-    'guests:view', 'guests:create', 'guests:edit', 'guests:delete', 'guests:view-details',
+    'guests.view', 'guests.add', 'guests.edit', 'guests.delete',
     
-    // Service Requests (full access)
-    'requests:view', 'requests:create', 'requests:accept', 'requests:complete', 'requests:cancel', 'requests:assign',
+    // Duty Roster (full management)
+    'duty.view', 'duty.manage',
     
-    // Locations (view and edit cabin assignments)
-    'locations:view', 'locations:edit',
+    // Devices (view and manage)
+    'devices.view', 'devices.assign',
     
-    // Devices (view and manage crew devices)
-    'devices:view', 'devices:manage',
+    // Locations (view and edit)
+    'locations.view', 'locations.edit',
     
-    // Buttons (view only)
-    'buttons:view',
+    // Communication
+    'communication.send', 'communication.broadcast',
     
-    // Settings (view and edit general settings)
-    'settings:view', 'settings:edit-general',
-    
-    // Activity Logs (view)
-    'logs:view',
-    
-    // Dashboard
-    'dashboard:view', 'dashboard:customize',
+    // System (view logs only)
+    'system.view-logs',
   ],
 
   /**
@@ -124,31 +106,25 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
    */
   'stewardess': [
     // Crew Management (view only)
-    'crew:view',
+    'crew.view',
     
-    // Guest Management (view, create, edit)
-    'guests:view', 'guests:create', 'guests:edit', 'guests:view-details',
+    // Guest Management (view, add, edit - no delete)
+    'guests.view', 'guests.add', 'guests.edit',
     
-    // Service Requests (create, accept, complete own requests)
-    'requests:view', 'requests:create', 'requests:accept', 'requests:complete',
-    
-    // Locations (view only)
-    'locations:view',
+    // Duty Roster (view only)
+    'duty.view',
     
     // Devices (view only)
-    'devices:view',
+    'devices.view',
     
-    // Buttons (view only)
-    'buttons:view',
+    // Locations (view only)
+    'locations.view',
     
-    // Settings (view only)
-    'settings:view',
+    // Communication (send messages)
+    'communication.send',
     
-    // Activity Logs (view own logs)
-    'logs:view',
-    
-    // Dashboard
-    'dashboard:view', 'dashboard:customize',
+    // System (view logs)
+    'system.view-logs',
   ],
 
   /**
@@ -157,28 +133,22 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
    */
   'crew': [
     // Crew Management (view only)
-    'crew:view',
+    'crew.view',
     
     // Guest Management (view only)
-    'guests:view',
+    'guests.view',
     
-    // Service Requests (view, accept, complete own requests)
-    'requests:view', 'requests:accept', 'requests:complete',
-    
-    // Locations (view only)
-    'locations:view',
+    // Duty Roster (view only)
+    'duty.view',
     
     // Devices (view only)
-    'devices:view',
+    'devices.view',
     
-    // Buttons (view only)
-    'buttons:view',
+    // Locations (view only)
+    'locations.view',
     
-    // Settings (view only)
-    'settings:view',
-    
-    // Dashboard
-    'dashboard:view',
+    // Communication (send messages only)
+    'communication.send',
   ],
 
   /**
@@ -187,31 +157,25 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
    */
   'eto': [
     // Crew Management (view only)
-    'crew:view',
+    'crew.view',
     
     // Guest Management (view only)
-    'guests:view',
+    'guests.view',
     
-    // Service Requests (view only, technical monitoring)
-    'requests:view',
+    // Duty Roster (view only)
+    'duty.view',
     
-    // Locations (view and edit for device installation)
-    'locations:view', 'locations:edit',
+    // Devices (full access - technical officer)
+    'devices.view', 'devices.add', 'devices.edit', 'devices.delete', 'devices.assign',
     
-    // Devices (full access - manage all technical devices)
-    'devices:view', 'devices:manage', 'devices:configure',
+    // Locations (view, edit, and DELETE - for technical maintenance)
+    'locations.view', 'locations.edit', 'locations.delete',
     
-    // Buttons (full access - manage butler buttons)
-    'buttons:view', 'buttons:manage',
+    // Communication (all except emergency)
+    'communication.send', 'communication.broadcast',
     
-    // Settings (view all, edit integrations and system)
-    'settings:view', 'settings:edit-system', 'settings:edit-integrations',
-    
-    // Activity Logs (view all, export for diagnostics)
-    'logs:view', 'logs:export',
-    
-    // Dashboard
-    'dashboard:view', 'dashboard:customize',
+    // System (all system access)
+    'system.view-logs', 'system.settings', 'system.backup',
   ],
 };
 
