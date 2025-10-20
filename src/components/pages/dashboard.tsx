@@ -18,12 +18,10 @@ interface DashboardPageProps {
   onNavigate?: (page: string) => void;
 }
 
-// Default active widgets
+// Default active widgets - Clean Dashboard Layout
 const DEFAULT_ACTIVE_WIDGETS = [
-  "dnd-guests",
   "serving-now",
-  "pending-requests",
-  "battery-alerts",
+  "weather",
   "duty-timer",
   "active-crew",
 ];
@@ -74,28 +72,7 @@ export const DashboardPage = forwardRef<DashboardPageHandle, DashboardPageProps>
           onNavigate={onNavigate}
         />
 
-      {/* Quick Actions */}
-      <Card className="p-6">
-        <h3 className="mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Button variant="outline" className="justify-start">
-            <Users className="h-4 w-4 mr-2" />
-            Assign Duty
-          </Button>
-          <Button variant="outline" className="justify-start">
-            <Activity className="h-4 w-4 mr-2" />
-            Create Request
-          </Button>
-          <Button variant="outline" className="justify-start">
-            <Smartphone className="h-4 w-4 mr-2" />
-            Add Device
-          </Button>
-          <Button variant="outline" className="justify-start">
-            <Clock className="h-4 w-4 mr-2" />
-            Schedule Shift
-          </Button>
-        </div>
-      </Card>
+      {/* Quick Actions removed - will be implemented differently later */}
       </div>
     </>
   );

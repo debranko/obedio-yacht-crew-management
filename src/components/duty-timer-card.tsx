@@ -33,55 +33,199 @@ export function getRingMetrics(totalSec: number, remainSec: number) {
   return { radius, stroke, circumference, percentage, dashLength };
 }
 
-// Circular countdown ring component (matches example implementation)
-function RingTimer({ totalSec, remainSec }: { totalSec: number; remainSec: number }) {
-  const { radius, stroke, circumference, dashLength } = getRingMetrics(totalSec, remainSec);
-  const elapsed = totalSec - remainSec;
+// Modern animated progress ring with gradient and glow effects
+function RingTimer({ totalSec, remainSec, shiftColor }: { totalSec: number; remainSec: number; shiftColor?: string }) {
+  const { radius, stroke, circumference, percentage, dashLength } = getRingMetrics(totalSec, remainSec);
   
   const hrs = Math.floor(remainSec / 3600);
   const mins = Math.floor((remainSec % 3600) / 60);
   
-  const elapsedHrs = Math.floor(elapsed / 3600);
-  const elapsedMins = Math.floor((elapsed % 3600) / 60);
+  // Calculate percentage for display
+  const percentDisplay = Math.round(percentage * 100);
+  
+  // DEBUG: Log shift color
+  console.log('🎨 RingTimer shiftColor:', shiftColor);
+  
+  // Urgency states
+  const isUrgent = remainSec < 7200; // < 2 hours
+  const isCritical = remainSec < 3600; // < 1 hour
+  
+  // Dynamic colors based on urgency
+  const getGradientColors = () => {
+    if (isCritical) {
+      return {
+        from: '#ef4444', // red-500
+        to: '#dc2626',   // red-600
+        glow: 'rgba(239, 68, 68, 0.5)'
+      };
+    }
+    if (isUrgent) {
+      return {
+        from: '#f59e0b', // amber-500
+        to: '#d97706',   // amber-600
+        glow: 'rgba(245, 158, 11, 0.4)'
+      };
+    }
+    // Default: Use shift color or fallback to golden
+    const baseColor = shiftColor || '#d4af37';
+    return {
+      from: baseColor,
+      to: baseColor,
+      glow: `${baseColor}66` // Add alpha for glow
+    };
+  };
+  
+  const colors = getGradientColors();
+  const gradientId = `gradient-${isCritical ? 'critical' : isUrgent ? 'urgent' : 'normal'}`;
 
   return (
     <div className="relative flex items-center justify-center">
-      {/* SVG Ring - rotated to start from top (BEHIND time) */}
-      <svg width={230} height={230} viewBox="0 0 230 230" className="-rotate-90 relative z-0">
-        {/* Background ring (always visible light gray track) */}
+      {/* Glow effect background */}
+      <div 
+        className="absolute inset-0 rounded-full blur-xl opacity-0 animate-pulse"
+        style={{
+          background: `radial-gradient(circle, ${colors.glow} 0%, transparent 70%)`,
+          animation: isUrgent ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none',
+          opacity: isUrgent ? 0.6 : 0
+        }}
+      />
+      
+      {/* SVG Ring with animated glow */}
+      <svg 
+        width={260} 
+        height={260} 
+        viewBox="0 0 260 260" 
+        className="-rotate-90 relative z-0"
+        style={{ 
+          filter: isUrgent ? `drop-shadow(0 0 12px ${colors.glow})` : 'drop-shadow(0 0 4px rgba(0,0,0,0.1))'
+        }}
+      >
+        {/* Define gradient - solid shift color */}
+        <defs>
+          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={colors.from} stopOpacity="0.95" />
+            <stop offset="100%" stopColor={colors.to} stopOpacity="1" />
+          </linearGradient>
+          
+          {/* Glow filter */}
+          <filter id={`glow-${gradientId}`}>
+            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        
+        {/* Background ring (track) */}
         <circle
-          cx="115"
-          cy="115"
+          cx="130"
+          cy="130"
           r={radius}
-          stroke="#EEF2F7"
+          stroke="currentColor"
           strokeWidth={stroke}
           fill="none"
+          className="text-muted/15"
         />
-        {/* Progress ring (gold/dark gray countdown) */}
+        
+        {/* Progress ring - countdown animates automatically via React re-render */}
         <circle
-          cx="115"
-          cy="115"
+          cx="130"
+          cy="130"
           r={radius}
-          stroke="rgba(17, 24, 39, 0.35)"
+          stroke={`url(#${gradientId})`}
           strokeWidth={stroke}
           strokeLinecap="round"
           fill="none"
           strokeDasharray={`${dashLength} ${circumference}`}
-          style={{ transition: 'stroke-dasharray 1s linear' }}
-        />
+          filter={`url(#glow-${gradientId})`}
+          opacity={Math.max(0.7, percentage)}
+          style={{ 
+            transition: 'stroke-dasharray 1s linear, opacity 1s linear',
+            transformOrigin: 'center'
+          }}
+        >
+          {/* Subtle pulse animation */}
+          <animate 
+            attributeName="stroke-width" 
+            values={`${stroke};${stroke + 1};${stroke}`}
+            dur="2s" 
+            repeatCount="indefinite" 
+          />
+        </circle>
       </svg>
       
-      {/* Time display (IN FRONT of ring with higher z-index) */}
+      {/* Content overlay */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
         <div className="text-center">
-          <div className="tabular-nums tracking-tight">
-            <span className="text-5xl font-semibold">{hrs}</span>
-            <span className="text-xl text-muted-foreground">h</span>
-            <span className="text-lg text-muted-foreground mx-0.5">:</span>
-            <span className="text-5xl font-semibold">{String(mins).padStart(2, "0")}</span>
-            <span className="text-xl text-muted-foreground">m</span>
+          {/* Percentage badge */}
+          <div className="mb-2">
+            <span 
+              className="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-semibold"
+              style={{
+                background: `linear-gradient(135deg, ${colors.from}, ${colors.to})`,
+                color: 'white',
+                boxShadow: `0 2px 8px ${colors.glow}`
+              }}
+            >
+              {percentDisplay}%
+            </span>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">remaining</p>
+          
+          {/* Time display - Luxury minimal style */}
+          <div className="flex items-center justify-center gap-3">
+            {/* Hours */}
+            <div className="text-center">
+              <div 
+                style={{ 
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
+                  fontWeight: 300,
+                  fontSize: '6rem',
+                  lineHeight: 1,
+                  letterSpacing: '-0.02em',
+                  color: 'currentColor'
+                }}
+              >
+                {String(hrs).padStart(2, "0")}
+              </div>
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground/40 mt-1 font-medium">hours</div>
+            </div>
+            
+            {/* Separator */}
+            <div 
+              style={{ 
+                fontSize: '4rem',
+                fontWeight: 200,
+                color: 'currentColor',
+                opacity: 0.2,
+                lineHeight: 1
+              }}
+            >
+              :
+            </div>
+            
+            {/* Minutes */}
+            <div className="text-center">
+              <div 
+                style={{ 
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
+                  fontWeight: 300,
+                  fontSize: '6rem',
+                  lineHeight: 1,
+                  letterSpacing: '-0.02em',
+                  color: 'currentColor'
+                }}
+              >
+                {String(mins).padStart(2, "0")}
+              </div>
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground/40 mt-1 font-medium">mins</div>
+            </div>
+          </div>
+          
+          {/* Label */}
+          <p className="text-xs font-medium text-muted-foreground mt-1 tracking-wide uppercase">
+            {isCritical ? 'Shift Change Soon!' : isUrgent ? 'Shift Ending' : 'Between Shifts'}
+          </p>
         </div>
       </div>
     </div>
@@ -201,16 +345,20 @@ export function DutyTimerCard() {
       return now >= start && now < end;
     });
     
+    // DEBUG: Log current shift
+    console.log('⏰ Current shift:', currentShift);
+    
     if (!currentShift) {
       // Default to 8-hour shift if no active shift found
       const defaultEnd = "20:00";
+      console.log('⚠️ No current shift found, using defaults');
       
       return {
         totalSec: 12 * 3600,
         remainSec: toSeconds(defaultEnd) - now,
         shiftEnd: defaultEnd,
-        currentShiftColor: "#C8A96B",
-        nextShiftColor: "#06B6D4"
+        currentShiftColor: "#d4af37", // Gold
+        nextShiftColor: "#d4af37" // Gold
       };
     }
     
@@ -247,8 +395,8 @@ export function DutyTimerCard() {
       totalSec: finalTotal,
       remainSec: finalRemain,
       shiftEnd: currentShift.endTime,
-      currentShiftColor: currentShift.color || "#C8A96B",
-      nextShiftColor: nextShift?.color || "#06B6D4"
+      currentShiftColor: currentShift.color || "#d4af37", // Gold
+      nextShiftColor: nextShift?.color || "#d4af37" // Gold
     };
   }, [currentTime, shifts]);
 
@@ -297,12 +445,11 @@ export function DutyTimerCard() {
     <>
         {/* Body - Cards with Ring Timer */}
         <div className="flex items-stretch">
-        {/* Left: Currently on duty - Full width card */}
+        {/* Left: Currently on duty - Gradient fades towards center */}
         <div
-          className="flex-1 p-4 pl-6 border-r border-border/50"
+          className="flex-1 p-4 pl-6 relative"
           style={{
-            background: `linear-gradient(180deg, ${hexToRgba(currentShiftColor, 0.08)}, transparent)`,
-            boxShadow: `0 1px 0 ${hexToRgba(currentShiftColor, 0.1)}`,
+            background: `linear-gradient(to right, ${hexToRgba(currentShiftColor, 0.12)}, ${hexToRgba(currentShiftColor, 0.04)} 70%, transparent)`,
           }}
         >
           <div className="flex items-center justify-between mb-2.5">
@@ -333,17 +480,16 @@ export function DutyTimerCard() {
           </div>
         </div>
 
-        {/* Center: Ring timer */}
-        <div className="flex items-center justify-center px-2">
-          <RingTimer totalSec={totalSec} remainSec={remainSec} />
+        {/* Center: Ring timer - Closer to edges */}
+        <div className="flex items-center justify-center px-0">
+          <RingTimer totalSec={totalSec} remainSec={remainSec} shiftColor={currentShiftColor} />
         </div>
 
-        {/* Right: Next on duty - Full width card */}
+        {/* Right: Next on duty - Gradient fades towards center */}
         <div
-          className="flex-1 p-4 pr-6 border-l border-border/50"
+          className="flex-1 p-4 pr-6 relative"
           style={{
-            background: `linear-gradient(180deg, ${hexToRgba(nextShiftColor, 0.08)}, transparent)`,
-            boxShadow: `0 1px 0 ${hexToRgba(nextShiftColor, 0.1)}`,
+            background: `linear-gradient(to left, ${hexToRgba(nextShiftColor, 0.12)}, ${hexToRgba(nextShiftColor, 0.04)} 70%, transparent)`,
           }}
         >
           <p className="text-sm font-medium text-muted-foreground mb-2.5 lg:text-right">Next on duty</p>

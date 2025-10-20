@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useAppData, type Guest } from '../contexts/AppDataContext';
+import { type Guest } from '../contexts/AppDataContext';
 import { useLocations } from '../hooks/useLocations';
+import { useGuestMutations } from '../hooks/useGuestMutations';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -67,7 +68,7 @@ function CabinSelect({ value, onValueChange }: { value?: string; onValueChange: 
 }
 
 export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogProps) {
-  const { addGuest, updateGuest } = useAppData();
+  const { createGuest, updateGuest, isCreating, isUpdating } = useGuestMutations();
   const [isCameraOpen, setIsCameraOpen] = useState(false);
 
   // Form state
@@ -208,16 +209,26 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
     }
 
     if (guest) {
-      // Update existing guest
-      updateGuest(guest.id, formData);
-      toast.success('Guest updated successfully');
+      // Update existing guest via backend API
+      updateGuest(
+        { id: guest.id, data: formData },
+        {
+          onSuccess: () => {
+            onOpenChange(false);
+          },
+        }
+      );
     } else {
-      // Add new guest
-      addGuest(formData as Omit<Guest, 'id' | 'createdAt' | 'updatedAt'>);
-      toast.success('Guest added successfully');
+      // Add new guest via backend API
+      createGuest(
+        formData as Omit<Guest, 'id' | 'createdAt' | 'updatedAt'>,
+        {
+          onSuccess: () => {
+            onOpenChange(false);
+          },
+        }
+      );
     }
-
-    onOpenChange(false);
   };
 
   const getInitials = (firstName: string, lastName: string) => {
@@ -329,7 +340,7 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
                   <Label htmlFor="type">Guest Type</Label>
                   <Select
                     value={formData.type}
-                    onValueChange={(value) => setFormData({ ...formData, type: value as Guest['type'] })}
+                    onValueChange={(value: string) => setFormData({ ...formData, type: value as Guest['type'] })}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -349,7 +360,7 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
                   <Label htmlFor="status">Status</Label>
                   <Select
                     value={formData.status}
-                    onValueChange={(value) => setFormData({ ...formData, status: value as Guest['status'] })}
+                    onValueChange={(value: string) => setFormData({ ...formData, status: value as Guest['status'] })}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -813,8 +824,8 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit}>
-              {guest ? 'Update Guest' : 'Add Guest'}
+            <Button onClick={handleSubmit} disabled={isCreating || isUpdating}>
+              {isCreating || isUpdating ? 'Saving...' : guest ? 'Update Guest' : 'Add Guest'}
             </Button>
           </div>
         </DialogContent>
@@ -825,7 +836,6 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
         open={isCameraOpen}
         onOpenChange={setIsCameraOpen}
         onCapture={handlePhotoCapture}
-        title="Guest Photo"
       />
     </>
   );

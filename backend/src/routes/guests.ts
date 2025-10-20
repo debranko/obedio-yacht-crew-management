@@ -21,7 +21,18 @@ router.get('/', async (_, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { firstName, lastName, preferredName, type, status, nationality, languages } = req.body ?? {};
+    const body = req.body ?? {};
+    const { 
+      firstName, 
+      lastName, 
+      preferredName, 
+      photo,
+      type, 
+      status, 
+      nationality, 
+      languages,
+      passportNumber
+    } = body;
     
     if (!firstName || !lastName) {
       return res.status(400).json({ 
@@ -30,20 +41,28 @@ router.post('/', async (req, res) => {
       });
     }
 
+    // Create with only fields that exist in Prisma schema
     const item = await prisma.guest.create({ 
       data: { 
         firstName, 
         lastName, 
-        preferredName,
+        preferredName: preferredName || null,
+        photo: photo || null,
         type: type ?? 'guest',
-        status: status ?? 'onboard',
-        nationality,
-        languages: languages ?? []
+        status: status ?? 'expected',
+        nationality: nationality || null,
+        languages: Array.isArray(languages) ? languages : [],
+        passportNumber: passportNumber || null
       } 
     });
+    
     res.json({ success: true, data: item });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Failed to create guest' });
+  } catch (error: any) {
+    console.error('Create guest error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Failed to create guest' 
+    });
   }
 });
 
@@ -70,16 +89,43 @@ router.get('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { firstName, lastName, preferredName, type, status, nationality, languages } = req.body;
+    const body = req.body ?? {};
+    const {
+      firstName,
+      lastName,
+      preferredName,
+      photo,
+      type,
+      status,
+      nationality,
+      languages,
+      passportNumber
+    } = body;
+    
+    // Update with only fields that exist in Prisma schema
+    const updateData: any = {};
+    if (firstName !== undefined) updateData.firstName = firstName;
+    if (lastName !== undefined) updateData.lastName = lastName;
+    if (preferredName !== undefined) updateData.preferredName = preferredName;
+    if (photo !== undefined) updateData.photo = photo;
+    if (type !== undefined) updateData.type = type;
+    if (status !== undefined) updateData.status = status;
+    if (nationality !== undefined) updateData.nationality = nationality;
+    if (languages !== undefined) updateData.languages = Array.isArray(languages) ? languages : [];
+    if (passportNumber !== undefined) updateData.passportNumber = passportNumber;
     
     const data = await prisma.guest.update({
       where: { id },
-      data: { firstName, lastName, preferredName, type, status, nationality, languages }
+      data: updateData
     });
     
     res.json({ success: true, data });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Failed to update guest' });
+  } catch (error: any) {
+    console.error('Update guest error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Failed to update guest' 
+    });
   }
 });
 

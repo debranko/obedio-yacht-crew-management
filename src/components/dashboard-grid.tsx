@@ -23,7 +23,12 @@ import { WidgetCard } from "./widget-card";
 import { DNDWidget } from "./dnd-widget";
 import { DNDGuestsWidget } from "./dnd-guests-widget";
 import { ServingNowWidget } from "./serving-now-widget";
+import { WeatherWidget } from "./weather-widget";
+import { WindyWidget } from "./windy-widget";
+import { GuestStatusWidget } from "./guest-status-widget";
 import { DutyTimerCard } from "./duty-timer-card";
+import { ClockWidget } from "./clock-widget";
+import { WeatherWindyWidget } from "./weather-windy-widget";
 import { useAppData } from "../contexts/AppDataContext";
 import { useDND } from "../hooks/useDND";
 import { Activity, Clock, Smartphone, BatteryLow, Users, BellOff, GripVertical, Bell } from "lucide-react";
@@ -46,12 +51,18 @@ interface WidgetLayout {
 }
 
 const defaultLayout: WidgetLayout[] = [
-  { i: "dnd-guests", x: 0, y: 0, w: 4, h: 3, minW: 2, minH: 2 },
-  { i: "serving-now", x: 4, y: 0, w: 4, h: 3, minW: 2, minH: 2 },
-  { i: "pending-requests", x: 0, y: 3, w: 2, h: 2, minW: 1, minH: 2 },
-  { i: "battery-alerts", x: 2, y: 3, w: 2, h: 2, minW: 1, minH: 2 },
-  { i: "duty-timer", x: 4, y: 3, w: 2, h: 2, minW: 1, minH: 2 },
-  { i: "active-crew", x: 6, y: 3, w: 2, h: 2, minW: 1, minH: 2 },
+  // Clean 2x2 Grid Layout
+  { i: "clock", x: 0, y: 0, w: 2, h: 2, minW: 2, minH: 2 },
+  { i: "serving-now", x: 2, y: 0, w: 4, h: 4, minW: 2, minH: 3 },
+  { i: "weather", x: 0, y: 3, w: 4, h: 3, minW: 2, minH: 3 },
+  { i: "duty-timer", x: 4, y: 0, w: 4, h: 3, minW: 2, minH: 2 },
+  { i: "active-crew", x: 4, y: 3, w: 4, h: 2, minW: 1, minH: 2 },
+  // Additional widgets (if enabled via Manage Widgets)
+  { i: "weather-windy", x: 0, y: 6, w: 4, h: 5, minW: 3, minH: 4 },
+  { i: "guest-status", x: 4, y: 6, w: 2, h: 2, minW: 2, minH: 2 },
+  { i: "windy", x: 2, y: 11, w: 6, h: 4, minW: 3, minH: 3 },
+  { i: "dnd-guests", x: 0, y: 11, w: 4, h: 3, minW: 2, minH: 2 },
+  // pending-requests and battery-alerts removed - hardcoded data
 ];
 
 interface DashboardGridProps {
@@ -181,6 +192,47 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
         compactType="vertical"
         preventCollision={false}
       >
+        {activeWidgets.includes("guest-status") && (
+          <div key="guest-status" className="dashboard-widget">
+            <WidgetWrapper id="guest-status">
+              <GuestStatusWidget 
+                guestsOnboard={true}
+                guestCount={6}
+                expectedGuests={3}
+                expectedArrival="Tomorrow 14:00"
+                onToggle={(onboard) => {
+                  console.log('Guest status toggled:', onboard);
+                  // TODO: Connect to state management
+                }}
+              />
+            </WidgetWrapper>
+          </div>
+        )}
+
+        {activeWidgets.includes("weather-windy") && (
+          <div key="weather-windy" className="dashboard-widget">
+            <WidgetWrapper id="weather-windy">
+              <WeatherWindyWidget />
+            </WidgetWrapper>
+          </div>
+        )}
+
+        {activeWidgets.includes("weather") && (
+          <div key="weather" className="dashboard-widget">
+            <WidgetWrapper id="weather">
+              <WeatherWidget />
+            </WidgetWrapper>
+          </div>
+        )}
+
+        {activeWidgets.includes("windy") && (
+          <div key="windy" className="dashboard-widget">
+            <WidgetWrapper id="windy">
+              <WindyWidget />
+            </WidgetWrapper>
+          </div>
+        )}
+
         {hasDND && activeWidgets.includes("dnd") && (
           <div key="dnd" className="dashboard-widget">
             <WidgetWrapper id="dnd">
@@ -205,35 +257,7 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
           </div>
         )}
 
-        {activeWidgets.includes("pending-requests") && (
-          <div key="pending-requests" className="dashboard-widget">
-            <WidgetWrapper id="pending-requests">
-              <KpiCard
-                icon={Bell}
-                title="Pending Requests"
-                value="12"
-                trend="up"
-                trendValue="+8%"
-                chart={<MiniChart data={requestsData} color="#C8A96B" />}
-              />
-            </WidgetWrapper>
-          </div>
-        )}
-
-        {activeWidgets.includes("battery-alerts") && (
-          <div key="battery-alerts" className="dashboard-widget">
-            <WidgetWrapper id="battery-alerts">
-              <KpiCard
-                icon={BatteryLow}
-                title="Battery Alerts"
-                value="3"
-                trend="down"
-                trendValue="-25%"
-                chart={<MiniChart data={[5, 4, 6, 5, 3, 4, 3, 2, 4, 3, 3, 3]} color="#B26A00" />}
-              />
-            </WidgetWrapper>
-          </div>
-        )}
+        {/* Pending Requests and Battery Alerts removed - hardcoded data */}
 
         {activeWidgets.includes("duty-timer") && (
           <div key="duty-timer" className="dashboard-widget">
@@ -245,20 +269,16 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
           </div>
         )}
 
-        {activeWidgets.includes("active-crew") && (
-          <div key="active-crew" className="dashboard-widget">
-            <WidgetWrapper id="active-crew">
-              <KpiCard
-                icon={Users}
-                title="Active Crew"
-                value="8"
-                trend="neutral"
-                trendValue="0%"
-                chart={<MiniChart data={[8, 8, 7, 8, 8, 8, 9, 8, 8, 8, 8, 8]} color="#2E7D32" />}
-              />
+        {/* Clock Widget */}
+        {activeWidgets.includes("clock") && (
+          <div key="clock" className="dashboard-widget">
+            <WidgetWrapper id="clock">
+              <ClockWidget timezone="auto" />
             </WidgetWrapper>
           </div>
         )}
+
+        {/* Active Crew widget removed - redundant with Duty Timer "Currently on duty" section */}
 
         {activeWidgets.includes("active-devices") && (
           <div key="active-devices" className="dashboard-widget">

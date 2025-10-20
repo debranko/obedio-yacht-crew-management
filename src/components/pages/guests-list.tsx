@@ -4,9 +4,10 @@ import { useAppData } from '../../contexts/AppDataContext';
 import { useLocations } from '../../hooks/useLocations';
 import { useGuests, useGuestsStats, useGuestsMeta } from '../../hooks/useGuests';
 import { useGuestsQueryParams } from '../../hooks/useGuestsQueryParams';
+import { useGuestMutations } from '../../hooks/useGuestMutations';
 import { GuestsService } from '../../services/guests';
 import { Button } from '../ui/button';
-import { MoreVertical, Users, Calendar, Star, AlertTriangle, Loader2, BellOff, MapPin, Edit2, Download, Plus } from 'lucide-react';
+import { MoreVertical, Users, Calendar, Star, AlertTriangle, Loader2, BellOff, MapPin, Edit2, Download, Plus, UserCheck } from 'lucide-react';
 import { Card } from '../ui/card';
 import GuestsToolbar, { FilterState } from '../guests/GuestsToolbar';
 import { DNDGuestsKpiCard } from '../dnd-guests-kpi-card';
@@ -52,12 +53,14 @@ import { Skeleton } from '../ui/skeleton';
 import { toast } from 'sonner';
 import type { Guest } from '../../contexts/AppDataContext';
 import { KpiCard } from '../kpi-card';
+import { GuestStatusWidget } from '../guest-status-widget';
 
 export function GuestsListPage() {
   const queryClient = useQueryClient();
-  const { guests, deleteGuest, updateGuest, getLocationByGuestId } = useAppData();
+  const { guests, updateGuest, getLocationByGuestId } = useAppData();
   const { locations, updateLocation } = useLocations();
   const { qp, set, reset } = useGuestsQueryParams();
+  const { deleteGuest, isDeleting } = useGuestMutations();
   
   // Dialog states
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -142,6 +145,17 @@ export function GuestsListPage() {
 
     toast.success("DND Removed", {
       description: `${guest.firstName} ${guest.lastName} can now receive requests`
+    });
+  };
+
+  // Handle guest deletion
+  const handleDeleteGuest = () => {
+    if (!deletingGuest) return;
+    
+    deleteGuest(deletingGuest.id, {
+      onSuccess: () => {
+        setDeletingGuest(null);
+      },
     });
   };
 
@@ -314,73 +328,45 @@ export function GuestsListPage() {
         </Card>
       )}
 
-      {/* KPI Cards and DND Widget - Clickable to filter */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard
-          title="Guests Onboard"
-          value={isLoadingStats ? "..." : stats?.onboard.toString() || "0"}
-          icon={Users}
-          iconColor="text-primary"
-          inlineValue={true}
-          onClick={() => {
-            reset();
-            set({ status: 'onboard' });
-          }}
-          details={
-            stats && stats.onboard > 0 ? (
-              <p className="text-xs text-muted-foreground">
-                Click to view all onboard guests
-              </p>
-            ) : (
-              <p className="text-xs text-muted-foreground">No guests onboard</p>
-            )
-          }
-        />
-
-        <KpiCard
-          title="Expected Arrivals"
-          value={isLoadingStats ? "..." : stats?.expected.toString() || "0"}
-          icon={Calendar}
-          iconColor="text-chart-3"
-          inlineValue={true}
-          onClick={() => {
-            reset();
-            set({ status: 'expected' });
-          }}
-          details={
-            stats && stats.expected > 0 ? (
-              <p className="text-xs text-muted-foreground">
-                Next 7 days
-              </p>
-            ) : (
-              <p className="text-xs text-muted-foreground">No expected arrivals</p>
-            )
-          }
-        />
-
-        {/* DND Guests Card - replaces VIP Guests KPI */}
-        <DNDGuestsKpiCard />
-
-        <KpiCard
-          title="Dietary Alerts"
-          value={isLoadingStats ? "..." : stats?.dietaryAlerts.toString() || "0"}
-          icon={AlertTriangle}
-          iconColor="text-destructive"
-          inlineValue={true}
-          onClick={() => {
-            reset();
-            set({ status: 'onboard', allergy: 'has-allergies' });
-          }}
-          details={
-            stats && stats.dietaryAlerts > 0 ? (
-              <p className="text-xs text-muted-foreground">
-                Active allergy alerts
-              </p>
-            ) : (
-              <p className="text-xs text-muted-foreground">No active allergies</p>
-            )
-          }
-        />
+      {/* Compact Status Row: Guest Status (75%) + Dietary Alerts (25%) */}
+      <div className="grid grid-cols-4 gap-4">
+        {/* Guest Status Widget - 3/4 width */}
+        <div className="col-span-3">
+          <GuestStatusWidget 
+            guestsOnboard={stats?.onboard ? stats.onboard > 0 : false}
+            guestCount={stats?.onboard || 0}
+            expectedGuests={stats?.expected || 0}
+            expectedArrival={stats?.expected > 0 ? "Next 7 days" : undefined}
+            onToggle={(onboard) => {
+              console.log('Guest status toggled on guests page:', onboard);
+              // TODO: Connect to state management
+            }}
+          />
+        </div>
+        
+        {/* Dietary Alerts - 1/4 width */}
+        <div className="col-span-1">
+          <KpiCard
+            title="Dietary Alerts"
+            value={isLoadingStats ? "..." : stats?.dietaryAlerts.toString() || "0"}
+            icon={AlertTriangle}
+            iconColor="text-destructive"
+            inlineValue={true}
+            onClick={() => {
+              reset();
+              set({ status: 'onboard', allergy: 'has-allergies' });
+            }}
+            details={
+              stats && stats.dietaryAlerts > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Active allergy alerts
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">No active allergies</p>
+              )
+            }
+          />
+        </div>
       </div>
 
       {/* New GuestsToolbar Component */}
@@ -735,18 +721,13 @@ export function GuestsListPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
-                if (deletingGuest) {
-                  deleteGuest(deletingGuest.id);
-                  toast.success('Guest deleted successfully');
-                  setDeletingGuest(null);
-                }
-              }}
+              onClick={handleDeleteGuest}
+              disabled={isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {isDeleting ? 'Deleting...' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

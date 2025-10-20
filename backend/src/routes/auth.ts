@@ -2,10 +2,23 @@ import { Router } from 'express';
 import { prisma } from '../services/db';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
 
 const router = Router();
 
-router.post('/login', async (req, res) => {
+// Rate limiting for login endpoint (prevent brute force attacks)
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 attempts per window
+  message: { 
+    success: false, 
+    message: 'Too many login attempts. Please try again in 15 minutes.' 
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
     
@@ -43,13 +56,23 @@ router.post('/login', async (req, res) => {
     }
 
     // Generate JWT token
+    const JWT_SECRET = process.env.JWT_SECRET;
+    if (!JWT_SECRET) {
+      console.error('CRITICAL: JWT_SECRET not configured!');
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Server configuration error' 
+      });
+    }
+    
     const token = jwt.sign(
       { 
-        userId: user.id, 
+        sub: user.id,        // Standard JWT field
+        userId: user.id,     // Legacy compatibility
         username: user.username, 
         role: user.role 
       },
-      process.env.JWT_SECRET || 'fallback-secret',
+      JWT_SECRET,
       { expiresIn: '7d' }
     );
 

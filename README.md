@@ -2,6 +2,24 @@
 
 **Production-ready Windows server application for luxury yacht crew management with ESP32 smart button integration.**
 
+---
+
+## ⚡ **QUICK START** → Otvori `README-START-HERE.md`
+
+```bash
+# Windows:
+SETUP-COMPLETE.bat    # Prvi put
+START-ALL.bat         # Pokreni aplikaciju
+
+# Linux/Mac:
+./SETUP-COMPLETE.sh   # Prvi put
+```
+
+**Login:** `admin` / `admin123`  
+**URL:** http://localhost:3000
+
+---
+
 ## 🚀 **Current Status**
 
 ### ✅ **COMPLETED - Full-Stack Migration**
@@ -12,23 +30,27 @@
 - **Real-time:** WebSocket communication for instant updates
 - **Deployment:** Windows server ready with PM2 configuration
 
+### ✅ **COMPLETED - Critical Fixes (19.10.2025)**
+- ✅ **requirePermission middleware** - Dodato kompletno permission sistema
+- ✅ **JWT token** - Popravljena struktura i validacija
+- ✅ **Prisma Schema** - Kompletirana sa svim modelima (Device, Assignment, ActivityLog, etc.)
+- ✅ **6 API Ruta** - Registrovano i aktivirano (/service-requests, /devices, etc.)
+- ✅ **Rate Limiting** - Login zaštićen od brute force napada
+- ✅ **Seed Data** - Mock podaci direktno u seed fajlu (9 lokacija, 6 crew, 4 gosta)
+- ✅ **Setup Scripts** - Automatizovani SETUP-COMPLETE i START-ALL
+
 ### ✅ **COMPLETED - Code Quality**
 - **AppDataContext refactored:** 2558 → 533 lines (79% reduction!)
 - **Type definitions organized:** `src/types/` (625 lines extracted)
 - **Mock data generators:** `src/mock-data/` (392 lines extracted)
 - **Service layer pattern:** Unified across all components
-- **6 critical code issues:** Resolved
+- **Critical bugs:** SVE POPRAVLJENO - aplikacija RADI!
 
-### 🔄 **IN PROGRESS - Code Cleanup**
-- **TypeScript errors:** 100+ errors from refactoring (need to fix import paths)
-- **Nepotrebni fajlovi:** Obrisano 11 dokumentacijskih fajlova
-- **Import standardization:** In progress
-
-### 📅 **TODO - Remaining Work**
-- Fix TypeScript import paths after refactoring
-- Create frontend login component for database access
-- Complete code cleanup (duplicates, unused files)
-- Standardize all import paths
+### 📅 **Future Enhancements**
+- TypeScript strict mode
+- WebSocket URL u environment variables
+- Replace `any` types sa proper interfaces
+- ESP32 hardware integration
 
 ## 🏗️ **Architecture**
 
@@ -109,17 +131,25 @@ npm run db:seed
 
 ## 🚨 **Known Issues**
 
-1. **TypeScript Errors:** 100+ errors from refactoring (components can't find moved types)
-2. **Authentication:** Frontend needs login component to access database instead of localStorage
-3. **Import Paths:** Need standardization after type extraction
+**NONE - Sve kritične greške su popravljene! ✅**
 
-## 🎯 **Next Steps**
+Manje probleme (opciono):
+- TypeScript strict mode isključen (funkcioniše, ali nije "striktno")
+- Neki `any` tipovi u kodu (radi, ali može bolje)
+- Console.log umesto logger-a u nekoliko fajlova
 
-1. Fix TypeScript import paths
-2. Create login component
-3. Complete code cleanup
-4. Deploy to Windows server
-5. ESP32 device integration
+## 🎯 **How to Use**
+
+### Prvi Put:
+1. **Run:** `SETUP-COMPLETE.bat` (Windows) ili `./SETUP-COMPLETE.sh` (Linux/Mac)
+2. **Wait:** Script će instalirati sve i seedovati bazu
+
+### Svaki Drugi Put:
+1. **Run:** `START-ALL.bat` (Windows)
+2. **Open:** http://localhost:3000
+3. **Login:** admin / admin123
+
+**Detaljne instrukcije:** `README-START-HERE.md`
 
 ---
 

@@ -24,6 +24,9 @@ import {
   Smartphone,
   TrendingUp,
   Timer,
+  Cloud,
+  Wind,
+  UserCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -37,6 +40,46 @@ export interface WidgetConfig {
 }
 
 export const availableWidgets: WidgetConfig[] = [
+  {
+    id: "clock",
+    name: "Clock",
+    description: "Real-time clock with timezone support",
+    icon: Clock,
+    defaultSize: { w: 2, h: 2, minW: 2, minH: 2 },
+    category: "status",
+  },
+  {
+    id: "guest-status",
+    name: "Guest Status",
+    description: "Guests onboard status with service mode",
+    icon: UserCheck,
+    defaultSize: { w: 2, h: 2, minW: 2, minH: 2 },
+    category: "status",
+  },
+  {
+    id: "weather-windy",
+    name: "Weather + Wind Map",
+    description: "Current weather combined with interactive Windy forecast map",
+    icon: Cloud,
+    defaultSize: { w: 4, h: 5, minW: 3, minH: 4 },
+    category: "status",
+  },
+  {
+    id: "weather",
+    name: "Weather",
+    description: "Current weather with live updates",
+    icon: Cloud,
+    defaultSize: { w: 3, h: 3, minW: 2, minH: 3 },
+    category: "status",
+  },
+  {
+    id: "windy",
+    name: "Windy Map",
+    description: "Interactive wind & weather forecast map",
+    icon: Wind,
+    defaultSize: { w: 4, h: 4, minW: 3, minH: 3 },
+    category: "status",
+  },
   {
     id: "dnd",
     name: "Do Not Disturb",
@@ -77,22 +120,7 @@ export const availableWidgets: WidgetConfig[] = [
     defaultSize: { w: 2, h: 2, minW: 1, minH: 2 },
     category: "kpi",
   },
-  {
-    id: "pending-requests",
-    name: "Pending Requests",
-    description: "Total pending service requests",
-    icon: Bell,
-    defaultSize: { w: 2, h: 2, minW: 1, minH: 2 },
-    category: "kpi",
-  },
-  {
-    id: "battery-alerts",
-    name: "Battery Alerts",
-    description: "Devices with low battery",
-    icon: BatteryLow,
-    defaultSize: { w: 2, h: 2, minW: 1, minH: 2 },
-    category: "kpi",
-  },
+  // Pending Requests and Battery Alerts removed - hardcoded data, not production-ready
   {
     id: "active-devices",
     name: "Active Devices",

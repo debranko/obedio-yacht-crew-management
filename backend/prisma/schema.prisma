@@ -7,14 +7,20 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  username  String   @unique
-  email     String   @unique
-  password  String
-  role      String   // "admin","chief-stewardess","stewardess","crew","eto"
-  firstName String?
-  lastName  String?
-  createdAt DateTime @default(now())
+  id           String        @id @default(cuid())
+  username     String        @unique
+  email        String        @unique
+  password     String
+  role         String        // "admin","chief-stewardess","stewardess","crew","eto"
+  firstName    String?
+  lastName     String?
+  isActive     Boolean       @default(true)
+  lastLogin    DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  
+  crewMember   CrewMember?
+  activityLogs ActivityLog[]
 }
 
 model CrewMember {
@@ -26,8 +32,14 @@ model CrewMember {
   contact    String?
   email      String?
   joinDate   DateTime?
-  role       String?  // mirror with User.role if needed
+  role       String?
+  userId     String?  @unique
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  user              User?               @relation(fields: [userId], references: [id])
+  assignments       Assignment[]
+  deviceAssignments DeviceAssignment[]
 }
 
 model Location {
@@ -36,34 +48,111 @@ model Location {
   type        String
   description String?
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  guests          Guest[]
+  serviceRequests ServiceRequest[]
 }
 
 model Guest {
-  id            String   @id @default(cuid())
-  firstName     String
-  lastName      String
-  preferredName String?
-  photo         String?
-  type          String    @default("guest")      // align with UI enums if any
-  status        String    @default("onboard")    // align with UI enums if any
-  nationality   String?
-  languages     String[]  @default([])
+  id             String   @id @default(cuid())
+  firstName      String
+  lastName       String
+  preferredName  String?
+  photo          String?
+  type           String   @default("guest")
+  status         String   @default("onboard")
+  nationality    String?
+  languages      String[] @default([])
   passportNumber String?
-  createdAt     DateTime  @default(now())
+  locationId     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  location        Location?        @relation(fields: [locationId], references: [id])
+  serviceRequests ServiceRequest[]
 }
 
 model ServiceRequest {
   id          String   @id @default(cuid())
-  requestType String   @default("call")  // "call","service","emergency"
+  requestType String   @default("call")
   guestId     String?
   locationId  String?
   cabinId     String?
-  priority    String   @default("normal") // "normal","urgent","emergency"
-  status      String   @default("open")   // "open","accepted","completed"
+  priority    String   @default("normal")
+  status      String   @default("open")
   notes       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
+  
   guest    Guest?    @relation(fields: [guestId], references: [id])
   location Location? @relation(fields: [locationId], references: [id])
+}
+
+model Device {
+  id           String   @id @default(cuid())
+  name         String
+  type         String
+  deviceId     String   @unique
+  status       String   @default("active")
+  batteryLevel Int?
+  lastSeen     DateTime?
+  locationId   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  assignments DeviceAssignment[]
+}
+
+model DeviceAssignment {
+  id           String   @id @default(cuid())
+  deviceId     String
+  crewMemberId String
+  assignedAt   DateTime @default(now())
+  notes        String?
+  
+  device      Device     @relation(fields: [deviceId], references: [id])
+  crewMember  CrewMember @relation(fields: [crewMemberId], references: [id])
+  
+  @@unique([deviceId, crewMemberId])
+}
+
+model Assignment {
+  id           String   @id @default(cuid())
+  crewMemberId String
+  shiftId      String
+  date         DateTime
+  role         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  crewMember CrewMember  @relation(fields: [crewMemberId], references: [id])
+  shift      ShiftConfig @relation(fields: [shiftId], references: [id])
+  
+  @@unique([crewMemberId, shiftId, date])
+}
+
+model ShiftConfig {
+  id          String   @id @default(cuid())
+  name        String
+  startTime   String
+  endTime     String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  assignments Assignment[]
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  type       String
+  action     String
+  details    String?
+  userId     String?
+  locationId String?
+  metadata   String?
+  createdAt  DateTime @default(now())
+  
+  user User? @relation(fields: [userId], references: [id])
 }
