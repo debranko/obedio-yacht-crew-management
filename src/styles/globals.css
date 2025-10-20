@@ -318,7 +318,7 @@ html {
 .react-grid-item {
   transition: all 200ms ease;
   transition-property: left, top, width, height;
-  padding: 6px;
+  padding: 4px;
 }
 
 .react-grid-item img {
