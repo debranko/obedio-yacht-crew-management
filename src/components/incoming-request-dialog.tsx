@@ -281,11 +281,11 @@ export function IncomingRequestDialog({
 
           {/* Request Details */}
           {request.voiceTranscript && (
-            <div className="bg-muted/50 rounded-lg p-4 border border-border">
+            <div className="bg-muted/50 rounded-lg p-5 border border-border">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
-                  <div className="text-xs text-muted-foreground mb-2">Message</div>
-                  <p className="text-sm leading-relaxed">{request.voiceTranscript}</p>
+                  <div className="text-xs text-muted-foreground mb-3 uppercase tracking-wide font-medium">Message</div>
+                  <p className="text-xl font-semibold leading-relaxed text-foreground">{request.voiceTranscript}</p>
                 </div>
                 {(request.voiceTranscript || request.voiceAudioUrl) && (
                   <button
