@@ -12,7 +12,7 @@ import { Location, LOCATION_TYPES, LOCATION_STATUS_LABELS } from "../../domain/l
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
-import { Plus, MapPin, Smartphone, Edit2, Trash2, Search, Image as ImageIcon, X, Upload, BellOff, Bell } from "lucide-react";
+import { Plus, MapPin, Smartphone, Edit2, Trash2, Search, Image as ImageIcon, X, Upload, BellOff, Bell, Users } from "lucide-react";
 import { Switch } from "../ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../ui/dialog";
 import { Input } from "../ui/input";
@@ -430,21 +430,33 @@ export function LocationsPage() {
                       </p>
                     )}
 
-                    {/* Metadata */}
-                    <div className="space-y-1">
-                      {location.smartButtonName && (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Smartphone className="h-3 w-3" />
-                          <span>{location.smartButtonName}</span>
+                    {/* Guest Assignment */}
+                    {location.guests && location.guests.length > 0 && (
+                      <div className="bg-muted/50 rounded-md p-2">
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-1">
+                          <Users className="h-3.5 w-3.5" />
+                          <span>Guest{location.guests.length > 1 ? 's' : ''}:</span>
                         </div>
-                      )}
-                      {location.deviceCount !== undefined && location.deviceCount > 0 && (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Smartphone className="h-3 w-3" />
-                          <span>{location.deviceCount} device{location.deviceCount !== 1 ? 's' : ''}</span>
+                        <div className="space-y-0.5">
+                          {location.guests.map((guest: any) => (
+                            <div key={guest.id} className="text-xs text-muted-foreground pl-5">
+                              {guest.firstName} {guest.lastName}
+                            </div>
+                          ))}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
+
+                    {/* Smart Button Assignment */}
+                    {location.smartButtonId && (
+                      <div className="bg-primary/5 rounded-md p-2">
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <Smartphone className="h-3.5 w-3.5 text-primary" />
+                          <span className="text-muted-foreground">Smart Button:</span>
+                          <span className="font-medium text-foreground">{location.smartButtonId}</span>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Actions */}
                     <div className="flex gap-2">

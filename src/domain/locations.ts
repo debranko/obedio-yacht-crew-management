@@ -25,6 +25,8 @@ export interface Location {
   notes?: string;
   doNotDisturb?: boolean; // DND mode - location not accepting requests
   smartButtonId?: string; // ESP32 smart button device ID
+  guests?: Array<{id: string; firstName: string; lastName: string}>; // Guests assigned to this location
+  serviceRequests?: Array<any>; // Service requests for this location
   createdAt: Date;
   updatedAt: Date;
 }
