@@ -42,13 +42,16 @@ model CrewMember {
 }
 
 model Location {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  type        String
-  floor       String?  // Yacht deck or building floor: Sun Deck, Main Deck, etc.
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(cuid())
+  name           String   @unique
+  type           String
+  floor          String?  // Yacht deck or building floor: Sun Deck, Main Deck, etc.
+  description    String?
+  image          String?  // URL to location image/photo
+  smartButtonId  String?  // ESP32 smart button device ID assigned to this location
+  doNotDisturb   Boolean  @default(false) // Do Not Disturb status
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
   
   guests          Guest[]
   serviceRequests ServiceRequest[]

@@ -77,7 +77,7 @@ r.post('/', async (req, res) => {
 // PUT update location
 r.put('/:id', async (req, res) => {
   try {
-    const { name, type, floor, description, status, doNotDisturb, image } = req.body;
+    const { name, type, floor, description, image, smartButtonId, doNotDisturb } = req.body;
     
     const data = await prisma.location.update({
       where: { id: req.params.id },
@@ -86,6 +86,9 @@ r.put('/:id', async (req, res) => {
         ...(type && { type }),
         ...(floor !== undefined && { floor }),
         ...(description !== undefined && { description }),
+        ...(image !== undefined && { image }),
+        ...(smartButtonId !== undefined && { smartButtonId }),
+        ...(doNotDisturb !== undefined && { doNotDisturb }),
       }
     });
     
