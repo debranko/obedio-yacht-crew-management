@@ -93,7 +93,8 @@ export function ButtonSimulatorWidget() {
     requestLabel: string,
     isVoice: boolean = false,
     voiceDuration?: number,
-    requestPriority: 'normal' | 'urgent' | 'emergency' = 'normal'
+    requestPriority: 'normal' | 'urgent' | 'emergency' = 'normal',
+    audioUrl?: string
   ) => {
     // ---- Guard against accidental double-fire within 500ms ----
     const key = `${selectedLocation}:${requestType}:${isVoice ? 'voice' : 'tap'}`;
@@ -131,8 +132,6 @@ export function ButtonSimulatorWidget() {
     const assignedCrew = onDutyCrew[0];
 
     // Create actual service request and add to context
-    const mockAudioUrl = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
-    
     const serviceRequest = addServiceRequest({
       guestName: guestName,
       guestCabin: location.name,
@@ -142,7 +141,7 @@ export function ButtonSimulatorWidget() {
       voiceTranscript: isVoice 
         ? `Voice message (${voiceDuration?.toFixed(1)}s): ${requestLabel}`
         : undefined, // Only set transcript for voice messages
-      voiceAudioUrl: isVoice ? mockAudioUrl : undefined,
+      voiceAudioUrl: isVoice ? (audioUrl || undefined) : undefined,
       cabinImage: location.image || 'https://images.unsplash.com/photo-1597126729864-51740ac05236?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080',
       status: 'pending' as const,
       notes: hadDND 
@@ -240,11 +239,11 @@ export function ButtonSimulatorWidget() {
 
   // Stop recording and transcribe
   const stopRecording = async () => {
-    return new Promise<string | null>((resolve) => {
+    return new Promise<{ transcript: string | null; audioUrl: string | null }>((resolve) => {
       const mediaRecorder = mediaRecorderRef.current;
       
       if (!mediaRecorder || mediaRecorder.state === 'inactive') {
-        resolve(null);
+        resolve({ transcript: null, audioUrl: null });
         return;
       }
 
@@ -254,6 +253,10 @@ export function ButtonSimulatorWidget() {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         console.log('Audio blob size:', audioBlob.size, 'bytes');
 
+        // Create audio URL for playback
+        const audioUrl = URL.createObjectURL(audioBlob);
+        console.log('🎵 Audio URL created:', audioUrl);
+
         // Stop all tracks
         mediaRecorder.stream.getTracks().forEach(track => track.stop());
 
@@ -262,11 +265,11 @@ export function ButtonSimulatorWidget() {
           setIsTranscribing(true);
           const transcript = await transcribeAudio(audioBlob, recordingDuration);
           setIsTranscribing(false);
-          resolve(transcript);
+          resolve({ transcript, audioUrl });
         } catch (error) {
           setIsTranscribing(false);
           console.error('Transcription failed:', error);
-          resolve(null);
+          resolve({ transcript: null, audioUrl });
         }
       };
 
@@ -345,13 +348,13 @@ export function ButtonSimulatorWidget() {
       setIsRecording(false);
       
       if (recordingDuration > 0.3) {
-        // Stop recording and get transcript
-        const transcript = await stopRecording();
+        // Stop recording and get transcript + audio URL
+        const { transcript, audioUrl } = await stopRecording();
         
-        // Use real transcript or fallback
-        const voiceMessage = transcript || `Voice message (${recordingDuration.toFixed(1)}s): Voice Message`;
+        // Use real transcript or fallback (plain text only, no formatting)
+        const voiceMessage = transcript || "Voice Message";
         
-        generateServiceRequest("main", voiceMessage, true, recordingDuration, 'normal');
+        generateServiceRequest("main", voiceMessage, true, recordingDuration, 'normal', audioUrl || undefined);
       }
       setRecordingDuration(0);
     } else {
