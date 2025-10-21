@@ -14,6 +14,7 @@ import {
   Forward,
   UserCheck,
   Volume2,
+  Play,
   UtensilsCrossed,
   Package,
   Home,
@@ -257,8 +258,26 @@ export function IncomingRequestDialog({
           {/* Request Details */}
           {request.voiceTranscript && (
             <div className="bg-muted/50 rounded-lg p-4 border border-border">
-              <div className="text-xs text-muted-foreground mb-2">Message</div>
-              <p className="text-sm leading-relaxed">{request.voiceTranscript}</p>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <div className="text-xs text-muted-foreground mb-2">Message</div>
+                  <p className="text-sm leading-relaxed">{request.voiceTranscript}</p>
+                </div>
+                {(request.voiceTranscript || request.voiceAudioUrl) && (
+                  <button
+                    onClick={handlePlayAudio}
+                    disabled={playingAudio}
+                    className="flex-shrink-0 w-12 h-12 rounded-full bg-accent/10 hover:bg-accent/20 border-2 border-accent flex items-center justify-center transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+                    aria-label="Play voice message"
+                  >
+                    {playingAudio ? (
+                      <Volume2 className="h-5 w-5 text-accent animate-pulse" />
+                    ) : (
+                      <Play className="h-5 w-5 text-accent" />
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -419,23 +438,11 @@ export function IncomingRequestDialog({
               variant="outline"
               size="sm"
               onClick={handleForwardClick}
-              className="flex-1"
+              className="w-full"
             >
               <Forward className="h-4 w-4 mr-2" />
               Forward
             </Button>
-            {(request.voiceTranscript || request.voiceAudioUrl) && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handlePlayAudio}
-                disabled={playingAudio}
-                className="flex-1"
-              >
-                <Volume2 className="h-4 w-4 mr-2" />
-                {playingAudio ? 'Playing...' : 'Play'}
-              </Button>
-            )}
           </div>
         </div>
       </DialogContent>
