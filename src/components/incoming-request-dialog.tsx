@@ -138,20 +138,44 @@ export function IncomingRequestDialog({
     
     setPlayingAudio(true);
     
-    // In production: play actual audio file from voiceAudioUrl
+    // Play actual audio file from voiceAudioUrl
     if (request.voiceAudioUrl) {
-      // const audio = new Audio(request.voiceAudioUrl);
-      // audio.play();
-      toast.info('Playing audio message...');
+      try {
+        const audio = new Audio(request.voiceAudioUrl);
+        
+        audio.onended = () => {
+          setPlayingAudio(false);
+        };
+        
+        audio.onerror = () => {
+          setPlayingAudio(false);
+          toast.error('Failed to play audio', {
+            description: 'Audio file could not be loaded'
+          });
+        };
+        
+        audio.play().catch((error) => {
+          console.error('Audio playback error:', error);
+          setPlayingAudio(false);
+          toast.error('Failed to play audio', {
+            description: error.message
+          });
+        });
+        
+        toast.info('🎵 Playing voice message...');
+      } catch (error) {
+        console.error('Audio creation error:', error);
+        setPlayingAudio(false);
+        toast.error('Failed to play audio');
+      }
     } else {
       toast.info('Playing voice message...', { 
         description: request.voiceTranscript 
       });
+      setTimeout(() => {
+        setPlayingAudio(false);
+      }, 3000);
     }
-    
-    setTimeout(() => {
-      setPlayingAudio(false);
-    }, 3000);
   };
 
   if (!request) return null;
