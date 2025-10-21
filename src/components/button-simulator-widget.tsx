@@ -18,7 +18,9 @@ import {
   CheckCircle2,
   MapPin,
   Wine,
-  AlertTriangle
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "motion/react";
@@ -69,6 +71,10 @@ export function ButtonSimulatorWidget() {
   const [isMainPressed, setIsMainPressed] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    const saved = localStorage.getItem('esp32-simulator-collapsed');
+    return saved ? JSON.parse(saved) : false;
+  });
   
   const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -361,16 +367,42 @@ export function ButtonSimulatorWidget() {
     );
   };
 
+  const toggleCollapse = () => {
+    const newState = !isCollapsed;
+    setIsCollapsed(newState);
+    localStorage.setItem('esp32-simulator-collapsed', JSON.stringify(newState));
+  };
+
   return (
     <div className="p-3 border-t border-sidebar-border space-y-3">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <Label className="text-xs text-muted-foreground">ESP32 Simulator</Label>
-        <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+      <div 
+        className="flex items-center justify-between cursor-pointer hover:opacity-70 transition-opacity" 
+        onClick={toggleCollapse}
+      >
+        <Label className="text-xs text-muted-foreground cursor-pointer">ESP32 Simulator</Label>
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+          {isCollapsed ? (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          )}
+        </div>
       </div>
 
-      {/* Location Selector */}
-      <div className="space-y-1.5">
+      {/* Collapsible Content */}
+      <AnimatePresence>
+        {!isCollapsed && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="space-y-3 overflow-hidden"
+          >
+            {/* Location Selector */}
+            <div className="space-y-1.5">
         <Label htmlFor="sim-loc" className="text-xs">Select Room</Label>
         <Select value={selectedLocation} onValueChange={setSelectedLocation}>
           <SelectTrigger id="sim-loc" className="h-8 text-xs">
@@ -485,7 +517,7 @@ export function ButtonSimulatorWidget() {
         </div>
       </div>
 
-      {/* Emergency Shake to Call Button */}
+            {/* Emergency Shake to Call Button */}
       <Button 
         variant="outline" 
         size="sm" 
@@ -501,6 +533,9 @@ export function ButtonSimulatorWidget() {
         </motion.div>
         <span className="text-xs font-semibold">🚨 Emergency Shake</span>
       </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
