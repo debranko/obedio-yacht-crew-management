@@ -204,18 +204,28 @@ export function WeatherWidget({ className }: WeatherWidgetProps) {
               {getWeatherIcon(weather.weather.icon, 'md')}
             </div>
 
-            {/* Temperature - Compact */}
-            <div className="mb-2">
-              <div className="flex items-baseline gap-1">
-                <span className="text-5xl font-bold tracking-tight leading-none">{weather.temp}°</span>
-                <span className="text-xl text-muted-foreground">C</span>
+            {/* Main Content - Side by Side Layout */}
+            <div className="flex-1 flex items-center justify-between gap-3">
+              {/* Left Side - Description */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline gap-1 mb-1">
+                  <span className="text-2xl font-bold tracking-tight leading-none">{weather.temp}°</span>
+                  <span className="text-sm text-muted-foreground">C</span>
+                </div>
+                <p className="text-sm font-medium capitalize truncate leading-tight">
+                  {weather.weather.description}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Feels like {weather.feels_like}°C
+                </p>
               </div>
-              <p className="text-sm font-medium capitalize truncate leading-tight mt-1">
-                {weather.weather.description}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Feels like {weather.feels_like}°C
-              </p>
+
+              {/* Right Side - HUGE Temperature */}
+              <div className="flex-shrink-0">
+                <span className="text-7xl font-black tracking-tighter leading-none text-foreground/90">
+                  {weather.temp}
+                </span>
+              </div>
             </div>
 
             {/* Key Stats - 2 columns - Compact */}
