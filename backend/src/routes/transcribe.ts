@@ -11,9 +11,19 @@ import path from 'path';
 
 const router = express.Router();
 
-// Configure multer for file uploads
+// Configure multer for file uploads with proper file extensions
+const storage = multer.diskStorage({
+  destination: 'uploads/',
+  filename: (req, file, cb) => {
+    // Get file extension from mimetype
+    const ext = file.mimetype.split('/')[1] || 'webm';
+    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1E9)}.${ext}`;
+    cb(null, uniqueName);
+  }
+});
+
 const upload = multer({
-  dest: 'uploads/',
+  storage: storage,
   limits: {
     fileSize: 25 * 1024 * 1024, // 25MB limit
   },
