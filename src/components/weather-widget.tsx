@@ -194,23 +194,23 @@ export function WeatherWidget({ className }: WeatherWidgetProps) {
 
         {/* MEDIUM MODE - Balanced display */}
         {mode === "medium" && (
-          <div className="p-4 h-full flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-3">
+          <div className="p-3 h-full flex flex-col">
+            {/* Compact Header with Icon */}
+            <div className="flex items-start justify-between mb-2">
               <div className="min-w-0 flex-1">
-                <h3 className="text-xs font-medium text-muted-foreground">Current Weather</h3>
-                <p className="text-xs text-muted-foreground truncate">{weather.location}</p>
+                <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Current Weather</h3>
+                <p className="text-xs text-muted-foreground truncate mt-0.5">{weather.location}</p>
               </div>
               {getWeatherIcon(weather.weather.icon, 'md')}
             </div>
 
-            {/* Temperature */}
-            <div className="flex-1 flex flex-col justify-center">
+            {/* Temperature - Compact */}
+            <div className="mb-2">
               <div className="flex items-baseline gap-1">
-                <span className="text-4xl font-bold tracking-tight">{weather.temp}°</span>
+                <span className="text-5xl font-bold tracking-tight leading-none">{weather.temp}°</span>
                 <span className="text-xl text-muted-foreground">C</span>
               </div>
-              <p className="text-sm font-medium mt-1 capitalize truncate">
+              <p className="text-sm font-medium capitalize truncate leading-tight mt-1">
                 {weather.weather.description}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -218,20 +218,20 @@ export function WeatherWidget({ className }: WeatherWidgetProps) {
               </p>
             </div>
 
-            {/* Key Stats - 2 columns */}
-            <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-border/50">
+            {/* Key Stats - 2 columns - Compact */}
+            <div className="grid grid-cols-2 gap-2 mt-auto pt-2 border-t border-border/50">
               <div className="flex items-center gap-1.5">
-                <Droplets className="h-3 w-3 text-blue-500 flex-shrink-0" />
+                <Droplets className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-[10px] text-muted-foreground">Humidity</p>
-                  <p className="text-xs font-semibold truncate">{weather.humidity}%</p>
+                  <p className="text-[9px] text-muted-foreground leading-none">Humidity</p>
+                  <p className="text-xs font-semibold truncate leading-tight mt-0.5">{weather.humidity}%</p>
                 </div>
               </div>
               <div className="flex items-center gap-1.5">
-                <Wind className="h-3 w-3 text-cyan-500 flex-shrink-0" />
+                <Wind className="h-3.5 w-3.5 text-cyan-500 flex-shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-[10px] text-muted-foreground">Wind</p>
-                  <p className="text-xs font-semibold truncate">{weather.wind_speed} km/h</p>
+                  <p className="text-[9px] text-muted-foreground leading-none">Wind</p>
+                  <p className="text-xs font-semibold truncate leading-tight mt-0.5">{weather.wind_speed} km/h</p>
                 </div>
               </div>
             </div>
@@ -240,74 +240,69 @@ export function WeatherWidget({ className }: WeatherWidgetProps) {
 
         {/* EXPANDED MODE - Full details */}
         {mode === "expanded" && (
-          <div className="p-6 h-full flex flex-col">
-            {/* Header */}
-            <div className="flex items-start justify-between mb-4">
+          <div className="p-4 h-full flex flex-col">
+            {/* Compact Header with Icon */}
+            <div className="flex items-start justify-between mb-3">
               <div>
-                <h3 className="text-sm font-medium text-muted-foreground">Current Weather</h3>
+                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Current Weather</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">{weather.location}</p>
               </div>
               {getWeatherIcon(weather.weather.icon, 'lg')}
             </div>
 
-            {/* Temperature - Large Display */}
-            <div className="flex-1 flex flex-col justify-center">
-              <div className="flex items-baseline gap-2">
-                <span className="text-6xl font-bold tracking-tight">
+            {/* Temperature - Large Display - Tighter */}
+            <div className="mb-3">
+              <div className="flex items-baseline gap-1">
+                <span className="text-6xl font-bold tracking-tight leading-none">
                   {weather.temp}°
                 </span>
                 <span className="text-2xl text-muted-foreground">C</span>
               </div>
-              <p className="text-lg font-medium mt-2 capitalize">
+              <p className="text-base font-medium mt-1 capitalize leading-tight">
                 {weather.weather.description}
               </p>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground mt-0.5">
                 Feels like {weather.feels_like}°C
               </p>
             </div>
 
-            {/* Weather Details Grid - Full */}
-            <div className="grid grid-cols-2 gap-3 mt-6 pt-6 border-t border-border/50">
+            {/* Weather Details Grid - Compact */}
+            <div className="grid grid-cols-2 gap-2.5 mt-auto pt-3 border-t border-border/50">
               {/* Humidity */}
               <div className="flex items-center gap-2">
-                <Droplets className="h-4 w-4 text-blue-500" />
+                <Droplets className="h-4 w-4 text-blue-500 flex-shrink-0" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Humidity</p>
-                  <p className="text-sm font-semibold">{weather.humidity}%</p>
+                  <p className="text-[10px] text-muted-foreground leading-none">Humidity</p>
+                  <p className="text-sm font-semibold leading-tight mt-0.5">{weather.humidity}%</p>
                 </div>
               </div>
 
               {/* Wind */}
               <div className="flex items-center gap-2">
-                <Wind className="h-4 w-4 text-cyan-500" />
+                <Wind className="h-4 w-4 text-cyan-500 flex-shrink-0" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Wind</p>
-                  <p className="text-sm font-semibold">{weather.wind_speed} km/h</p>
+                  <p className="text-[10px] text-muted-foreground leading-none">Wind</p>
+                  <p className="text-sm font-semibold leading-tight mt-0.5">{weather.wind_speed} km/h</p>
                 </div>
               </div>
 
               {/* Pressure */}
               <div className="flex items-center gap-2">
-                <Gauge className="h-4 w-4 text-purple-500" />
+                <Gauge className="h-4 w-4 text-purple-500 flex-shrink-0" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Pressure</p>
-                  <p className="text-sm font-semibold">{weather.pressure} hPa</p>
+                  <p className="text-[10px] text-muted-foreground leading-none">Pressure</p>
+                  <p className="text-sm font-semibold leading-tight mt-0.5">{weather.pressure} hPa</p>
                 </div>
               </div>
 
               {/* Visibility */}
               <div className="flex items-center gap-2">
-                <Eye className="h-4 w-4 text-green-500" />
+                <Eye className="h-4 w-4 text-green-500 flex-shrink-0" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Visibility</p>
-                  <p className="text-sm font-semibold">{weather.visibility} km</p>
+                  <p className="text-[10px] text-muted-foreground leading-none">Visibility</p>
+                  <p className="text-sm font-semibold leading-tight mt-0.5">{weather.visibility} km</p>
                 </div>
               </div>
-            </div>
-
-            {/* Last Updated */}
-            <div className="mt-4 text-xs text-muted-foreground text-center">
-              Updated just now
             </div>
           </div>
         )}
