@@ -279,7 +279,7 @@ export function LocationsPage() {
     location.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Group locations by deck
+  // Group locations by deck and sort DND locations first
   const locationsByFloor = filteredLocations.reduce((acc, location) => {
     const floor = location.floor || "No Deck";
     if (!acc[floor]) {
@@ -288,6 +288,17 @@ export function LocationsPage() {
     acc[floor].push(location);
     return acc;
   }, {} as Record<string, Location[]>);
+
+  // Sort locations within each floor: DND first, then alphabetically
+  Object.keys(locationsByFloor).forEach(floor => {
+    locationsByFloor[floor].sort((a, b) => {
+      // DND locations come first
+      if (a.doNotDisturb && !b.doNotDisturb) return -1;
+      if (!a.doNotDisturb && b.doNotDisturb) return 1;
+      // Then sort alphabetically
+      return a.name.localeCompare(b.name);
+    });
+  });
 
   // Sort decks in a logical order (Sun Deck, Bridge Deck, Owner's Deck, Main Deck, Lower Deck, Tank Deck, etc.)
   const floorOrder = ["Sun Deck", "Bridge Deck", "Owner's Deck", "Main Deck", "Lower Deck", "Tank Deck", "No Deck"];
@@ -424,7 +435,7 @@ export function LocationsPage() {
                         <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                         <h3 className="truncate flex-1">{location.name}</h3>
                         {location.doNotDisturb && (
-                          <Badge variant="destructive" className="flex items-center gap-1 flex-shrink-0">
+                          <Badge variant="secondary" className="flex items-center gap-1 flex-shrink-0 bg-warning/20 text-warning border-warning">
                             <BellOff className="h-3 w-3" />
                             DND
                           </Badge>
@@ -779,39 +790,22 @@ export function LocationsPage() {
               </div>
             </div>
 
-            {/* Do Not Disturb Toggle */}
-            <div className="border-t border-border pt-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 flex-1">
-                  {formData.doNotDisturb ? (
-                    <BellOff className="h-5 w-5 text-destructive" />
-                  ) : (
-                    <Bell className="h-5 w-5 text-muted-foreground" />
-                  )}
-                  <div className="flex-1">
-                    <p className="font-medium">Do Not Disturb</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {formData.doNotDisturb 
-                        ? "This location will not receive service requests"
-                        : "Allow service requests to this location"
-                      }
-                    </p>
+            {/* DND Status (Read-Only Display) */}
+            {selectedLocation?.doNotDisturb && (
+              <div className="border-t border-border pt-4">
+                <div className="rounded-md bg-warning/10 border border-warning/30 p-3">
+                  <div className="flex items-center gap-2">
+                    <BellOff className="h-4 w-4 text-warning" />
+                    <div>
+                      <p className="text-sm font-medium text-warning">Guest Privacy Mode Active</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Guest activated Do Not Disturb from their room. Service requests will still be received and visible to crew.
+                      </p>
+                    </div>
                   </div>
                 </div>
-                <Switch
-                  checked={formData.doNotDisturb}
-                  onCheckedChange={(checked) => setFormData({ ...formData, doNotDisturb: checked })}
-                />
               </div>
-              
-              {formData.doNotDisturb && (
-                <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 mt-4">
-                  <p className="text-xs text-destructive">
-                    <strong>Warning:</strong> Service calls to this location will be blocked. Staff will be notified that DND is active.
-                  </p>
-                </div>
-              )}
-            </div>
+            )}
 
             {/* Notes Section */}
             <div className="border-t border-border pt-4 space-y-4">
