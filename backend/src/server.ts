@@ -10,6 +10,7 @@ import authRoutes from './routes/auth';
 import crewRoutes from './routes/crew';
 import locationRoutes from './routes/locations';
 import guestRoutes from './routes/guests';
+import transcribeRoutes from './routes/transcribe';
 
 dotenv.config();
 
@@ -36,6 +37,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/crew', crewRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/guests', guestRoutes);
+app.use('/api/transcribe', transcribeRoutes);
 
 // Error handling
 app.use((err: any, req: any, res: any, next: any) => {

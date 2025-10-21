@@ -75,10 +75,13 @@ export function ButtonSimulatorWidget() {
     const saved = localStorage.getItem('esp32-simulator-collapsed');
     return saved ? JSON.parse(saved) : false;
   });
+  const [isTranscribing, setIsTranscribing] = useState(false);
   
   const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastGenRef = useRef<{ key: string; t: number } | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   // Use locations from service (React Query + locationsService)
   const allLocations = locationsFromService;
@@ -208,19 +211,124 @@ export function ButtonSimulatorWidget() {
     });
   };
 
+  // Start real audio recording
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm'
+      });
+      
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.start();
+      console.log('🎙️ Started recording audio');
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+      toast.error('Microphone access denied', {
+        description: 'Please allow microphone access to use voice messages'
+      });
+    }
+  };
+
+  // Stop recording and transcribe
+  const stopRecording = async () => {
+    return new Promise<string | null>((resolve) => {
+      const mediaRecorder = mediaRecorderRef.current;
+      
+      if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+        resolve(null);
+        return;
+      }
+
+      mediaRecorder.onstop = async () => {
+        console.log('🎙️ Stopped recording, processing audio...');
+        
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        console.log('Audio blob size:', audioBlob.size, 'bytes');
+
+        // Stop all tracks
+        mediaRecorder.stream.getTracks().forEach(track => track.stop());
+
+        // Transcribe audio
+        try {
+          setIsTranscribing(true);
+          const transcript = await transcribeAudio(audioBlob, recordingDuration);
+          setIsTranscribing(false);
+          resolve(transcript);
+        } catch (error) {
+          setIsTranscribing(false);
+          console.error('Transcription failed:', error);
+          resolve(null);
+        }
+      };
+
+      mediaRecorder.stop();
+    });
+  };
+
+  // Send audio to backend for transcription
+  const transcribeAudio = async (audioBlob: Blob, duration: number): Promise<string | null> => {
+    try {
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'recording.webm');
+      formData.append('duration', duration.toFixed(2));
+
+      console.log('📤 Sending audio to backend for transcription...');
+
+      const response = await fetch('http://localhost:3001/api/transcribe', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Transcription failed');
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.transcript) {
+        console.log('✅ Transcription successful:', data.transcript);
+        toast.success('Voice message transcribed!', {
+          description: data.transcript.substring(0, 100)
+        });
+        return data.transcript;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Transcription error:', error);
+      toast.error('Failed to transcribe audio', {
+        description: 'Using fallback mode'
+      });
+      return null;
+    }
+  };
+
   const handleMainButtonDown = () => {
     if (!selectedLocation) return;
     setIsMainPressed(true);
     pressTimerRef.current = setTimeout(() => {
       setIsRecording(true);
       setRecordingDuration(0);
+      
+      // Start real audio recording
+      startRecording();
+      
       recordingTimerRef.current = setInterval(() => {
         setRecordingDuration(prev => prev + 0.1);
       }, 100);
     }, 500);
   };
 
-  const handleMainButtonUp = (e?: React.MouseEvent) => {
+  const handleMainButtonUp = async (e?: React.MouseEvent) => {
     e?.preventDefault();
     e?.stopPropagation();
     
@@ -235,8 +343,15 @@ export function ButtonSimulatorWidget() {
         recordingTimerRef.current = null;
       }
       setIsRecording(false);
+      
       if (recordingDuration > 0.3) {
-        generateServiceRequest("main", "Voice Message", true, recordingDuration, 'normal');
+        // Stop recording and get transcript
+        const transcript = await stopRecording();
+        
+        // Use real transcript or fallback
+        const voiceMessage = transcript || `Voice message (${recordingDuration.toFixed(1)}s): Voice Message`;
+        
+        generateServiceRequest("main", voiceMessage, true, recordingDuration, 'normal');
       }
       setRecordingDuration(0);
     } else {
