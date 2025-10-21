@@ -36,6 +36,7 @@ export function LocationsPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [imageUrl, setImageUrl] = useState("");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
@@ -190,7 +191,7 @@ export function LocationsPage() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!selectedLocation) return;
     
     if (!canDeleteLocation) {
@@ -198,9 +199,17 @@ export function LocationsPage() {
       return;
     }
 
+    // Open confirmation dialog instead of deleting immediately
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!selectedLocation) return;
+
     try {
       await deleteLocation(selectedLocation.id);
       toast.success("Location deleted successfully");
+      setIsDeleteDialogOpen(false);
       setIsEditDialogOpen(false);
       setSelectedLocation(null);
       resetForm();
@@ -1016,6 +1025,67 @@ export function LocationsPage() {
               disabled={!uploadedImage && !imageUrl}
             >
               Save Image
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Location</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{selectedLocation?.name}"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Warning if location has guests */}
+            {selectedLocation?.guests && selectedLocation.guests.length > 0 && (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                <div className="flex items-start gap-2">
+                  <Users className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
+                  <div className="text-sm">
+                    <p className="font-medium text-destructive mb-1">Warning: Location has assigned guests</p>
+                    <p className="text-muted-foreground">
+                      This location currently has {selectedLocation.guests.length} guest(s) assigned. 
+                      Deleting it will remove these assignments.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Warning if location has smart button */}
+            {selectedLocation?.smartButtonId && (
+              <div className="rounded-lg border border-warning/30 bg-warning/5 p-3">
+                <div className="flex items-start gap-2">
+                  <Smartphone className="h-4 w-4 text-warning mt-0.5 flex-shrink-0" />
+                  <div className="text-sm">
+                    <p className="font-medium text-warning mb-1">Smart Button Assigned</p>
+                    <p className="text-muted-foreground">
+                      This location has smart button "{selectedLocation.smartButtonId}" assigned.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Location
             </Button>
           </DialogFooter>
         </DialogContent>
