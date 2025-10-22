@@ -52,7 +52,7 @@
 
 ---
 
-### **WEEK 2: HARDWARE INTEGRATION (Oct 29 - Nov 4)**
+### **WEEK 2: HARDWARE + MOBILE (Oct 29 - Nov 4)**
 
 #### **Day 8-9: ESP32 Smart Button - Phase 1** ⭐⭐⭐
 - [ ] MQTT broker setup (local or cloud)
@@ -61,26 +61,34 @@
 - [ ] Button press creates service request
 - **Deliverable:** Physical button working!
 
-#### **Day 10-11: ESP32 Smart Button - Phase 2** ⭐⭐
-- [ ] LED feedback (green = connected, red = disconnected, blue = sending)
-- [ ] Battery level monitoring
-- [ ] WiFi connection status
-- [ ] Location assignment per button
-- **Deliverable:** Professional button behavior
+#### **Day 10-11: Mobile App Foundation** ⭐⭐
+**Option A: React Native (Faster, Recommended)**
+- [ ] React Native project setup
+- [ ] API service integration (reuse web hooks!)
+- [ ] Authentication screen (login with existing backend)
+- [ ] Service requests list view
+- **Deliverable:** Basic mobile app connecting to backend
 
-#### **Day 12-13: Device Manager Integration** ⭐
-- [ ] Register buttons in Device Manager UI
-- [ ] Assign buttons to locations
-- [ ] Monitor battery & signal strength
-- [ ] Test button configuration
-- **Deliverable:** Full button management system
+**Option B: Native iOS (More polished, but slower)**
+- [ ] SwiftUI project setup
+- [ ] API client (Alamofire)
+- [ ] JWT authentication
+- [ ] Service requests view
+- **Deliverable:** iOS app prototype
 
-#### **Day 14: Hardware Testing & Backup Plan** ⭐⭐⭐
-- [ ] Test with multiple buttons
-- [ ] Stress test (many requests)
-- [ ] **BACKUP PLAN:** If hardware fails, simulator must be PERFECT
-- [ ] Prepare spare ESP32 units
-- **Deliverable:** Hardware demo-ready OR excellent simulator
+#### **Day 12-13: Mobile App Core Features** ⭐⭐
+- [ ] Push notifications setup (FCM for Android, APNS for iOS)
+- [ ] Accept/Complete service request buttons
+- [ ] Real-time updates (polling or WebSocket)
+- [ ] Guest/Location info display
+- **Deliverable:** Functional mobile app for demo
+
+#### **Day 14: Watch App Prototype** ⭐
+- [ ] Apple Watch companion app (SwiftUI)
+- [ ] Notification on wrist when button pressed
+- [ ] Quick action buttons (Accept, Complete)
+- [ ] Haptic feedback for urgent requests
+- **Deliverable:** Watch app showing "crew on the go" vision
 
 ---
 
@@ -141,30 +149,34 @@
 
 ---
 
-## 🚨 **WHAT TO CUT (If Running Out of Time):**
+## 🚨 **UPDATED PRIORITIES (Realistic Assessment):**
 
-### **LOW PRIORITY (Can Skip for Demo):**
-- ❌ Voice-to-text (show as "coming soon")
-- ❌ LoRa integration (WiFi only for now)
-- ❌ Watch apps (mention as roadmap item)
-- ❌ Mobile apps (web app sufficient for demo)
+### **ALREADY WORKING (Just Need Testing):**
+- ✅ **Voice-to-text** - Backend ready, just test it!
+- ✅ **Backend API** - All endpoints functional
+- ✅ **Database** - Production-ready schema
+- ✅ **Authentication** - JWT working (just fix token persistence)
+
+### **HIGH PRIORITY (Must Have for Demo):**
+- ⭐⭐⭐ Service Requests (butler call system) - **CORE DEMO**
+- ⭐⭐⭐ Locations management - **ESSENTIAL**
+- ⭐⭐⭐ Guest management - **ESSENTIAL**
+- ⭐⭐⭐ Dashboard with real-time updates - **IMPRESSIVE**
+- ⭐⭐⭐ ESP32 button working - **WOW FACTOR**
+- ⭐⭐⭐ Voice transcription demo - **ALREADY WORKS!**
+
+### **MEDIUM PRIORITY (Doable in 24 Days):**
+- ⭐⭐ **Mobile App (iOS/Android)** - Just frontend on existing API!
+- ⭐⭐ **Watch Apps** - Push notifications + quick actions
+- ⭐⭐ Device Manager - Shows scalability
+- ⭐ Real-time notifications - WebSocket or SSE
+
+### **LOW PRIORITY (Skip for Demo):**
+- ❌ LoRa integration (WiFi sufficient, mention as "coming soon")
 - ❌ Advanced analytics & reports
-- ❌ Crew scheduling/duty roster (show as planned feature)
-- ❌ Guest preferences AI (future feature)
-
-### **MEDIUM PRIORITY (Nice-to-Have):**
-- ⚠️ Crew management (show basic list, not full CRUD)
-- ⚠️ Activity log (show recent activity only)
-- ⚠️ Settings page (admin can configure, but not critical for demo)
-- ⚠️ Weather widget (cool, but not essential)
-
-### **HIGH PRIORITY (Must Have):**
-- ✅ Service Requests (butler call system) - **CORE DEMO**
-- ✅ Locations management - **ESSENTIAL**
-- ✅ Guest management - **ESSENTIAL**
-- ✅ Dashboard with real-time updates - **IMPRESSIVE**
-- ✅ ESP32 button working - **WOW FACTOR**
-- ✅ Device Manager - **SHOWS SCALABILITY**
+- ❌ Crew scheduling/duty roster
+- ❌ Guest preferences AI
+- ❌ Multi-yacht management
 
 ---
 
@@ -183,18 +195,18 @@
 4. Accept request, show status update
 5. Complete request, show history
 
-### **Minute 4: Show Key Features**
-- Real-time dashboard (multiple requests handling)
-- Location management (yacht layout with photos)
-- Guest profiles (dietary restrictions, preferences)
-- Device Manager (monitor all buttons, battery levels)
+### **Minute 4: Show Multi-Platform**
+- **Web Dashboard** - Real-time updates, location management
+- **Mobile App** - Crew accepts requests on iPhone/Android
+- **Watch App** - Notifications on Apple Watch (show prototype!)
+- **Voice Transcription** - Guest speaks, crew sees text
 
-### **Minute 5: Scalability & Roadmap**
+### **Minute 5: Scalability & Business Model**
 - Works on yachts of any size (show 200+ locations)
-- Watch apps for crew (Apple Watch, Android Wear)
-- LoRa for long-range (superyachts, outdoor areas)
-- Voice messages (ESP32 with microphone)
-- AI predictions (anticipate guest needs)
+- **All crew devices** - Web, mobile, watch, tablet
+- **Voice messages** - Already integrated (Whisper API)
+- **Hardware options** - ESP32 buttons (show physical unit)
+- **Future:** LoRa for superyachts, AI predictions
 
 **Call to Action:** "Book a demo installation for your yacht. First 10 sign-ups get 50% off hardware."
 
@@ -207,7 +219,10 @@
 - [ ] 3D-printed button enclosures (professional look)
 - [ ] USB-C power banks (backup power)
 - [ ] LED strips for visual effect
-- [ ] Tablet/iPad for dashboard demo
+- [ ] **iPad/Tablet** for web dashboard demo
+- [ ] **iPhone** with mobile app installed
+- [ ] **Apple Watch** with watch app (show wrist notifications!)
+- [ ] **Portable WiFi router** (backup internet)
 
 ### **Software:**
 - [x] Backend deployed (Railway/Heroku)
