@@ -9,6 +9,151 @@ const router = Router();
 router.use(authMiddleware);
 
 /**
+ * GET /api/devices/logs
+ * Get all device logs with optional filters
+ * NOTE: This MUST be before /:id routes to avoid "logs" being treated as an ID
+ */
+router.get('/logs', requirePermission('devices.view'), asyncHandler(async (req, res) => {
+  console.log('📱 GET /api/devices/logs - Handler called');
+  console.log('   Query params:', req.query);
+
+  const {
+    deviceId,
+    status,
+    startDate,
+    endDate,
+    search,
+    page = 1,
+    limit = 50,
+    eventType
+  } = req.query;
+
+  const where: any = {};
+
+  if (deviceId) where.deviceId = deviceId as string;
+  if (eventType) where.eventType = eventType as string;
+
+  // Handle status filter - map status to eventType
+  if (status) {
+    switch (status) {
+      case 'online':
+        where.eventType = 'device_online';
+        break;
+      case 'offline':
+        where.eventType = 'device_offline';
+        break;
+      case 'alert':
+        where.eventType = { in: ['battery_low', 'error'] };
+        break;
+      case 'maintenance':
+        where.eventType = 'maintenance';
+        break;
+    }
+  }
+
+  // Date range filter
+  if (startDate || endDate) {
+    where.createdAt = {};
+    if (startDate) where.createdAt.gte = new Date(startDate as string);
+    if (endDate) where.createdAt.lte = new Date(endDate as string);
+  }
+
+  // Search in eventData
+  if (search) {
+    where.OR = [
+      { eventType: { contains: search as string, mode: 'insensitive' } },
+      { severity: { contains: search as string, mode: 'insensitive' } }
+    ];
+  }
+
+  const skip = (Number(page) - 1) * Number(limit);
+
+  const [logs, total] = await Promise.all([
+    prisma.deviceLog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: Number(limit),
+      include: {
+        device: {
+          select: {
+            id: true,
+            deviceId: true,
+            name: true,
+            type: true,
+            location: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        }
+      }
+    }),
+    prisma.deviceLog.count({ where })
+  ]);
+
+  // Transform logs to match frontend expectations
+  const transformedLogs = logs.map(log => ({
+    id: log.id,
+    timestamp: log.createdAt,
+    createdAt: log.createdAt,
+    deviceId: log.device.deviceId,
+    deviceName: log.device.name,
+    location: log.device.location?.name || null,
+    status: mapEventTypeToStatus(log.eventType),
+    message: formatEventMessage(log.eventType, log.eventData),
+    event: log.eventType,
+    user: (log.eventData as any)?.user || null,
+    severity: log.severity
+  }));
+
+  console.log(`✅ Returning ${transformedLogs.length} device logs`);
+  res.json({
+    success: true,
+    data: transformedLogs,
+    pagination: {
+      page: Number(page),
+      limit: Number(limit),
+      total,
+      totalPages: Math.ceil(total / Number(limit))
+    }
+  });
+}));
+
+/**
+ * GET /api/devices/stats/summary
+ * Get device statistics
+ */
+router.get('/stats/summary', requirePermission('devices.view'), asyncHandler(async (req, res) => {
+  const [total, online, offline, lowBattery, byType] = await Promise.all([
+    prisma.device.count(),
+    prisma.device.count({ where: { status: 'online' } }),
+    prisma.device.count({ where: { status: 'offline' } }),
+    prisma.device.count({ where: { status: 'low_battery' } }),
+    prisma.device.groupBy({
+      by: ['type'],
+      _count: true
+    })
+  ]);
+
+  res.json({
+    success: true,
+    data: {
+      total,
+      online,
+      offline,
+      lowBattery,
+      byType: byType.reduce((acc: any, item: any) => {
+        acc[item.type] = item._count;
+        return acc;
+      }, {})
+    }
+  });
+}));
+
+/**
  * GET /api/devices
  * List all devices with optional filters
  */
@@ -16,7 +161,7 @@ router.get('/', requirePermission('devices.view'), asyncHandler(async (req, res)
   console.log('📱 GET /api/devices - Handler called');
   console.log('   Query params:', req.query);
   console.log('   User:', (req as any).user);
-  
+
   const { type, status, locationId, crewMemberId } = req.query;
 
   const where: any = {};
@@ -230,120 +375,7 @@ router.get('/:id/logs', requirePermission('devices.view'), asyncHandler(async (r
   res.json({ success: true, data: logs });
 }));
 
-/**
- * GET /api/devices/logs
- * Get all device logs with optional filters
- */
-router.get('/logs', requirePermission('devices.view'), asyncHandler(async (req, res) => {
-  console.log('📱 GET /api/devices/logs - Handler called');
-  console.log('   Query params:', req.query);
-  
-  const {
-    deviceId,
-    status,
-    startDate,
-    endDate,
-    search,
-    page = 1,
-    limit = 50,
-    eventType
-  } = req.query;
-
-  const where: any = {};
-  
-  if (deviceId) where.deviceId = deviceId as string;
-  if (eventType) where.eventType = eventType as string;
-  
-  // Handle status filter - map status to eventType
-  if (status) {
-    switch (status) {
-      case 'online':
-        where.eventType = 'device_online';
-        break;
-      case 'offline':
-        where.eventType = 'device_offline';
-        break;
-      case 'alert':
-        where.eventType = { in: ['battery_low', 'error'] };
-        break;
-      case 'maintenance':
-        where.eventType = 'maintenance';
-        break;
-    }
-  }
-  
-  // Date range filter
-  if (startDate || endDate) {
-    where.createdAt = {};
-    if (startDate) where.createdAt.gte = new Date(startDate as string);
-    if (endDate) where.createdAt.lte = new Date(endDate as string);
-  }
-  
-  // Search in eventData
-  if (search) {
-    where.OR = [
-      { eventType: { contains: search as string, mode: 'insensitive' } },
-      { severity: { contains: search as string, mode: 'insensitive' } }
-    ];
-  }
-
-  const skip = (Number(page) - 1) * Number(limit);
-
-  const [logs, total] = await Promise.all([
-    prisma.deviceLog.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: Number(limit),
-      include: {
-        device: {
-          select: {
-            id: true,
-            deviceId: true,
-            name: true,
-            type: true,
-            location: {
-              select: {
-                id: true,
-                name: true
-              }
-            }
-          }
-        }
-      }
-    }),
-    prisma.deviceLog.count({ where })
-  ]);
-
-  // Transform logs to match frontend expectations
-  const transformedLogs = logs.map(log => ({
-    id: log.id,
-    timestamp: log.createdAt,
-    createdAt: log.createdAt,
-    deviceId: log.device.deviceId,
-    deviceName: log.device.name,
-    location: log.device.location?.name || null,
-    status: mapEventTypeToStatus(log.eventType),
-    message: formatEventMessage(log.eventType, log.eventData),
-    event: log.eventType,
-    user: (log.eventData as any)?.user || null,
-    severity: log.severity
-  }));
-
-  console.log(`✅ Returning ${transformedLogs.length} device logs`);
-  res.json({
-    success: true,
-    data: transformedLogs,
-    pagination: {
-      page: Number(page),
-      limit: Number(limit),
-      total,
-      totalPages: Math.ceil(total / Number(limit))
-    }
-  });
-}));
-
-// Helper functions for device logs
+// Helper functions for device logs (moved to top of file where /logs endpoint is defined)
 function mapEventTypeToStatus(eventType: string): string {
   switch (eventType) {
     case 'device_online':
@@ -382,36 +414,5 @@ function formatEventMessage(eventType: string, eventData: any): string {
       return eventType.replace(/_/g, ' ');
   }
 }
-
-/**
- * GET /api/devices/stats
- * Get device statistics
- */
-router.get('/stats/summary', requirePermission('devices.view'), asyncHandler(async (req, res) => {
-  const [total, online, offline, lowBattery, byType] = await Promise.all([
-    prisma.device.count(),
-    prisma.device.count({ where: { status: 'online' } }),
-    prisma.device.count({ where: { status: 'offline' } }),
-    prisma.device.count({ where: { status: 'low_battery' } }),
-    prisma.device.groupBy({
-      by: ['type'],
-      _count: true
-    })
-  ]);
-
-  res.json({
-    success: true,
-    data: {
-      total,
-      online,
-      offline,
-      lowBattery,
-      byType: byType.reduce((acc: any, item: any) => {
-        acc[item.type] = item._count;
-        return acc;
-      }, {})
-    }
-  });
-}));
 
 export default router;

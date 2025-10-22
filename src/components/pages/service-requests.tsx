@@ -2,12 +2,12 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Card } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import { 
-  Bell, 
-  AlertCircle, 
-  Play, 
-  CheckCircle2, 
-  Send, 
+import {
+  Bell,
+  AlertCircle,
+  Play,
+  CheckCircle2,
+  Send,
   Clock,
   User,
   MapPin,
@@ -29,6 +29,7 @@ import type { ServiceRequest, InteriorTeam } from '../../contexts/AppDataContext
 import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { ServiceRequestsSettingsDialog } from '../service-requests-settings-dialog';
 import { ServingRequestCard } from '../serving-request-card';
+import { useCreateServiceRequest } from '../../hooks/useServiceRequestsApi';
 import {
   Dialog,
   DialogContent,
@@ -51,9 +52,9 @@ interface ServiceRequestsPageProps {
   onToggleFullscreen?: () => void;
 }
 
-export function ServiceRequestsPage({ 
-  isFullscreen: externalFullscreen, 
-  onToggleFullscreen: externalToggleFullscreen 
+export function ServiceRequestsPage({
+  isFullscreen: externalFullscreen,
+  onToggleFullscreen: externalToggleFullscreen
 }: ServiceRequestsPageProps = {}) {
   const {
     serviceRequests,
@@ -61,12 +62,14 @@ export function ServiceRequestsPage({
     delegateServiceRequest,
     forwardServiceRequest,
     completeServiceRequest,
-    simulateNewRequest,
+    // simulateNewRequest removed - using API directly
     serviceRequestHistory,
     clearServiceRequestHistory,
     crewMembers,
     userPreferences,
   } = useAppData();
+
+  const createServiceRequest = useCreateServiceRequest();
 
   // Track completing requests with timers
   const [completingRequests, setCompletingRequests] = useState<Record<string, number>>({});
@@ -330,18 +333,23 @@ export function ServiceRequestsPage({
                   </Badge>
                 )}
 
-                {/* Simulate Request Button */}
+                {/* Test Request Button - Creates real service request via API */}
                 <Button
                   variant="secondary"
                   size={isFullscreen ? 'lg' : 'default'}
                   onClick={() => {
-                    const newReq = simulateNewRequest();
-                    toast.info(`Simulated ${newReq.priority} request from ${newReq.guestName}`);
+                    createServiceRequest.mutate({
+                      requestType: 'call',
+                      priority: 'normal',
+                      notes: 'Test service request created from UI',
+                      status: 'open'
+                    });
                   }}
+                  disabled={createServiceRequest.isPending}
                   className={`gap-2 ${isFullscreen ? 'h-14 px-6' : ''}`}
                 >
                   <Bell className={`${isFullscreen ? 'h-5 w-5' : 'h-4 w-4'}`} />
-                  Simulate Request
+                  {createServiceRequest.isPending ? 'Creating...' : 'Test Request'}
                 </Button>
 
                 {/* Settings Button */}

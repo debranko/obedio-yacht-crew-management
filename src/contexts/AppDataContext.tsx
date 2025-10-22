@@ -157,7 +157,7 @@ interface AppDataContextType {
   delegateServiceRequest: (requestId: string, toCrewMember: string) => void;
   forwardServiceRequest: (requestId: string, toTeam: InteriorTeam) => void;
   completeServiceRequest: (requestId: string, crewMemberName?: string) => void;
-  simulateNewRequest: () => ServiceRequest;
+  // simulateNewRequest removed - use API directly
   getPendingRequestsForService: (serviceName: string) => ServiceRequest[];
   serviceRequestHistory: ServiceRequestHistory[];
   clearServiceRequestHistory: () => void;
@@ -1137,26 +1137,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     setServiceRequestHistory([]);
   };
 
-  const simulateNewRequest = (): ServiceRequest => {
-    // TODO: Replace with real API call to create a service request
-    // For now, create a minimal request using real data
-    const newRequest: ServiceRequest = {
-      id: `req-${Date.now()}`,
-      guestName: 'Simulated Guest',
-      guestCabin: 'Test Location',
-      cabinId: '',
-      requestType: 'call',
-      priority: 'normal',
-      timestamp: new Date(),
-      voiceTranscript: 'Simulated service request',
-      voiceAudioUrl: undefined,
-      cabinImage: undefined,
-      status: 'pending',
-    };
-    
-    setServiceRequests(prev => [newRequest, ...prev]);
-    return newRequest;
-  };
+  // REMOVED: simulateNewRequest - replaced with real API calls in components
+  // Components should use useServiceRequestsApi().createMutation directly
 
   return (
     <AppDataContext.Provider
@@ -1215,7 +1197,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         delegateServiceRequest,
         forwardServiceRequest,
         completeServiceRequest,
-        simulateNewRequest,
+        // simulateNewRequest removed - use API directly
         getPendingRequestsForService,
         serviceRequestHistory,
         clearServiceRequestHistory,

@@ -37,7 +37,7 @@ import {
   FileDown,
 } from 'lucide-react';
 import { Assignment, ViewMode, ShiftConfig, CrewMember } from '../duty-roster/types';
-import { mockCrewMembers, defaultShiftConfig } from '../duty-roster/mock-data';
+import { defaultShiftConfig } from '../duty-roster/mock-data';
 import { CrewMemberItem } from '../duty-roster/crew-member-item';
 import { CalendarDayCell } from '../duty-roster/calendar-day-cell';
 import { CalendarSettingsDialog } from '../duty-roster/calendar-settings-dialog';

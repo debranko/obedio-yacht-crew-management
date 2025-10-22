@@ -14,8 +14,8 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
       // Create default settings
       settings = await prisma.yachtSettings.create({
         data: {
-          vesselName: 'M/Y Serenity',
-          vesselType: 'motor-yacht',
+          name: 'M/Y Serenity',
+          type: 'motor',
           timezone: 'Europe/Monaco',
           floors: ['Lower Deck', 'Main Deck', 'Upper Deck', 'Sun Deck'],
         },
@@ -25,14 +25,14 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: {
-        name: settings.vesselName,
-        type: settings.vesselType,
+        name: settings.name,
+        type: settings.type,
         timezone: settings.timezone,
         floors: settings.floors,
-        dateFormat: 'DD/MM/YYYY', // Return default values for now
-        timeFormat: '24h',
-        weatherUnits: 'metric',
-        windSpeedUnits: 'knots',
+        dateFormat: settings.dateFormat,
+        timeFormat: settings.timeFormat,
+        weatherUnits: settings.weatherUnits,
+        windSpeedUnits: settings.windSpeedUnits,
       },
     });
   } catch (error) {
@@ -47,7 +47,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 // Update yacht settings
 router.put('/', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { name, type, timezone, floors } = req.body;
+    const { name, type, timezone, floors, dateFormat, timeFormat, weatherUnits, windSpeedUnits } = req.body;
 
     // Validate input
     if (!name || !type || !timezone) {
@@ -59,41 +59,44 @@ router.put('/', authMiddleware, async (req: Request, res: Response) => {
 
     // Get existing settings or create if not exists
     let settings = await prisma.yachtSettings.findFirst();
-    
+
+    const updateData: any = {
+      name,
+      type,
+      timezone,
+      floors: floors || ['Lower Deck', 'Main Deck', 'Upper Deck', 'Sun Deck'],
+    };
+
+    // Add optional fields if provided
+    if (dateFormat) updateData.dateFormat = dateFormat;
+    if (timeFormat) updateData.timeFormat = timeFormat;
+    if (weatherUnits) updateData.weatherUnits = weatherUnits;
+    if (windSpeedUnits) updateData.windSpeedUnits = windSpeedUnits;
+
     if (settings) {
       // Update existing settings
       settings = await prisma.yachtSettings.update({
         where: { id: settings.id },
-        data: {
-          vesselName: name,
-          vesselType: type,
-          timezone,
-          floors: floors || ['Lower Deck', 'Main Deck', 'Upper Deck', 'Sun Deck'],
-        },
+        data: updateData,
       });
     } else {
       // Create new settings
       settings = await prisma.yachtSettings.create({
-        data: {
-          vesselName: name,
-          vesselType: type,
-          timezone,
-          floors: floors || ['Lower Deck', 'Main Deck', 'Upper Deck', 'Sun Deck'],
-        },
+        data: updateData,
       });
     }
 
     res.json({
       success: true,
       data: {
-        name: settings.vesselName,
-        type: settings.vesselType,
+        name: settings.name,
+        type: settings.type,
         timezone: settings.timezone,
         floors: settings.floors,
-        dateFormat: 'DD/MM/YYYY', // Return default values for now
-        timeFormat: '24h',
-        weatherUnits: 'metric',
-        windSpeedUnits: 'knots',
+        dateFormat: settings.dateFormat,
+        timeFormat: settings.timeFormat,
+        weatherUnits: settings.weatherUnits,
+        windSpeedUnits: settings.windSpeedUnits,
         updatedAt: settings.updatedAt,
       },
     });

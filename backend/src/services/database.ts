@@ -453,7 +453,7 @@ export class DatabaseService {
       include: {
         guest: true,
         location: true,
-        assignedTo: true
+        category: true
       }
     });
   }
@@ -462,14 +462,13 @@ export class DatabaseService {
     return this.prisma.serviceRequest.update({
       where: { id: requestId },
       data: {
-        status: 'ACCEPTED',
-        assignedToId: crewMemberId,
-        acceptedAt: new Date()
+        status: 'in-progress',
+        assignedTo: crewMemberId  // assignedTo is a String field, not a relation
       },
       include: {
         guest: true,
         location: true,
-        assignedTo: true
+        category: true
       }
     });
   }
