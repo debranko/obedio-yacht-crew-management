@@ -122,7 +122,23 @@ export function ButtonSimulatorPage() {
     const location = currentLocation!;
     
     // Find guest at this location using proper foreign key relationship
-    const guestAtLocation = getGuestByLocationId(location.id) || guests[0];
+    // If multiple guests in same cabin, prefer owner > vip > partner > guest
+    const guestsAtLocation = guests.filter(g => g.locationId === location.id);
+    let guestAtLocation = null;
+    
+    if (guestsAtLocation.length > 0) {
+      // Sort by priority: owner > vip > partner > family > guest
+      const priorityOrder = { owner: 1, vip: 2, partner: 3, family: 4, guest: 5 };
+      guestsAtLocation.sort((a, b) => {
+        const aPriority = priorityOrder[a.type as keyof typeof priorityOrder] || 10;
+        const bPriority = priorityOrder[b.type as keyof typeof priorityOrder] || 10;
+        return aPriority - bPriority;
+      });
+      guestAtLocation = guestsAtLocation[0];  // Take highest priority guest
+    } else {
+      // Fallback: try context helper, but don't default to guests[0]
+      guestAtLocation = getGuestByLocationId(location.id);
+    }
 
     // Determine which crew member should handle this
     const assignedCrew = onDutyCrew[0]; // For now, assign to first on-duty crew

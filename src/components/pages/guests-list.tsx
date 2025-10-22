@@ -297,20 +297,23 @@ export function GuestsListPage() {
                   className="flex items-center justify-between gap-3 rounded-lg border border-destructive/20 bg-card px-4 py-3"
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <Avatar className="h-8 w-8 flex-shrink-0">
-                      {guest.photo && <AvatarImage src={guest.photo} alt={`${guest.firstName} ${guest.lastName}`} />}
-                      <AvatarFallback className="bg-destructive/10 text-destructive">
-                        {getInitials(guest.firstName, guest.lastName)}
+                    <Avatar className="h-10 w-10 border-2 border-background">
+                      <AvatarImage src={guest.photo} alt={guest.firstName} />
+                      <AvatarFallback className="text-sm bg-primary/10 text-primary">
+                        {guest.firstName[0]}{guest.lastName[0]}
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">
                       <p className="font-medium truncate">{guest.firstName} {guest.lastName}</p>
-                      {guest.cabin && (
-                        <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {guest.cabin}
-                        </p>
-                      )}
+                      {guest.locationId && (() => {
+                        const cabin = locations.find(l => l.id === guest.locationId);
+                        return cabin ? (
+                          <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {cabin.name}
+                          </p>
+                        ) : null;
+                      })()}
                     </div>
                   </div>
                   <Button
@@ -568,7 +571,12 @@ export function GuestsListPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm">{guest.cabin || '—'}</span>
+                      <span className="text-sm">
+                        {guest.locationId 
+                          ? (locations.find(l => l.id === guest.locationId)?.name || '—')
+                          : '—'
+                        }
+                      </span>
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">

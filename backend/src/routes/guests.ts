@@ -91,6 +91,7 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const body = req.body ?? {};
     const {
+      // Basic Info
       firstName,
       lastName,
       preferredName,
@@ -99,20 +100,60 @@ router.put('/:id', async (req, res) => {
       status,
       nationality,
       languages,
-      passportNumber
+      passportNumber,
+      
+      // Accommodation
+      locationId,
+      checkInDate,
+      checkOutDate,
+      
+      // Dietary & Medical
+      allergies,
+      dietaryRestrictions,
+      medicalConditions,
+      
+      // Preferences & Notes
+      preferences,
+      notes,
+      
+      // Emergency Contact
+      emergencyContactName,
+      emergencyContactPhone,
+      emergencyContactRelation
     } = body;
     
     // Update with only fields that exist in Prisma schema
     const updateData: any = {};
+    
+    // Basic Info
     if (firstName !== undefined) updateData.firstName = firstName;
     if (lastName !== undefined) updateData.lastName = lastName;
-    if (preferredName !== undefined) updateData.preferredName = preferredName;
-    if (photo !== undefined) updateData.photo = photo;
+    if (preferredName !== undefined) updateData.preferredName = preferredName || null;
+    if (photo !== undefined) updateData.photo = photo || null;
     if (type !== undefined) updateData.type = type;
     if (status !== undefined) updateData.status = status;
-    if (nationality !== undefined) updateData.nationality = nationality;
+    if (nationality !== undefined) updateData.nationality = nationality || null;
     if (languages !== undefined) updateData.languages = Array.isArray(languages) ? languages : [];
-    if (passportNumber !== undefined) updateData.passportNumber = passportNumber;
+    if (passportNumber !== undefined) updateData.passportNumber = passportNumber || null;
+    
+    // Accommodation
+    if (locationId !== undefined) updateData.locationId = locationId || null;
+    if (checkInDate !== undefined) updateData.checkInDate = checkInDate ? new Date(checkInDate) : null;
+    if (checkOutDate !== undefined) updateData.checkOutDate = checkOutDate ? new Date(checkOutDate) : null;
+    
+    // Dietary & Medical
+    if (allergies !== undefined) updateData.allergies = Array.isArray(allergies) ? allergies : [];
+    if (dietaryRestrictions !== undefined) updateData.dietaryRestrictions = Array.isArray(dietaryRestrictions) ? dietaryRestrictions : [];
+    if (medicalConditions !== undefined) updateData.medicalConditions = Array.isArray(medicalConditions) ? medicalConditions : [];
+    
+    // Preferences & Notes
+    if (preferences !== undefined) updateData.preferences = preferences || null;
+    if (notes !== undefined) updateData.notes = notes || null;
+    
+    // Emergency Contact
+    if (emergencyContactName !== undefined) updateData.emergencyContactName = emergencyContactName || null;
+    if (emergencyContactPhone !== undefined) updateData.emergencyContactPhone = emergencyContactPhone || null;
+    if (emergencyContactRelation !== undefined) updateData.emergencyContactRelation = emergencyContactRelation || null;
     
     const data = await prisma.guest.update({
       where: { id },
@@ -122,7 +163,7 @@ router.put('/:id', async (req, res) => {
     res.json({ success: true, data });
   } catch (error: any) {
     console.error('Update guest error:', error);
-    res.status(500).json({ 
+    res.json({ 
       success: false, 
       error: error.message || 'Failed to update guest' 
     });

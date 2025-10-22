@@ -9,6 +9,7 @@ import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import { toast } from "sonner";
 import { availableWidgets } from "./manage-widgets-dialog";
+import { useUserPreferences } from "../hooks/useUserPreferences";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -74,14 +75,32 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
   // Check if there are any DND active locations/guests
   const { hasDND } = useDND();
   
+  // Use backend-synced preferences
+  const { preferences, updateDashboard } = useUserPreferences();
+  
   const [layout, setLayout] = useState<WidgetLayout[]>(() => {
-    // Load saved layout from localStorage
-    const saved = localStorage.getItem("obedio-dashboard-layout");
-    return saved ? JSON.parse(saved) : defaultLayout;
+    // Load from backend preferences only (no localStorage fallback)
+    console.log('🎨 Initializing dashboard layout...');
+    if (preferences?.dashboardLayout) {
+      console.log('✅ Loading saved layout from preferences:', preferences.dashboardLayout);
+      return preferences.dashboardLayout;
+    }
+    console.log('⚠️ No saved layout found, using default');
+    return defaultLayout;
   });
 
-  // Save layout to localStorage
+  // Update layout when preferences are loaded from backend
+  useEffect(() => {
+    console.log('🔄 Preferences changed:', preferences);
+    if (preferences?.dashboardLayout) {
+      console.log('✅ Updating layout from preferences:', preferences.dashboardLayout);
+      setLayout(preferences.dashboardLayout);
+    }
+  }, [preferences]);
+
+  // Save layout to backend only
   const handleLayoutChange = (newLayout: any[]) => {
+    console.log('🔄 Dashboard layout changed:', newLayout.length, 'widgets');
     const updatedLayout = newLayout.map(item => ({
       i: item.i,
       x: item.x,
@@ -93,7 +112,17 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
       maxH: item.maxH,
     }));
     setLayout(updatedLayout);
-    localStorage.setItem("obedio-dashboard-layout", JSON.stringify(updatedLayout));
+    
+    console.log('💾 Saving layout to backend...', {
+      dashboardLayout: updatedLayout,
+      activeWidgets: activeWidgets,
+    });
+    
+    // Save to backend
+    updateDashboard({
+      dashboardLayout: updatedLayout,
+      activeWidgets: activeWidgets,
+    });
   };
 
   // Update layout when widgets are added/removed
@@ -126,14 +155,12 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
       
       const updatedLayout = [...layout, ...newLayouts];
       setLayout(updatedLayout);
-      localStorage.setItem("obedio-dashboard-layout", JSON.stringify(updatedLayout));
     }
     
     // Remove widgets that are no longer active
     const filteredLayout = layout.filter(l => activeWidgets.includes(l.i));
     if (filteredLayout.length !== layout.length) {
       setLayout(filteredLayout);
-      localStorage.setItem("obedio-dashboard-layout", JSON.stringify(filteredLayout));
     }
   }, [activeWidgets]);
 
@@ -143,7 +170,13 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
       // Reset to default layout but only for active widgets
       const filteredDefault = defaultLayout.filter(l => activeWidgets.includes(l.i));
       setLayout(filteredDefault);
-      localStorage.setItem("obedio-dashboard-layout", JSON.stringify(filteredDefault));
+      
+      // Update backend
+      updateDashboard({
+        dashboardLayout: filteredDefault,
+        activeWidgets: activeWidgets,
+      });
+      
       toast.success("Dashboard layout reset to default");
     },
     openManageWidgets: () => {

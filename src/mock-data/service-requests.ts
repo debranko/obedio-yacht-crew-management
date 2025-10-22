@@ -141,70 +141,59 @@ export function generateMockServiceRequests(): ServiceRequest[] {
   return requests.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 }
 
-export function simulateNewServiceRequest(): ServiceRequest {
-  // Mock cabin images
-  const cabinImages = [
-    'https://images.unsplash.com/photo-1697124510322-27ef594f67fd?w=800',
-    'https://images.unsplash.com/photo-1737061296028-2eb5cb0a62df?w=800',
-    'https://images.unsplash.com/photo-1573717865061-202c78c4b414?w=800',
-  ];
+/**
+ * Simulates a new service request using REAL data from database
+ * This function should be called with actual guests and locations data
+ */
+export function simulateNewServiceRequest(
+  guests?: any[],
+  locations?: any[]
+): ServiceRequest {
+  // If no real data provided, create minimal request
+  if (!guests || guests.length === 0 || !locations || locations.length === 0) {
+    const priorities: Array<'normal' | 'urgent' | 'emergency'> = ['normal', 'normal', 'urgent'];
+    const priority = priorities[Math.floor(Math.random() * priorities.length)];
+    
+    return {
+      id: `req-${Date.now()}`,
+      guestName: 'Unknown Guest',
+      guestCabin: 'Unknown Location',
+      cabinId: undefined,
+      requestType: priority === 'emergency' ? 'emergency' : 'call',
+      priority,
+      timestamp: new Date(),
+      voiceTranscript: 'Service request from smart button (no message)',
+      voiceAudioUrl: undefined,
+      cabinImage: undefined,
+      status: 'pending',
+    };
+  }
 
-  const mockAudioUrl = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
-
-  const guestRequests = [
-    {
-      guestName: 'Mr. Anderson',
-      cabin: 'Owner\'s Stateroom',
-      cabinId: 'M01',
-      voiceText: 'Could we have a bottle of champagne and some fresh towels brought to the sun deck please?',
-    },
-    {
-      guestName: 'Mrs. Chen',
-      cabin: 'VIP Cabin',
-      cabinId: 'M02',
-      voiceText: 'We would like evening turndown service at 8 PM.',
-    },
-    {
-      guestName: 'Dr. Williams',
-      cabin: 'Cabin 6',
-      cabinId: 'U01',
-      voiceText: 'I need a gluten-free meal prepared for dinner tonight, no dairy products please.',
-    },
-    {
-      guestName: 'Ms. Taylor',
-      cabin: 'VIP Cabin',
-      cabinId: 'M03',
-      voiceText: 'Can someone help set up the beach club area? We need water sports equipment.',
-    },
-    {
-      guestName: 'Mr. Blackwood',
-      cabin: 'Cabin 6',
-      cabinId: 'U02',
-      voiceText: 'The air conditioning in our cabin seems too cold. Could someone adjust it?',
-    },
-    {
-      guestName: 'Ms. Rodriguez',
-      cabin: 'Cabin 6',
-      cabinId: 'U03',
-      voiceText: 'We would like to have breakfast served on the external salon at 9 AM tomorrow.',
-    },
-  ];
-
-  const reqData = guestRequests[Math.floor(Math.random() * guestRequests.length)];
-  const priorities: Array<'normal' | 'urgent' | 'emergency'> = ['normal', 'normal', 'urgent', 'emergency'];
+  // Use REAL guest from database
+  const randomGuest = guests[Math.floor(Math.random() * guests.length)];
+  
+  // Use REAL location from database
+  const randomLocation = locations[Math.floor(Math.random() * locations.length)];
+  
+  // Priority distribution (mostly normal, some urgent, rare emergency)
+  const priorities: Array<'normal' | 'urgent' | 'emergency'> = ['normal', 'normal', 'normal', 'urgent'];
   const priority = priorities[Math.floor(Math.random() * priorities.length)];
+
+  const guestFullName = randomGuest.firstName 
+    ? `${randomGuest.firstName} ${randomGuest.lastName}`
+    : randomGuest.lastName;
 
   const newRequest: ServiceRequest = {
     id: `req-${Date.now()}`,
-    guestName: reqData.guestName,
-    guestCabin: reqData.cabin,
-    cabinId: reqData.cabinId,
+    guestName: guestFullName,
+    guestCabin: randomLocation.name,
+    cabinId: randomLocation.id,
     requestType: priority === 'emergency' ? 'emergency' : 'call',
     priority,
     timestamp: new Date(),
-    voiceTranscript: reqData.voiceText,
-    voiceAudioUrl: mockAudioUrl,
-    cabinImage: cabinImages[Math.floor(Math.random() * cabinImages.length)],
+    voiceTranscript: 'Service request via smart button',
+    voiceAudioUrl: undefined, // No audio in simulation
+    cabinImage: randomLocation.image || undefined, // Use location image if available
     status: 'pending',
   };
 

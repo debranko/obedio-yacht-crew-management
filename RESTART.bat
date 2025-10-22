@@ -1,0 +1,3 @@
+@echo off
+echo Restarting OBEDIO Development Servers...
+powershell -ExecutionPolicy Bypass -File "%~dp0restart.ps1"

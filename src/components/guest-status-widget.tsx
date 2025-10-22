@@ -28,6 +28,7 @@ export function GuestStatusWidget({
         return {
           name: `${guest.firstName} ${guest.lastName}`,
           cabin: location?.name || 'Unknown',
+          photo: guest.photo,
           id: guest.id
         };
       })
@@ -54,21 +55,37 @@ export function GuestStatusWidget({
         </div>
       </div>
 
-      {/* Guest List - Responsive */}
-      <div className="space-y-1.5 overflow-y-auto" style={{ maxHeight: 'calc(100% - 36px)' }}>
+      {/* Guest List with Photos - Scrollable */}
+      <div className="space-y-2 overflow-y-auto pr-1" style={{ maxHeight: 'calc(100% - 36px)' }}>
         {guestsWithCabins.length > 0 ? (
           guestsWithCabins.map((guest) => (
             <div
               key={guest.id}
-              className="flex items-center justify-between py-1.5 px-2 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors"
+              className="flex items-center gap-2.5 py-2 px-2.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
             >
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                <span className="text-xs font-medium truncate">{guest.name}</span>
+              {/* Guest Photo */}
+              <div className="flex-shrink-0">
+                {guest.photo ? (
+                  <img 
+                    src={guest.photo} 
+                    alt={guest.name}
+                    className="w-10 h-10 rounded-full object-cover ring-2 ring-background"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center ring-2 ring-background">
+                    <Users className="h-5 w-5 text-primary/50" />
+                  </div>
+                )}
               </div>
-              <span className="text-xs text-muted-foreground font-medium ml-2 flex-shrink-0">
-                {guest.cabin}
-              </span>
+              
+              {/* Guest Info */}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold truncate">{guest.name}</div>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <MapPin className="h-3 w-3 flex-shrink-0" />
+                  <span className="truncate">{guest.cabin}</span>
+                </div>
+              </div>
             </div>
           ))
         ) : (

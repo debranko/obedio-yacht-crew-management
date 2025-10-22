@@ -21,6 +21,24 @@ model User {
   
   crewMember   CrewMember?
   activityLogs ActivityLog[]
+  preferences  UserPreferences?
+}
+
+model UserPreferences {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Dashboard Layout & Widgets
+  dashboardLayout   Json?    // Widget positions and sizes
+  activeWidgets     Json?    // Array of active widget IDs
+  
+  // UI Preferences
+  theme             String   @default("light") // "light", "dark", "auto"
+  language          String   @default("en")
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model CrewMember {
@@ -39,6 +57,7 @@ model CrewMember {
   
   user              User?               @relation(fields: [userId], references: [id])
   deviceAssignments DeviceAssignment[]
+  devices           Device[]
 }
 
 model Location {
@@ -55,6 +74,7 @@ model Location {
   
   guests          Guest[]
   serviceRequests ServiceRequest[]
+  devices         Device[]
 }
 
 model Guest {
@@ -69,6 +89,25 @@ model Guest {
   languages      String[] @default([])
   passportNumber String?
   locationId     String?
+  
+  // Accommodation & Check-in Info
+  checkInDate    DateTime?
+  checkOutDate   DateTime?
+  
+  // Dietary & Medical
+  allergies              String[] @default([])
+  dietaryRestrictions    String[] @default([])
+  medicalConditions      String[] @default([])
+  
+  // Preferences & Notes
+  preferences            String?  // General preferences
+  notes                  String?  // Staff notes
+  
+  // Emergency Contact
+  emergencyContactName   String?
+  emergencyContactPhone  String?
+  emergencyContactRelation String?
+  
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   
@@ -93,18 +132,56 @@ model ServiceRequest {
 }
 
 model Device {
-  id           String   @id @default(cuid())
-  name         String
-  type         String
-  deviceId     String   @unique
-  status       String   @default("active")
-  batteryLevel Int?
-  lastSeen     DateTime?
-  locationId   String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id              String    @id @default(cuid())
+  deviceId        String    @unique  // BTN-001, WCH-001, RPT-001, APP-IOS-001
+  name            String
+  type            String    // "smart_button", "watch", "repeater", "mobile_app"
+  subType         String?   // "ios", "android", "esp32"
+  status          String    @default("online") // "online", "offline", "low_battery", "error"
   
-  assignments DeviceAssignment[]
+  // Location & Assignment
+  locationId      String?
+  location        Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  crewMemberId    String?
+  crewMember      CrewMember? @relation(fields: [crewMemberId], references: [id], onDelete: SetNull)
+  
+  // Status Monitoring
+  batteryLevel    Int?      // 0-100
+  signalStrength  Int?      // RSSI in dBm (-120 to 0)
+  connectionType  String?   // "lora_868", "lora_915", "lora_433", "wifi", "bluetooth"
+  lastSeen        DateTime?
+  
+  // Configuration (JSON - flexible per device type)
+  config          Json?     // Button actions, LED, audio, repeater settings, etc.
+  
+  // Metadata
+  firmwareVersion String?
+  hardwareVersion String?
+  macAddress      String?
+  ipAddress       String?
+  
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  assignments     DeviceAssignment[]
+  logs            DeviceLog[]
+}
+
+model DeviceLog {
+  id         String   @id @default(cuid())
+  deviceId   String
+  device     Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  
+  eventType  String   // "button_press", "battery_low", "offline", "config_change", "test_signal"
+  eventData  Json?    // Additional event details
+  severity   String   @default("info") // "info", "warning", "error"
+  
+  createdAt  DateTime @default(now())
+  
+  @@index([deviceId])
+  @@index([eventType])
+  @@index([createdAt])
 }
 
 model DeviceAssignment {

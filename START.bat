@@ -1,0 +1,3 @@
+@echo off
+echo Starting OBEDIO Development Servers...
+powershell -ExecutionPolicy Bypass -File "%~dp0start.ps1"

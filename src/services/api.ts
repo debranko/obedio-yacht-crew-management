@@ -20,6 +20,8 @@ async function fetchApi<T>(
 ): Promise<T> {
   const token = localStorage.getItem('obedio-auth-token');
   
+  console.log('🔐 API Call:', endpoint, { hasToken: !!token, token: token?.substring(0, 20) + '...' });
+  
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...(token && { Authorization: `Bearer ${token}` }),
@@ -107,15 +109,37 @@ export const crewApi = {
 
 export interface GuestDTO {
   id: string;
+  
+  // Basic Info
   firstName: string;
   lastName: string;
   preferredName?: string | null;
   photo?: string | null;
-  type: 'owner' | 'vip' | 'guest';
+  type: 'owner' | 'vip' | 'guest' | 'partner' | 'family';
   status: 'expected' | 'onboard' | 'ashore' | 'departed';
   nationality?: string | null;
   languages?: string[];
   passportNumber?: string | null;
+  
+  // Accommodation
+  locationId?: string | null;
+  checkInDate?: string | null;
+  checkOutDate?: string | null;
+  
+  // Dietary & Medical
+  allergies?: string[];
+  dietaryRestrictions?: string[];
+  medicalConditions?: string[];
+  
+  // Preferences & Notes
+  preferences?: string | null;
+  notes?: string | null;
+  
+  // Emergency Contact
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  emergencyContactRelation?: string | null;
+  
   serviceRequests?: any[];
   createdAt: string;
   updatedAt: string;
@@ -234,6 +258,86 @@ export const serviceRequestsApi = {
 };
 
 // =====================
+// DEVICES API
+// =====================
+
+export const devicesApi = {
+  /**
+   * Get all devices
+   */
+  getAll: (params?: Record<string, string>) => {
+    const query = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return fetchApi<any[]>(`/devices${query}`);
+  },
+
+  /**
+   * Get single device by ID
+   */
+  getById: (id: string) => fetchApi<any>(`/devices/${id}`),
+
+  /**
+   * Create new device
+   */
+  create: (data: any) =>
+    fetchApi<any>('/devices', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Update device
+   */
+  update: (id: string, data: any) =>
+    fetchApi<any>(`/devices/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Delete device
+   */
+  delete: (id: string) =>
+    fetchApi<void>(`/devices/${id}`, {
+      method: 'DELETE',
+    }),
+
+  /**
+   * Get device config
+   */
+  getConfig: (id: string) => fetchApi<any>(`/devices/${id}/config`),
+
+  /**
+   * Update device config
+   */
+  updateConfig: (id: string, config: any) =>
+    fetchApi<any>(`/devices/${id}/config`, {
+      method: 'PUT',
+      body: JSON.stringify({ config }),
+    }),
+
+  /**
+   * Test device (send test signal)
+   */
+  test: (id: string) =>
+    fetchApi<any>(`/devices/${id}/test`, {
+      method: 'POST',
+    }),
+
+  /**
+   * Get device logs
+   */
+  getLogs: (id: string, params?: Record<string, string>) => {
+    const query = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return fetchApi<any[]>(`/devices/${id}/logs${query}`);
+  },
+
+  /**
+   * Get device statistics
+   */
+  getStats: () => fetchApi<any>('/devices/stats/summary'),
+};
+
+// =====================
 // EXPORT ALL
 // =====================
 
@@ -241,4 +345,22 @@ export const api = {
   crew: crewApi,
   guests: guestsApi,
   serviceRequests: serviceRequestsApi,
+  devices: devicesApi,
+  
+  // Direct methods for convenience
+  get: (endpoint: string) => fetchApi<any>(endpoint),
+  post: (endpoint: string, data?: any) => 
+    fetchApi<any>(endpoint, {
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+    }),
+  put: (endpoint: string, data?: any) =>
+    fetchApi<any>(endpoint, {
+      method: 'PUT',
+      body: data ? JSON.stringify(data) : undefined,
+    }),
+  delete: (endpoint: string) =>
+    fetchApi<void>(endpoint, {
+      method: 'DELETE',
+    }),
 };

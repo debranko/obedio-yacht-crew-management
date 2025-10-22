@@ -27,18 +27,38 @@ async function seedAdmin() {
 }
 
 async function seedLocations() {
-  console.log(' Seeding locations...');
+  console.log(' Seeding locations (Real Yacht Layout with Images)...');
   
   const locations = [
-    { name: 'Master Suite', type: 'cabin', description: 'Owner\'s primary cabin' },
-    { name: 'VIP Suite', type: 'cabin', description: 'VIP guest cabin' },
-    { name: 'Guest Cabin 1', type: 'cabin', description: 'Guest accommodation' },
-    { name: 'Guest Cabin 2', type: 'cabin', description: 'Guest accommodation' },
-    { name: 'Main Salon', type: 'common', description: 'Main living area' },
-    { name: 'Upper Deck', type: 'deck', description: 'Upper deck area' },
-    { name: 'Sun Deck', type: 'deck', description: 'Sun deck with pool' },
-    { name: 'Bridge', type: 'service', description: 'Navigation bridge' },
-    { name: 'Galley', type: 'service', description: 'Main kitchen' },
+    // SUN DECK
+    { name: 'Sun Deck Lounge', type: 'common', floor: 'Sun Deck', description: 'Top deck lounge with panoramic views', image: '/images/locations/Sun Deck.jpg' },
+    
+    // BRIDGE DECK
+    { name: 'Gym', type: 'common', floor: 'Bridge Deck', description: 'Fitness center with modern equipment', image: '/images/locations/Gym.jpg' },
+    
+    // OWNER\'S DECK
+    { name: 'External Saloon', type: 'common', floor: 'Owner\'s Deck', description: 'Outdoor lounge and entertainment area', image: '/images/locations/Exterior Aft.jpg' },
+    { name: 'Main Saloon', type: 'common', floor: 'Owner\'s Deck', description: 'Primary living and entertainment space', image: '/images/locations/Main Salon.jpg' },
+    { name: 'VIP Office', type: 'cabin', floor: 'Owner\'s Deck', description: 'Private office for VIP guests', image: '/images/locations/VIP Office.jpg' },
+    { name: 'VIP Cabin', type: 'cabin', floor: 'Owner\'s Deck', description: 'Luxury VIP guest accommodation', image: '/images/locations/vip bedroom.jpg' },
+    { name: 'Master Bedroom', type: 'cabin', floor: 'Owner\'s Deck', description: 'Owner\'s master suite with balcony', image: '/images/locations/Master Bedroom.jpg' },
+    { name: 'Dining Room', type: 'common', floor: 'Owner\'s Deck', description: 'Formal dining area', image: '/images/locations/dinning room.jpg' },
+    
+    // MAIN DECK
+    { name: 'Meeting Room', type: 'common', floor: 'Main Deck', description: 'Conference and meeting space', image: '/images/locations/Meeting Room.jpg' },
+    { name: 'Welcome Salon', type: 'common', floor: 'Main Deck', description: 'Guest reception and lounge', image: '/images/locations/Welcome Salon.jpg' },
+    { name: 'Staff Cabin', type: 'service', floor: 'Main Deck', description: 'Crew accommodation', image: '/images/locations/Staff Cabin.jpg' },
+    
+    // LOWER DECK
+    { name: 'Lazzaret', type: 'deck', floor: 'Lower Deck', description: 'Swim platform and water sports access', image: '/images/locations/Lazzaret (swimming platform).jpg' },
+    
+    // TANK DECK - Guest Cabins
+    { name: 'Cabin 1', type: 'cabin', floor: 'Tank Deck', description: 'Guest cabin with modern amenities', image: '/images/locations/Yersin.jpg' },
+    { name: 'Cabin 2', type: 'cabin', floor: 'Tank Deck', description: 'Guest cabin with modern amenities', image: '/images/locations/Yersin.jpg' },
+    { name: 'Cabin 3', type: 'cabin', floor: 'Tank Deck', description: 'Guest cabin with modern amenities', image: '/images/locations/Yersin.jpg' },
+    { name: 'Cabin 4', type: 'cabin', floor: 'Tank Deck', description: 'Guest cabin with modern amenities', image: '/images/locations/Yersin.jpg' },
+    { name: 'Cabin 5', type: 'cabin', floor: 'Tank Deck', description: 'Guest cabin with modern amenities', image: '/images/locations/Yersin.jpg' },
+    { name: 'Cabin 6', type: 'cabin', floor: 'Tank Deck', description: 'Guest cabin with modern amenities', image: '/images/locations/Yersin.jpg' },
   ];
 
   await prisma.location.createMany({
@@ -46,19 +66,28 @@ async function seedLocations() {
     skipDuplicates: true,
   });
   
-  console.log(` Created ${locations.length} locations`);
+  console.log(` Created ${locations.length} locations (Real Yacht Layout)`);
 }
 
 async function seedCrew() {
-  console.log(' Seeding crew members...');
+  console.log(' Seeding crew members (Interior Department only)...');
   
   const crew = [
+    // Interior Department ONLY - Stewardesses
     { name: 'Sarah Johnson', position: 'Chief Stewardess', department: 'Interior', status: 'active', email: 'sarah@yacht.local', role: 'chief-stewardess' },
-    { name: 'Emma Williams', position: 'Stewardess', department: 'Interior', status: 'active', email: 'emma@yacht.local', role: 'stewardess' },
+    { name: 'Emma Williams', position: 'Senior Stewardess', department: 'Interior', status: 'active', email: 'emma@yacht.local', role: 'stewardess' },
     { name: 'Lisa Brown', position: 'Stewardess', department: 'Interior', status: 'active', email: 'lisa@yacht.local', role: 'stewardess' },
-    { name: 'John Smith', position: 'Captain', department: 'Deck', status: 'active', email: 'captain@yacht.local', role: 'admin' },
-    { name: 'Mike Davis', position: 'First Officer', department: 'Deck', status: 'active', email: 'mike@yacht.local', role: 'crew' },
-    { name: 'Tom Wilson', position: 'Chief Engineer', department: 'Engineering', status: 'active', email: 'tom@yacht.local', role: 'eto' },
+    { name: 'Maria Garcia', position: 'Stewardess', department: 'Interior', status: 'active', email: 'maria@yacht.local', role: 'stewardess' },
+    { name: 'Sophie Martin', position: 'Junior Stewardess', department: 'Interior', status: 'active', email: 'sophie@yacht.local', role: 'stewardess' },
+    { name: 'Isabella Rossi', position: 'Laundry Stewardess', department: 'Interior', status: 'active', email: 'isabella@yacht.local', role: 'stewardess' },
+    { name: 'Chloe Anderson', position: 'Night Stewardess', department: 'Interior', status: 'active', email: 'chloe@yacht.local', role: 'stewardess' },
+    { name: 'Olivia Taylor', position: 'Stewardess', department: 'Interior', status: 'on-leave', email: 'olivia@yacht.local', role: 'stewardess' },
+    
+    // NOTE: Removed all non-Interior departments:
+    // - Deck Department (Captain, Officers, Deckhand) - REMOVED
+    // - Engineering Department (Engineers, ETO) - REMOVED
+    // - Galley Department (Chefs) - REMOVED
+    // Only Interior stewardesses remain as per user requirements
   ];
 
   await prisma.crewMember.createMany({
@@ -70,56 +99,201 @@ async function seedCrew() {
     skipDuplicates: true,
   });
   
-  console.log(` Created ${crew.length} crew members`);
+  console.log(` Created ${crew.length} Interior crew members`);
 }
 
 async function seedGuests() {
-  console.log(' Seeding guests...');
+  console.log(' Seeding celebrity guests...');
   
-  // Get location IDs
-  const masterSuite = await prisma.location.findFirst({ where: { name: 'Master Suite' } });
-  const vipSuite = await prisma.location.findFirst({ where: { name: 'VIP Suite' } });
-  const guestCabin1 = await prisma.location.findFirst({ where: { name: 'Guest Cabin 1' } });
+  // Get location IDs from new yacht layout
+  const masterBedroom = await prisma.location.findFirst({ where: { name: 'Master Bedroom' } });
+  const vipCabin = await prisma.location.findFirst({ where: { name: 'VIP Cabin' } });
+  const vipOffice = await prisma.location.findFirst({ where: { name: 'VIP Office' } });
+  const cabin1 = await prisma.location.findFirst({ where: { name: 'Cabin 1' } });
+  const cabin2 = await prisma.location.findFirst({ where: { name: 'Cabin 2' } });
+  const cabin3 = await prisma.location.findFirst({ where: { name: 'Cabin 3' } });
+  const cabin4 = await prisma.location.findFirst({ where: { name: 'Cabin 4' } });
+  const cabin5 = await prisma.location.findFirst({ where: { name: 'Cabin 5' } });
+  const cabin6 = await prisma.location.findFirst({ where: { name: 'Cabin 6' } });
   
   const guests = [
+    // MASTER BEDROOM (Owner's Deck) - Leonardo DiCaprio & Scarlett Johansson
     { 
-      firstName: 'Alexander', 
-      lastName: 'Montgomery',
-      preferredName: 'Alex',
+      firstName: 'Leonardo', 
+      lastName: 'DiCaprio',
+      preferredName: 'Leo',
       type: 'owner', 
       status: 'onboard',
-      nationality: 'British',
-      languages: ['English', 'French'],
-      locationId: masterSuite?.id
+      nationality: 'American',
+      languages: ['English', 'German'],
+      locationId: masterBedroom?.id,
+      photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop'
     },
     { 
-      firstName: 'Victoria', 
-      lastName: 'Montgomery',
-      preferredName: 'Vicky',
+      firstName: 'Scarlett', 
+      lastName: 'Johansson',
       type: 'partner', 
       status: 'onboard',
-      nationality: 'British',
-      languages: ['English', 'Spanish'],
-      locationId: masterSuite?.id
+      nationality: 'American',
+      languages: ['English', 'French'],
+      locationId: masterBedroom?.id,
+      photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop'
     },
+    
+    // VIP CABIN (Owner's Deck) - George Clooney & Amal
     { 
-      firstName: 'Robert', 
-      lastName: 'Harrison',
-      preferredName: 'Rob',
+      firstName: 'George', 
+      lastName: 'Clooney',
       type: 'vip', 
       status: 'onboard',
       nationality: 'American',
-      languages: ['English'],
-      locationId: vipSuite?.id
+      languages: ['English', 'Italian'],
+      locationId: vipCabin?.id,
+      photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop'
     },
     { 
-      firstName: 'Sophie', 
-      lastName: 'Anderson',
-      type: 'family', 
+      firstName: 'Amal', 
+      lastName: 'Clooney',
+      type: 'vip', 
       status: 'onboard',
-      nationality: 'Swedish',
-      languages: ['English', 'Swedish'],
-      locationId: guestCabin1?.id
+      nationality: 'British',
+      languages: ['English', 'Arabic', 'French'],
+      locationId: vipCabin?.id,
+      photo: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop'
+    },
+    
+    // VIP OFFICE (Owner's Deck) - Chris Hemsworth & Elsa Pataky
+    { 
+      firstName: 'Chris', 
+      lastName: 'Hemsworth',
+      type: 'vip', 
+      status: 'onboard',
+      nationality: 'Australian',
+      languages: ['English'],
+      locationId: vipOffice?.id,
+      photo: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=400&fit=crop'
+    },
+    { 
+      firstName: 'Elsa', 
+      lastName: 'Pataky',
+      type: 'vip', 
+      status: 'onboard',
+      nationality: 'Spanish',
+      languages: ['Spanish', 'English'],
+      locationId: vipOffice?.id,
+      photo: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&h=400&fit=crop'
+    },
+    
+    // CABIN 1 (Tank Deck) - Ed Sheeran & Cherry Seaborn
+    { 
+      firstName: 'Ed', 
+      lastName: 'Sheeran',
+      type: 'guest', 
+      status: 'onboard',
+      nationality: 'British',
+      languages: ['English'],
+      locationId: cabin1?.id,
+      photo: 'https://images.unsplash.com/photo-1552374196-c4e7ffc6e126?w=400&h=400&fit=crop'
+    },
+    { 
+      firstName: 'Cherry', 
+      lastName: 'Seaborn',
+      type: 'guest', 
+      status: 'onboard',
+      nationality: 'British',
+      languages: ['English'],
+      locationId: cabin1?.id,
+      photo: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop'
+    },
+    
+    // CABIN 2 (Tank Deck) - Timothée Chalamet & Zendaya
+    { 
+      firstName: 'Timothée', 
+      lastName: 'Chalamet',
+      type: 'guest', 
+      status: 'onboard',
+      nationality: 'American',
+      languages: ['English', 'French'],
+      locationId: cabin2?.id,
+      photo: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&h=400&fit=crop'
+    },
+    { 
+      firstName: 'Zendaya', 
+      lastName: 'Coleman',
+      preferredName: 'Z',
+      type: 'guest', 
+      status: 'onboard',
+      nationality: 'American',
+      languages: ['English'],
+      locationId: cabin2?.id,
+      photo: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&h=400&fit=crop'
+    },
+    
+    // CABIN 3 (Tank Deck) - Dwayne Johnson & Lauren
+    { 
+      firstName: 'Dwayne', 
+      lastName: 'Johnson',
+      preferredName: 'The Rock',
+      type: 'guest', 
+      status: 'onboard',
+      nationality: 'American',
+      languages: ['English'],
+      locationId: cabin3?.id,
+      photo: 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=400&h=400&fit=crop'
+    },
+    { 
+      firstName: 'Lauren', 
+      lastName: 'Hashian',
+      type: 'guest', 
+      status: 'onboard',
+      nationality: 'American',
+      languages: ['English'],
+      locationId: cabin3?.id,
+      photo: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=400&h=400&fit=crop'
+    },
+    { 
+      firstName: 'Ryan', 
+      lastName: 'Reynolds',
+      type: 'guest', 
+      status: 'onboard',
+      nationality: 'Canadian',
+      languages: ['English', 'French'],
+      locationId: cabin4?.id,
+      photo: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=400&h=400&fit=crop'
+    },
+    { 
+      firstName: 'Blake', 
+      lastName: 'Lively',
+      type: 'guest', 
+      status: 'onboard',
+      nationality: 'American',
+      languages: ['English'],
+      locationId: cabin4?.id,
+      photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop'
+    },
+    
+    // CABIN 5 (Tank Deck) - Tom Holland & Zendaya's friend
+    { 
+      firstName: 'Tom', 
+      lastName: 'Holland',
+      type: 'guest', 
+      status: 'onboard',
+      nationality: 'British',
+      languages: ['English'],
+      locationId: cabin5?.id,
+      photo: 'https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?w=400&h=400&fit=crop'
+    },
+    
+    // CABIN 6 (Tank Deck) - Margot Robbie (solo guest)
+    { 
+      firstName: 'Margot', 
+      lastName: 'Robbie',
+      type: 'guest', 
+      status: 'onboard',
+      nationality: 'Australian',
+      languages: ['English'],
+      locationId: cabin6?.id,
+      photo: 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=400&h=400&fit=crop'
     },
   ];
 
@@ -171,6 +345,14 @@ async function main() {
   console.log(' Starting database seed...\n');
   
   try {
+    // Clean up existing data (except users)
+    console.log(' Cleaning up existing data...');
+    await prisma.serviceRequest.deleteMany({});
+    await prisma.guest.deleteMany({});
+    await prisma.crewMember.deleteMany({});
+    await prisma.location.deleteMany({});
+    console.log(' Cleanup complete!\n');
+    
     await seedAdmin();
     await seedLocations();
     await seedCrew();

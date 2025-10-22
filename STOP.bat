@@ -1,0 +1,3 @@
+@echo off
+echo Stopping OBEDIO Development Servers...
+powershell -ExecutionPolicy Bypass -File "%~dp0stop.ps1"

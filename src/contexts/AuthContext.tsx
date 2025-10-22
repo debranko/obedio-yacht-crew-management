@@ -84,7 +84,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const login = async (email: string, password: string) => {
     console.log('🔑 AuthContext.login called');
+    console.log('🔑 Current state before login:', { user, isLoading });
     try {
+      console.log('⏳ Setting isLoading = true');
       setIsLoading(true);
 
       console.log('📡 Fetching http://localhost:3001/api/auth/login...');

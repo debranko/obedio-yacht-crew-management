@@ -11,6 +11,9 @@ import crewRoutes from './routes/crew';
 import locationRoutes from './routes/locations';
 import guestRoutes from './routes/guests';
 import transcribeRoutes from './routes/transcribe';
+import deviceRoutes from './routes/devices';
+import userPreferencesRoutes from './routes/user-preferences';
+import serviceRequestRoutes from './routes/service-requests';
 
 dotenv.config();
 
@@ -27,6 +30,13 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Request logging middleware (for debugging)
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${req.method} ${req.url}`);
+  next();
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
@@ -38,6 +48,9 @@ app.use('/api/crew', crewRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/guests', guestRoutes);
 app.use('/api/transcribe', transcribeRoutes);
+app.use('/api/devices', deviceRoutes);
+app.use('/api/user-preferences', userPreferencesRoutes);
+app.use('/api/service-requests', serviceRequestRoutes);
 
 // Error handling
 app.use((err: any, req: any, res: any, next: any) => {
@@ -77,6 +90,7 @@ async function startServer() {
    • GET /api/crew - List crew members
    • GET /api/locations - List locations
    • GET /api/guests - List guests
+   • GET /api/service-requests - List service requests
    • POST /api/auth/login - Login (admin/admin123)
    
 🔧 Development:

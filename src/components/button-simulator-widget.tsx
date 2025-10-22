@@ -6,6 +6,7 @@
 import { useState, useRef } from "react";
 import { useAppData } from "../contexts/AppDataContext";
 import { useLocations } from "../hooks/useLocations";
+import { useGuests } from "../hooks/useGuests";
 import { DNDService } from "../services/dnd";
 import { 
   Mic, 
@@ -58,12 +59,15 @@ export function ButtonSimulatorWidget() {
   // Use same source of truth as Dashboard and DNDWidget
   const { locations: locationsFromService = [], updateLocation } = useLocations();
   
+  // Use React Query for guests (real-time updates from database)
+  const { data: guestsData } = useGuests({ page: 1, limit: 1000 });
+  const guests = (guestsData as any)?.items || [];
+  
   const {
     crew = [],
-    guests = [],
     addServiceRequest,
-    updateGuest,
     addActivityLog,
+    updateGuest,
     getGuestByLocationId
   } = useAppData();
   
@@ -123,13 +127,74 @@ export function ButtonSimulatorWidget() {
     }
     
     // Find guest by proper foreign key relationship
-    const guestAtLocation = getGuestByLocationId(location.id) || guests[0];
+    // If multiple guests in same cabin, prefer owner > vip > partner > guest
+    const guestsAtLocation = guests.filter(g => g.locationId === location.id);
+    let guestAtLocation = null;
+    
+    if (guestsAtLocation.length > 0) {
+      // Sort by priority: owner > vip > partner > family > guest
+      const priorityOrder = { owner: 1, vip: 2, partner: 3, family: 4, guest: 5 };
+      guestsAtLocation.sort((a, b) => {
+        const aPriority = priorityOrder[a.type as keyof typeof priorityOrder] || 10;
+        const bPriority = priorityOrder[b.type as keyof typeof priorityOrder] || 10;
+        return aPriority - bPriority;
+      });
+      guestAtLocation = guestsAtLocation[0];  // Take highest priority guest
+    } else {
+      // Fallback: try context helper, but don't default to guests[0]
+      guestAtLocation = getGuestByLocationId(location.id);
+    }
     
     const guestName = guestAtLocation 
       ? `${guestAtLocation.firstName} ${guestAtLocation.lastName}` 
       : 'Guest';
     
     const assignedCrew = onDutyCrew[0];
+
+    // Build request notes - include critical medical info for EMERGENCY requests
+    let requestNotes = hadDND 
+      ? `DND REMOVED - ${location.floor ? location.floor + ' - ' : ''}${requestLabel}${location.smartButtonId ? ` (Device: ${location.smartButtonId})` : ''}`
+      : `${location.floor ? location.floor + ' - ' : ''}${requestLabel}${location.smartButtonId ? ` (Device: ${location.smartButtonId})` : ''}`;
+    
+    // CRITICAL: Add medical information for EMERGENCY priority requests
+    if (requestPriority === 'emergency' && guestAtLocation) {
+      const medicalInfo: string[] = [];
+      
+      // Medical Conditions
+      if (guestAtLocation.medicalConditions && guestAtLocation.medicalConditions.length > 0) {
+        medicalInfo.push(`⚠️ MEDICAL CONDITIONS: ${guestAtLocation.medicalConditions.join(', ')}`);
+      }
+      
+      // Allergies
+      if (guestAtLocation.allergies && guestAtLocation.allergies.length > 0) {
+        medicalInfo.push(`🚨 ALLERGIES: ${guestAtLocation.allergies.join(', ')}`);
+      }
+      
+      // Dietary Restrictions (may be relevant in medical emergency)
+      if (guestAtLocation.dietaryRestrictions && guestAtLocation.dietaryRestrictions.length > 0) {
+        medicalInfo.push(`🍽️ DIETARY: ${guestAtLocation.dietaryRestrictions.join(', ')}`);
+      }
+      
+      // Emergency Contact
+      if (guestAtLocation.emergencyContactName || guestAtLocation.emergencyContactPhone) {
+        const contact = [];
+        if (guestAtLocation.emergencyContactName) contact.push(guestAtLocation.emergencyContactName);
+        if (guestAtLocation.emergencyContactRelation) contact.push(`(${guestAtLocation.emergencyContactRelation})`);
+        if (guestAtLocation.emergencyContactPhone) contact.push(guestAtLocation.emergencyContactPhone);
+        medicalInfo.push(`📞 EMERGENCY CONTACT: ${contact.join(' ')}`);
+      }
+      
+      // Preferences (may contain important info)
+      if (guestAtLocation.preferences) {
+        medicalInfo.push(`📋 PREFERENCES: ${guestAtLocation.preferences}`);
+      }
+      
+      if (medicalInfo.length > 0) {
+        requestNotes += '\n\n' + medicalInfo.join('\n');
+      } else {
+        requestNotes += '\n\n✓ No medical conditions or allergies on file';
+      }
+    }
 
     // Create actual service request and add to context
     const serviceRequest = addServiceRequest({
@@ -144,9 +209,15 @@ export function ButtonSimulatorWidget() {
       voiceAudioUrl: isVoice ? (audioUrl || undefined) : undefined,
       cabinImage: location.image || 'https://images.unsplash.com/photo-1597126729864-51740ac05236?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080',
       status: 'pending' as const,
-      notes: hadDND 
-        ? `DND REMOVED - ${location.floor ? location.floor + ' - ' : ''}${requestLabel}${location.smartButtonId ? ` (Device: ${location.smartButtonId})` : ''}`
-        : `${location.floor ? location.floor + ' - ' : ''}${requestLabel}${location.smartButtonId ? ` (Device: ${location.smartButtonId})` : ''}`
+      notes: requestNotes
+    });
+
+    // Log activity for tracking
+    addActivityLog({
+      type: 'service',
+      user: guestName,
+      action: requestPriority === 'emergency' ? 'Emergency call' : (isVoice ? 'Voice message' : 'Service call'),
+      details: `${location.name} - ${requestLabel}${requestPriority === 'emergency' ? ' [EMERGENCY]' : ''}`
     });
 
     toast.success(

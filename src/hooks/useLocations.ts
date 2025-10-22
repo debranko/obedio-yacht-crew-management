@@ -25,6 +25,8 @@ export function useLocations() {
     mutationFn: (input: UpdateLocationInput) => locationsService.update(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['locations'] });
+      // Also invalidate guests query when location guest assignment changes
+      queryClient.invalidateQueries({ queryKey: ['guests'] });
     }
   });
 

@@ -40,6 +40,13 @@ export interface Guest {
   specialRequests?: string;
   vipNotes?: string;
   crewNotes?: string;
+  preferences?: string; // General guest preferences (from database)
+  notes?: string; // Staff notes (from database)
+  
+  // Emergency Contact (CRITICAL for emergencies)
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelation?: string; // e.g., "Spouse", "Parent", "Sibling"
   
   // Contact Person (Family Office, Manager, Agent, etc.)
   contactPerson?: {

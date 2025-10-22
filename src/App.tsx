@@ -5,7 +5,7 @@ import { AppSidebar } from "./components/app-sidebar";
 import { DashboardPage, DashboardPageHandle } from "./components/pages/dashboard";
 import { CrewManagementPage } from "./components/pages/crew-management";
 import { GuestsListPage } from "./components/pages/guests-list";
-import { DeviceManagerPage } from "./components/pages/device-manager";
+import { DeviceManagerPage } from "./components/pages/device-manager-full";
 import { ButtonSimulatorPage } from "./components/pages/button-simulator";
 import { LocationsPage } from "./components/pages/locations";
 import { ActivityLogPage } from "./components/pages/activity-log";
@@ -20,6 +20,7 @@ import { EmergencyShakeDialog } from "./components/emergency-shake-dialog";
 import { LoginPage } from "./components/pages/login";
 import { useWebSocket } from "./services/websocket";
 import { toast } from "sonner";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // Initialize TanStack Query
 const queryClient = new QueryClient({
@@ -358,9 +359,11 @@ function AuthRouter() {
 
   console.log('✅ Authenticated - showing app content');
   return (
-    <AppDataProvider>
-      <AppContent />
-    </AppDataProvider>
+    <ErrorBoundary>
+      <AppDataProvider>
+        <AppContent />
+      </AppDataProvider>
+    </ErrorBoundary>
   );
 }
 

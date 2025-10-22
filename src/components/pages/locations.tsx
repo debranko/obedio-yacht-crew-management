@@ -5,6 +5,8 @@
 
 import { useState, useRef } from "react";
 import { useLocations } from "../../hooks/useLocations";
+import { useGuests } from "../../hooks/useGuests";
+import { useGuestMutations } from "../../hooks/useGuestMutations";
 import { useDND } from "../../hooks/useDND";
 import { useAppData } from "../../contexts/AppDataContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -26,7 +28,15 @@ import { DNDWidget } from "../dnd-widget";
 export function LocationsPage() {
   const { locations, isLoading, createLocation, updateLocation, deleteLocation } = useLocations();
   const { dndLocations, hasDND } = useDND();
-  const { guests, updateGuest, addActivityLog, getGuestByLocationId } = useAppData();
+  
+  // Use React Query for guests (real-time updates from database)
+  const { data: guestsData } = useGuests({ page: 1, limit: 1000 });
+  const guests = (guestsData as any)?.items || [];
+  
+  // Use React Query mutations for database updates
+  const { updateGuest: updateGuestMutation } = useGuestMutations();
+  
+  const { addActivityLog, getGuestByLocationId } = useAppData();
   const { user } = useAuth();
   
   // Get current user role from auth context
@@ -54,6 +64,7 @@ export function LocationsPage() {
     status: "active" as Location["status"],
     notes: "",
     smartButtonId: "", // Smart button assignment
+    assignedGuestId: "", // Guest assignment (new)
     doNotDisturb: false // Do Not Disturb status
   });
 
@@ -66,6 +77,7 @@ export function LocationsPage() {
       status: "active",
       notes: "",
       smartButtonId: "",
+      assignedGuestId: "",
       doNotDisturb: false
     });
   };
@@ -122,6 +134,8 @@ export function LocationsPage() {
 
   const handleEdit = (location: Location) => {
     setSelectedLocation(location);
+    // Find guest currently assigned to this location
+    const currentGuest = getGuestByLocationId(location.id);
     setFormData({
       name: location.name,
       type: location.type,
@@ -130,6 +144,7 @@ export function LocationsPage() {
       status: location.status,
       notes: location.notes || "",
       smartButtonId: location.smartButtonId || "",
+      assignedGuestId: currentGuest?.id || "",
       doNotDisturb: location.doNotDisturb || false
     });
     setIsEditDialogOpen(true);
@@ -145,11 +160,58 @@ export function LocationsPage() {
     // Find selected button name
     const selectedButton = mockSmartButtons.find(b => b.id === formData.smartButtonId);
 
-    // Find guest assigned to this location using proper foreign key relationship
-    const guest = getGuestByLocationId(selectedLocation.id);
+    // Find guest currently assigned to this location
+    const currentGuest = getGuestByLocationId(selectedLocation.id);
+    const previousGuestId = currentGuest?.id;
+    const newGuestId = formData.assignedGuestId;
 
     try {
-      // Update location
+      // Handle guest assignment changes
+      if (previousGuestId !== newGuestId) {
+        // Remove previous guest from this location
+        if (previousGuestId) {
+          updateGuestMutation({ id: previousGuestId, data: { locationId: undefined } });
+        }
+        
+        // Assign new guest to this location
+        if (newGuestId) {
+          updateGuestMutation({ id: newGuestId, data: { locationId: selectedLocation.id } });
+        }
+        
+        // Log guest assignment change
+        if (addActivityLog) {
+          const newGuest = guests.find(g => g.id === newGuestId);
+          const previousGuest = guests.find(g => g.id === previousGuestId);
+          
+          if (newGuest && previousGuest) {
+            addActivityLog({
+              type: 'guest',
+              action: 'Guest Reassigned',
+              location: selectedLocation.name,
+              user: 'Crew (Manual)',
+              details: `${previousGuest.firstName} ${previousGuest.lastName} moved out, ${newGuest.firstName} ${newGuest.lastName} moved in`
+            });
+          } else if (newGuest) {
+            addActivityLog({
+              type: 'guest',
+              action: 'Guest Assigned',
+              location: selectedLocation.name,
+              user: 'Crew (Manual)',
+              details: `${newGuest.firstName} ${newGuest.lastName} assigned to ${selectedLocation.name}`
+            });
+          } else if (previousGuest) {
+            addActivityLog({
+              type: 'guest',
+              action: 'Guest Unassigned',
+              location: selectedLocation.name,
+              user: 'Crew (Manual)',
+              details: `${previousGuest.firstName} ${previousGuest.lastName} removed from ${selectedLocation.name}`
+            });
+          }
+        }
+      }
+
+      // Update location details
       await updateLocation({
         id: selectedLocation.id,
         name: formData.name.trim(),
@@ -159,30 +221,27 @@ export function LocationsPage() {
         status: formData.status,
         notes: formData.notes.trim() || undefined,
         smartButtonId: formData.smartButtonId || undefined,
-        smartButtonName: selectedButton?.name || undefined,
         doNotDisturb: formData.doNotDisturb,
       });
 
       // Update guest DND status if guest is in this location
-      if (guest) {
-        updateGuest(guest.id, { doNotDisturb: formData.doNotDisturb });
+      const assignedGuest = newGuestId ? guests.find(g => g.id === newGuestId) : null;
+      if (assignedGuest) {
+        updateGuestMutation({ id: assignedGuest.id, data: { doNotDisturb: formData.doNotDisturb } });
       }
 
-      // Log activity
-      if (addActivityLog) {
+      // Log DND activity
+      if (addActivityLog && formData.doNotDisturb !== selectedLocation.doNotDisturb) {
         addActivityLog({
           type: 'dnd',
           action: formData.doNotDisturb ? 'DND Activated' : 'DND Deactivated',
           location: selectedLocation.name,
           user: 'Crew (Manual)',
-          details: `Do Not Disturb ${formData.doNotDisturb ? 'enabled' : 'disabled'} for ${selectedLocation.name}${guest ? ` (${guest.firstName} ${guest.lastName})` : ''}`
+          details: `Do Not Disturb ${formData.doNotDisturb ? 'enabled' : 'disabled'} for ${selectedLocation.name}${assignedGuest ? ` (${assignedGuest.firstName} ${assignedGuest.lastName})` : ''}`
         });
       }
       
-      toast.success(formData.doNotDisturb 
-        ? "Location updated - DND enabled" 
-        : "Location updated successfully"
-      );
+      toast.success("Location updated successfully");
       setIsEditDialogOpen(false);
       setSelectedLocation(null);
       resetForm();
@@ -443,29 +502,59 @@ export function LocationsPage() {
                       </div>
                     </div>
 
-                    {/* Description */}
-                    {location.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {location.description}
-                      </p>
-                    )}
-
-                    {/* Guest Assignment */}
-                    {location.guests && location.guests.length > 0 && (
-                      <div className="bg-muted/50 rounded-md p-2">
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-1">
-                          <Users className="h-3.5 w-3.5" />
-                          <span>Guest{location.guests.length > 1 ? 's' : ''}:</span>
-                        </div>
-                        <div className="space-y-0.5">
-                          {location.guests.map((guest: any) => (
-                            <div key={guest.id} className="text-xs text-muted-foreground pl-5">
-                              {guest.firstName} {guest.lastName}
+                    {/* Guest Assignment - Show only for cabin types */}
+                    {(() => {
+                      // Only show guest info for cabin types (not common areas)
+                      const isCabin = ['master_suite', 'vip_suite', 'guest_cabin', 'crew_cabin', 'cabin'].includes(location.type);
+                      if (!isCabin) return null;
+                      
+                      // Find all guests in this cabin and prefer owner > vip > partner
+                      const guestsAtLocation = guests.filter(g => g.locationId === location.id);
+                      let assignedGuest = null;
+                      
+                      if (guestsAtLocation.length > 0) {
+                        // Sort by priority: owner > vip > partner > family > guest
+                        const priorityOrder = { owner: 1, vip: 2, partner: 3, family: 4, guest: 5 };
+                        guestsAtLocation.sort((a, b) => {
+                          const aPriority = priorityOrder[a.type as keyof typeof priorityOrder] || 10;
+                          const bPriority = priorityOrder[b.type as keyof typeof priorityOrder] || 10;
+                          return aPriority - bPriority;
+                        });
+                        assignedGuest = guestsAtLocation[0];  // Take highest priority guest
+                      } else {
+                        // Fallback to context helper
+                        assignedGuest = getGuestByLocationId(location.id);
+                      }
+                      
+                      if (assignedGuest) {
+                        return (
+                          <div className="bg-primary/5 rounded-md p-2.5 border border-primary/20">
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4 text-primary flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-foreground truncate">
+                                  {assignedGuest.firstName} {assignedGuest.lastName}
+                                </p>
+                                {assignedGuest.preferredName && (
+                                  <p className="text-xs text-muted-foreground">
+                                    ({assignedGuest.preferredName})
+                                  </p>
+                                )}
+                              </div>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="bg-muted/30 rounded-md p-2.5 border border-dashed border-muted-foreground/30">
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4 text-muted-foreground/50 flex-shrink-0" />
+                              <p className="text-sm text-muted-foreground">No guest assigned</p>
+                            </div>
+                          </div>
+                        );
+                      }
+                    })()}
 
                     {/* Smart Button Assignment */}
                     {location.smartButtonId && (
@@ -748,6 +837,67 @@ export function LocationsPage() {
                 <p className="text-xs text-muted-foreground mt-2">
                   Configure available floors/decks in Settings
                 </p>
+              </div>
+            </div>
+
+            {/* Guest Assignment Section */}
+            <div className="border-t border-border pt-4 space-y-4">
+              <h4 className="text-sm font-medium">Guest Assignment</h4>
+              
+              <div>
+                <Label htmlFor="edit-guest">Assign Guest to Location</Label>
+                <Select value={formData.assignedGuestId || "none"} onValueChange={(value: string) => setFormData({ ...formData, assignedGuestId: value === "none" ? "" : value })}>
+                  <SelectTrigger id="edit-guest" className="mt-1.5">
+                    <SelectValue placeholder="No guest assigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-3 w-3 text-muted-foreground" />
+                        <span>No guest assigned</span>
+                      </div>
+                    </SelectItem>
+                    {guests
+                      .filter(g => g.status === 'onboard')
+                      .map((guest) => {
+                        const currentLocation = guest.locationId ? locations.find(l => l.id === guest.locationId) : null;
+                        const isInThisLocation = guest.locationId === selectedLocation?.id;
+                        const isInAnotherLocation = guest.locationId && !isInThisLocation;
+                        
+                        return (
+                          <SelectItem key={guest.id} value={guest.id}>
+                            <div className="flex items-center gap-2">
+                              <Users className="h-3 w-3" />
+                              <span>{guest.firstName} {guest.lastName}</span>
+                              {guest.preferredName && (
+                                <span className="text-xs text-muted-foreground">({guest.preferredName})</span>
+                              )}
+                              {isInAnotherLocation && currentLocation && (
+                                <span className="text-xs text-warning">• {currentLocation.name}</span>
+                              )}
+                              {isInThisLocation && (
+                                <span className="text-xs text-success">• Current</span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
+                  </SelectContent>
+                </Select>
+                {formData.assignedGuestId && formData.assignedGuestId !== "none" && (() => {
+                  const selectedGuest = guests.find(g => g.id === formData.assignedGuestId);
+                  return selectedGuest ? (
+                    <p className="text-xs text-success mt-2 flex items-center gap-1">
+                      <Users className="h-3 w-3" />
+                      {selectedGuest.firstName} {selectedGuest.lastName} will be assigned to this location
+                    </p>
+                  ) : null;
+                })()}
+                {(!formData.assignedGuestId || formData.assignedGuestId === "none") && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Assign a guest to this cabin/location
+                  </p>
+                )}
               </div>
             </div>
 

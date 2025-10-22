@@ -21,6 +21,8 @@ export function useGuestMutations() {
     onSuccess: (newGuest) => {
       // Invalidate queries to refetch fresh data
       queryClient.invalidateQueries({ queryKey: ['guests'] });
+      // Also invalidate locations if guest is assigned to a location
+      queryClient.invalidateQueries({ queryKey: ['locations'] });
       
       toast.success('Guest created successfully', {
         description: `${newGuest.firstName} ${newGuest.lastName} has been added`,
@@ -44,6 +46,8 @@ export function useGuestMutations() {
       // Invalidate queries to refetch fresh data
       queryClient.invalidateQueries({ queryKey: ['guests'] });
       queryClient.invalidateQueries({ queryKey: ['guests', updatedGuest.id] });
+      // Also invalidate locations query when guest location changes
+      queryClient.invalidateQueries({ queryKey: ['locations'] });
       
       toast.success('Guest updated successfully', {
         description: `${updatedGuest.firstName} ${updatedGuest.lastName} has been updated`,
@@ -66,6 +70,8 @@ export function useGuestMutations() {
     onSuccess: () => {
       // Invalidate queries to refetch fresh data
       queryClient.invalidateQueries({ queryKey: ['guests'] });
+      // Also invalidate locations to remove guest from location display
+      queryClient.invalidateQueries({ queryKey: ['locations'] });
       
       toast.success('Guest deleted successfully', {
         description: 'Guest has been removed from the system',

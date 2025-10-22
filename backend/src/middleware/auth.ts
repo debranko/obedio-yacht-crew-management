@@ -3,10 +3,24 @@ import jwt from 'jsonwebtoken';
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
   const h = req.headers.authorization;
-  if (!h?.startsWith('Bearer ')) return res.status(401).json({ error: 'Auth required' });
+  console.log('🔐 Auth middleware:', { 
+    hasHeader: !!h, 
+    headerPrefix: h?.substring(0, 20),
+    hasJwtSecret: !!process.env.JWT_SECRET,
+    jwtSecretLength: process.env.JWT_SECRET?.length 
+  });
+  
+  if (!h?.startsWith('Bearer ')) {
+    console.log('❌ No Bearer token found');
+    return res.status(401).json({ error: 'Auth required' });
+  }
+  
   try {
     const token = h.slice(7);
+    console.log('🔑 Verifying token...');
     const payload = jwt.verify(token, process.env.JWT_SECRET as string) as any;
+    console.log('✅ Token verified:', { userId: payload.sub || payload.userId, role: payload.role });
+    
     // Support both 'sub' (standard) and 'userId' (legacy)
     (req as any).user = { 
       id: payload.sub || payload.userId, 
@@ -14,7 +28,8 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
       username: payload.username 
     };
     return next();
-  } catch {
+  } catch (error) {
+    console.log('❌ Token verification failed:', error);
     return res.status(401).json({ error: 'Invalid token' });
   }
 }

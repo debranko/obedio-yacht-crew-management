@@ -280,30 +280,46 @@ export function IncomingRequestDialog({
           </div>
 
           {/* Request Details */}
-          {request.voiceTranscript && (
-            <div className="bg-muted/50 rounded-lg p-5 border border-border">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="text-xs text-muted-foreground mb-3 uppercase tracking-wide font-medium">Message</div>
-                  <p className="text-xl font-semibold leading-relaxed text-foreground">{request.voiceTranscript}</p>
-                </div>
-                {(request.voiceTranscript || request.voiceAudioUrl) && (
-                  <button
-                    onClick={handlePlayAudio}
-                    disabled={playingAudio}
-                    className="flex-shrink-0 w-12 h-12 rounded-full bg-accent/10 hover:bg-accent/20 border-2 border-accent flex items-center justify-center transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
-                    aria-label="Play voice message"
-                  >
-                    {playingAudio ? (
-                      <Volume2 className="h-5 w-5 text-accent animate-pulse" />
-                    ) : (
-                      <Play className="h-5 w-5 text-accent" />
+          {request.voiceTranscript && (() => {
+            // Parse voice message format: "Voice message (3.0s): Bring us coffee."
+            const match = request.voiceTranscript.match(/^Voice message \(([\d.]+)s\):\s*(.+)$/i);
+            const duration = match ? match[1] : null;
+            const transcript = match ? match[2] : request.voiceTranscript;
+            
+            return (
+              <div className="bg-muted/50 rounded-lg p-5 border border-border">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="text-xs text-muted-foreground mb-3 uppercase tracking-wide font-medium">Message</div>
+                    {/* Voice message indicator with duration - smaller, muted */}
+                    {duration && (
+                      <div className="text-xs text-muted-foreground mb-2">
+                        Voice message ({duration}s)
+                      </div>
                     )}
-                  </button>
-                )}
+                    {/* Three dots separator */}
+                    <div className="text-muted-foreground mb-2">• • •</div>
+                    {/* Transcript text - large and prominent */}
+                    <p className="text-xl font-semibold leading-relaxed text-foreground">{transcript}</p>
+                  </div>
+                  {(request.voiceTranscript || request.voiceAudioUrl) && (
+                    <button
+                      onClick={handlePlayAudio}
+                      disabled={playingAudio}
+                      className="flex-shrink-0 w-12 h-12 rounded-full bg-accent/10 hover:bg-accent/20 border-2 border-accent flex items-center justify-center transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+                      aria-label="Play voice message"
+                    >
+                      {playingAudio ? (
+                        <Volume2 className="h-5 w-5 text-accent animate-pulse" />
+                      ) : (
+                        <Play className="h-5 w-5 text-accent" />
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {request.notes && !request.voiceTranscript && (
             <div className="bg-muted/50 rounded-lg p-4 border border-border">

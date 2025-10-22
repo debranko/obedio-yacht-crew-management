@@ -642,28 +642,46 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       // Map API DTO to app Guest type with all required fields
       const mappedGuests: Guest[] = apiGuests.map(apiGuest => ({
         id: apiGuest.id,
+        
+        // Basic Info
         firstName: apiGuest.firstName,
         lastName: apiGuest.lastName,
         photo: apiGuest.photo || undefined,
         preferredName: apiGuest.preferredName || undefined,
-        type: apiGuest.type as any,  // API type may differ, cast for now
-        status: apiGuest.status as any, // API has different status values
+        type: apiGuest.type as any,
+        status: apiGuest.status as any,
         nationality: apiGuest.nationality || undefined,
         languages: apiGuest.languages || [],
         passportNumber: apiGuest.passportNumber || undefined,
-        locationId: undefined,
-        checkInDate: new Date().toISOString().split('T')[0], // Default to today
-        checkOutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Default +7 days
+        
+        // Accommodation
+        locationId: apiGuest.locationId || undefined,
+        checkInDate: apiGuest.checkInDate || new Date().toISOString().split('T')[0],
+        checkOutDate: apiGuest.checkOutDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        
+        // Dietary & Medical - from database
+        allergies: apiGuest.allergies || [],
+        dietaryRestrictions: apiGuest.dietaryRestrictions || [],
+        medicalConditions: apiGuest.medicalConditions || [],
+        
+        // Preferences & Notes - from database
+        preferences: apiGuest.preferences || undefined,
+        notes: apiGuest.notes || undefined,
+        
+        // Emergency Contact - from database
+        emergencyContactName: apiGuest.emergencyContactName || undefined,
+        emergencyContactPhone: apiGuest.emergencyContactPhone || undefined,
+        emergencyContactRelation: apiGuest.emergencyContactRelation || undefined,
+        
+        // Legacy fields (keep for backward compatibility, can be removed later)
         doNotDisturb: false,
-        allergies: [],
-        medicalConditions: [],
-        dietaryRestrictions: [],
         foodDislikes: [],
         favoriteFoods: [],
         favoriteDrinks: [],
+        
         createdAt: apiGuest.createdAt,
         updatedAt: apiGuest.updatedAt,
-        createdBy: 'system', // Default, should come from API eventually
+        createdBy: 'system',
       }));
       
       setGuests(mappedGuests);
@@ -799,28 +817,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   useEffect(() => { localStorage.setItem('obedio-yacht-locations', JSON.stringify(yachtLocations)); }, [yachtLocations]);
   useEffect(() => { localStorage.setItem('obedio-service-requests', JSON.stringify(serviceRequests)); }, [serviceRequests]);
 
-  // Initialize locations service with mock data BEFORE first render
+  // Initialize locations service - Let it load from backend API first
+  // Only use localStorage as emergency fallback if backend is unavailable
   useEffect(() => {
-    const initializeLocations = () => {
-      const stored = localStorage.getItem('obedio-locations');
-      
-      if (!stored || stored === '[]') {
-        const locationsData = generateMockLocations();
-        locationsService.initialize(locationsData);
-        console.log('🏠 Locations initialized with mock data:', locationsData.length);
-      } else {
-        try {
-          const locationsData = JSON.parse(stored, (key, value) => 
-            key === 'createdAt' || key === 'updatedAt' ? new Date(value) : value
-          );
-          locationsService.initialize(locationsData);
-          console.log('🏠 Locations loaded from localStorage:', locationsData.length);
-        } catch (e) {
-          console.error('Failed to parse locations from localStorage, reinitializing:', e);
-          const locationsData = generateMockLocations();
-          locationsService.initialize(locationsData);
-        }
-      }
+    const initializeLocations = async () => {
+      // DO NOT clear localStorage - it may be the only source of data if backend is down!
+      // locationsService will fetch from backend API first
+      // and only fall back to localStorage if backend is unavailable
+      console.log('🏠 Locations service ready - will load from backend API');
     };
     
     initializeLocations();
@@ -1391,7 +1395,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   };
 
   const simulateNewRequest = (): ServiceRequest => {
-    const newRequest = simulateNewServiceRequest();
+    // Pass REAL guests and locations to simulation function
+    const newRequest = simulateNewServiceRequest(guests, locations);
     setServiceRequests(prev => [newRequest, ...prev]);
     return newRequest;
   };

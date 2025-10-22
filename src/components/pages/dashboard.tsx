@@ -1,6 +1,7 @@
 import { DashboardGrid, DashboardGridHandle } from "../dashboard-grid";
-import { forwardRef, useImperativeHandle, useRef, useState, useEffect } from "react";
+import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { ManageWidgetsDialog } from "../manage-widgets-dialog";
+import { useUserPreferences } from "../../hooks/useUserPreferences";
 
 export interface DashboardPageHandle {
   resetLayout: () => void;
@@ -25,16 +26,19 @@ export const DashboardPage = forwardRef<DashboardPageHandle, DashboardPageProps>
   ({ isEditMode = false, onEditModeChange, onNavigate }, ref) => {
   const dashboardGridRef = useRef<DashboardGridHandle>(null);
   const [showManageWidgets, setShowManageWidgets] = useState(false);
+  
+  // Load active widgets from backend (user preferences)
+  const { preferences, updateDashboard } = useUserPreferences();
   const [activeWidgets, setActiveWidgets] = useState<string[]>(() => {
-    // Load from localStorage or use defaults
-    const saved = localStorage.getItem("obedio-active-widgets");
-    return saved ? JSON.parse(saved) : DEFAULT_ACTIVE_WIDGETS;
+    return preferences?.activeWidgets || DEFAULT_ACTIVE_WIDGETS;
   });
 
-  // Save active widgets to localStorage
-  useEffect(() => {
-    localStorage.setItem("obedio-active-widgets", JSON.stringify(activeWidgets));
-  }, [activeWidgets]);
+  // Update activeWidgets when preferences load from backend
+  useState(() => {
+    if (preferences?.activeWidgets) {
+      setActiveWidgets(preferences.activeWidgets);
+    }
+  });
   
   // Expose functions to parent
   useImperativeHandle(ref, () => ({
