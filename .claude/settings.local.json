@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(timeout 10 npm run dev:*)",
+      "Bash(curl:*)",
+      "Bash(powershell -Command \"Invoke-RestMethod -Uri ''http://localhost:8080/api/health'' -Method Get\")",
+      "Bash(npm run dev)",
+      "Bash(python -m json.tool:*)",
+      "Bash(cat:*)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWgwaHo0ZTgwMDAwdXBoa294cTMwY2wzIiwidXNlcklkIjoiY21oMGh6NGU4MDAwMHVwaGtveHEzMGNsMyIsInVzZXJuYW1lIjoiYWRtaW4iLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NjExNzQ5OTQsImV4cCI6MTc2MTc3OTc5NH0.NeHCQldOUCLf21yU3mWDvQkPci2MQumirmfCn9eNfEE\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(taskkill:*)",
+      "Bash(find:*)",
+      "Bash(npx prisma migrate:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npm install:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

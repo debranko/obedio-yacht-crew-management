@@ -25,6 +25,8 @@ import settingsRoutes from './routes/settings';
 import smartButtonsRoutes from './routes/smart-buttons';
 import dashboardRoutes from './routes/dashboard';
 import serviceCategoriesRoutes from './routes/service-categories';
+import uploadRoutes from './routes/upload';
+import path from 'path';
 
 dotenv.config();
 
@@ -33,13 +35,17 @@ const httpServer = createServer(app);
 const PORT = process.env.PORT || 8080;
 
 // Middleware - Allow all origins for development
-app.use(cors({ 
+app.use(cors({
   origin: true, // Allow any origin in development
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Increase JSON payload limit for base64 images
+app.use(express.urlencoded({ extended: true, limit: '10mb' })); // Increase URL-encoded payload limit
+
+// Serve uploaded images statically
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Request logging middleware (for debugging)
 app.use((req, res, next) => {
@@ -73,6 +79,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/smart-buttons', smartButtonsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/service-categories', serviceCategoriesRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Error handling
 app.use((err: any, req: any, res: any, next: any) => {

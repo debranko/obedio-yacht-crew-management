@@ -50,6 +50,7 @@ export function LocationsPage() {
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [imageUrl, setImageUrl] = useState("");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Permission check - only Admin and ETO can delete locations
@@ -281,6 +282,7 @@ export function LocationsPage() {
     setSelectedLocation(location);
     setImageUrl(location.image || "");
     setUploadedImage(null);
+    setUploadedFile(null);
     setIsImageDialogOpen(true);
   };
 
@@ -300,11 +302,15 @@ export function LocationsPage() {
       return;
     }
 
+    // Store the file object for later upload
+    setUploadedFile(file);
+    setImageUrl(""); // Clear URL when file is uploaded
+
+    // Create preview
     const reader = new FileReader();
     reader.onload = (e) => {
       const imageData = e.target?.result as string;
-      setUploadedImage(imageData);
-      setImageUrl(""); // Clear URL when file is uploaded
+      setUploadedImage(imageData); // Preview only
     };
     reader.onerror = () => {
       toast.error('Failed to read image file');
@@ -315,20 +321,49 @@ export function LocationsPage() {
   const handleSaveImage = async () => {
     if (!selectedLocation) return;
 
-    const finalImage = uploadedImage || imageUrl;
-
     try {
+      let finalImageUrl = imageUrl;
+
+      // If a file was uploaded, send it to the backend first
+      if (uploadedFile) {
+        const formData = new FormData();
+        formData.append('image', uploadedFile);
+
+        const token = localStorage.getItem('obedio-auth-token');
+        const uploadResponse = await fetch('http://localhost:8080/api/upload/image', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData
+        });
+
+        if (!uploadResponse.ok) {
+          const errorData = await uploadResponse.json();
+          throw new Error(errorData.message || 'Failed to upload image');
+        }
+
+        const uploadData = await uploadResponse.json();
+        // Get the URL from the upload response
+        finalImageUrl = `http://localhost:8080${uploadData.data.url}`;
+        console.log('✅ Image uploaded:', finalImageUrl);
+      }
+
+      // Update location with the image URL
       await updateLocation({
         id: selectedLocation.id,
-        image: finalImage || undefined
+        image: finalImageUrl || undefined
       });
-      toast.success(`Image ${finalImage ? 'updated' : 'removed'} for ${selectedLocation.name}`);
+
+      toast.success(`Image ${finalImageUrl ? 'updated' : 'removed'} for ${selectedLocation.name}`);
       setIsImageDialogOpen(false);
       setImageUrl("");
       setUploadedImage(null);
+      setUploadedFile(null);
       setSelectedLocation(null);
-    } catch (error) {
-      toast.error("Failed to update image");
+    } catch (error: any) {
+      console.error('❌ Failed to update image:', error);
+      toast.error(error.message || "Failed to update image");
     }
   };
 
