@@ -5,7 +5,8 @@ import { Input } from "../ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Badge } from "../ui/badge";
 import { useAppData } from "../../contexts/AppDataContext";
-import { Search, Smartphone, Bell, Users, Circle, User, MapPin } from "lucide-react";
+import { useDeviceLogs } from "../../hooks/useDeviceLogs";
+import { Search, Smartphone, Bell, Users, Circle, User, MapPin, Loader2 } from "lucide-react";
 
 // Simple date formatting helper
 const formatDateTime = (date: Date) => {
@@ -17,36 +18,41 @@ const formatDate = (date: Date | string) => {
 };
 
 export function ActivityLogPage() {
-  const { deviceLogs, serviceRequestHistory, crewChangeLogs, crewMembers } = useAppData();
+  const { serviceRequestHistory, crewChangeLogs, crewMembers } = useAppData();
   
   const [searchQuery, setSearchQuery] = useState("");
   const [filterUser, setFilterUser] = useState("all");
   const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [deviceLogStatus, setDeviceLogStatus] = useState<string | undefined>();
+  
+  // Fetch device logs from backend API
+  const { data: deviceLogs = [], isLoading: isLoadingDeviceLogs, error: deviceLogsError } = useDeviceLogs({
+    search: searchQuery || undefined,
+    status: deviceLogStatus,
+    limit: itemsPerPage,
+  });
 
   // Get unique users for filter
   const allUsers = useMemo(() => {
     const users = new Set<string>();
-    deviceLogs.forEach(log => log.user && users.add(log.user));
+    if (Array.isArray(deviceLogs)) {
+      deviceLogs.forEach((log: any) => log.user && users.add(log.user));
+    }
     crewChangeLogs.forEach(log => users.add(log.performedBy));
     serviceRequestHistory.forEach(log => log.completedBy && users.add(log.completedBy));
     return Array.from(users);
   }, [deviceLogs, crewChangeLogs, serviceRequestHistory]);
 
-  // Filter and search device logs
+  // Process device logs - already filtered by API
   const filteredDeviceLogs = useMemo(() => {
-    return deviceLogs
-      .filter(log => {
-        const matchesSearch = searchQuery === "" || 
-          log.device.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          log.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          log.message.toLowerCase().includes(searchQuery.toLowerCase());
-        
-        const matchesUser = filterUser === "all" || log.user === filterUser;
-        
-        return matchesSearch && matchesUser;
-      })
-      .slice(0, itemsPerPage);
-  }, [deviceLogs, searchQuery, filterUser, itemsPerPage]);
+    if (!Array.isArray(deviceLogs)) return [];
+    
+    // Additional client-side filtering if needed
+    return deviceLogs.filter((log: any) => {
+      const matchesUser = filterUser === "all" || log.user === filterUser;
+      return matchesUser;
+    });
+  }, [deviceLogs, filterUser]);
 
   // Filter and search service request history
   const filteredServiceRequests = useMemo(() => {
@@ -151,7 +157,7 @@ export function ActivityLogPage() {
           </Select>
 
           {/* Items per page */}
-          <Select value={itemsPerPage.toString()} onValueChange={(v) => setItemsPerPage(Number(v))}>
+          <Select value={itemsPerPage.toString()} onValueChange={(v: string) => setItemsPerPage(Number(v))}>
             <SelectTrigger className="w-full md:w-[140px]">
               <SelectValue />
             </SelectTrigger>
@@ -187,6 +193,22 @@ export function ActivityLogPage() {
         {/* Device Logs */}
         <TabsContent value="devices" className="space-y-0">
           <Card>
+            {/* Status Filter for Device Logs */}
+            <div className="p-4 border-b border-border">
+              <Select value={deviceLogStatus || "all"} onValueChange={(v: string) => setDeviceLogStatus(v === "all" ? undefined : v)}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="online">Online</SelectItem>
+                  <SelectItem value="offline">Offline</SelectItem>
+                  <SelectItem value="alert">Alert</SelectItem>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="border-b border-border">
@@ -200,32 +222,47 @@ export function ActivityLogPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredDeviceLogs.length === 0 ? (
+                  {isLoadingDeviceLogs ? (
+                    <tr>
+                      <td colSpan={6} className="p-8">
+                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading device logs...
+                        </div>
+                      </td>
+                    </tr>
+                  ) : deviceLogsError ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-error">
+                        Failed to load device logs. Please try again.
+                      </td>
+                    </tr>
+                  ) : filteredDeviceLogs.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="p-8 text-center text-muted-foreground">
                         No device logs found
                       </td>
                     </tr>
                   ) : (
-                    filteredDeviceLogs.map((log) => (
+                    filteredDeviceLogs.map((log: any) => (
                       <tr key={log.id} className="border-b border-border hover:bg-accent/50 transition-colors">
                         <td className="p-4 text-sm">
-                          {formatDateTime(log.timestamp)}
+                          {formatDateTime(new Date(log.timestamp || log.createdAt))}
                         </td>
                         <td className="p-4">
                           <div className="flex items-center gap-2">
                             <Smartphone className="h-4 w-4 text-primary" />
-                            <span className="text-sm font-medium">{log.device}</span>
+                            <span className="text-sm font-medium">{log.deviceName || log.deviceId || 'Unknown Device'}</span>
                           </div>
                         </td>
-                        <td className="p-4 text-sm text-muted-foreground">{log.location}</td>
+                        <td className="p-4 text-sm text-muted-foreground">{log.location || '—'}</td>
                         <td className="p-4">
-                          <Badge variant="outline" className={getStatusColor(log.status)}>
+                          <Badge variant="outline" className={getStatusColor(log.status || 'unknown')}>
                             <Circle className="h-2 w-2 mr-1 fill-current" />
-                            {log.status}
+                            {log.status || 'unknown'}
                           </Badge>
                         </td>
-                        <td className="p-4 text-sm">{log.message}</td>
+                        <td className="p-4 text-sm">{log.message || log.event || '—'}</td>
                         <td className="p-4 text-sm text-muted-foreground">{log.user || '—'}</td>
                       </tr>
                     ))

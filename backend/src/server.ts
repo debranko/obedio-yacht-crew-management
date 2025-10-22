@@ -14,6 +14,7 @@ import transcribeRoutes from './routes/transcribe';
 import deviceRoutes from './routes/devices';
 import userPreferencesRoutes from './routes/user-preferences';
 import serviceRequestRoutes from './routes/service-requests';
+import yachtSettingsRoutes from './routes/yacht-settings';
 
 dotenv.config();
 
@@ -51,6 +52,7 @@ app.use('/api/transcribe', transcribeRoutes);
 app.use('/api/devices', deviceRoutes);
 app.use('/api/user-preferences', userPreferencesRoutes);
 app.use('/api/service-requests', serviceRequestRoutes);
+app.use('/api/yacht-settings', yachtSettingsRoutes);
 
 // Error handling
 app.use((err: any, req: any, res: any, next: any) => {

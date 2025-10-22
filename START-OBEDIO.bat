@@ -15,11 +15,11 @@ echo.
 
 REM Check if ports are already in use
 echo Checking ports...
-netstat -ano | findstr ":3001" >nul
+netstat -ano | findstr ":8080" >nul
 if %errorlevel%==0 (
     echo.
     echo ========================================
-    echo    WARNING: Port 3001 already in use!
+    echo    WARNING: Port 8080 already in use!
     echo ========================================
     echo.
     echo Backend server is already running or was not properly stopped.
@@ -64,7 +64,7 @@ if %errorlevel%==0 (
 )
 
 REM Start Backend Server
-echo [1/2] Starting Backend API Server (Port 3001)...
+echo [1/2] Starting Backend API Server (Port 8080)...
 start "OBEDIO Backend API" cmd /k "cd /d "%~dp0backend" && npm run dev"
 
 REM Wait for backend to initialize
@@ -84,7 +84,7 @@ echo ========================================
 echo    SERVERS STARTED SUCCESSFULLY!
 echo ========================================
 echo.
-echo Backend API:  http://localhost:3001/api
+echo Backend API:  http://localhost:8080/api
 echo Frontend App: http://localhost:5173
 echo.
 echo Database: PostgreSQL (running)
@@ -101,7 +101,7 @@ echo ========================================
 echo   SYSTEM READY FOR DEMO!
 echo ========================================
 echo.
-echo Login: admin / password
+echo Login: admin / admin123
 echo.
 echo IMPORTANT: 
 echo - Do NOT close Backend and Frontend windows!

@@ -152,7 +152,7 @@ export function useDeviceMutations() {
   const createDevice = useMutation({
     mutationFn: async (data: Partial<Device>) => {
       const response = await api.post('/devices', data);
-      return response.data.data;
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['devices'] });
@@ -162,7 +162,7 @@ export function useDeviceMutations() {
   const updateDevice = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Device> }) => {
       const response = await api.put(`/devices/${id}`, data);
-      return response.data.data;
+      return response;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['devices'] });
@@ -182,7 +182,7 @@ export function useDeviceMutations() {
   const updateDeviceConfig = useMutation({
     mutationFn: async ({ id, config }: { id: string; config: any }) => {
       const response = await api.put(`/devices/${id}/config`, { config });
-      return response.data.data;
+      return response;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['devices', variables.id] });
@@ -193,7 +193,7 @@ export function useDeviceMutations() {
   const testDevice = useMutation({
     mutationFn: async (id: string) => {
       const response = await api.post(`/devices/${id}/test`);
-      return response.data;
+      return response;
     },
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ['devices', id, 'logs'] });

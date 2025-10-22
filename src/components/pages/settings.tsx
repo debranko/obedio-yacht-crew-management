@@ -1,4 +1,4 @@
-import { useState, Fragment, useEffect } from "react";
+import { useState, Fragment, useEffect, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Card } from "../ui/card";
 import { Label } from "../ui/label";
@@ -135,6 +135,7 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   const [yachtType, setYachtType] = useState<"yacht" | "villa">("yacht");
   const [notifications, setNotifications] = useState(true);
   const [autoBackup, setAutoBackup] = useState(true);
+  const [timezone, setTimezone] = useState("Europe/Monaco");
   const [serviceRequestDisplayMode, setServiceRequestDisplayMode] = useState<"guest-name" | "location">(
     userPreferences.serviceRequestDisplayMode
   );
@@ -266,6 +267,43 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
               <Separator />
               
               <div>
+                <h3 className="mb-4">Time & Location</h3>
+                
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="timezone">Timezone</Label>
+                    <Select value={timezone} onValueChange={setTimezone}>
+                      <SelectTrigger id="timezone">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="UTC">UTC (Coordinated Universal Time)</SelectItem>
+                        <SelectItem value="Europe/Monaco">Europe/Monaco</SelectItem>
+                        <SelectItem value="Europe/London">Europe/London</SelectItem>
+                        <SelectItem value="Europe/Paris">Europe/Paris</SelectItem>
+                        <SelectItem value="Europe/Rome">Europe/Rome</SelectItem>
+                        <SelectItem value="Europe/Athens">Europe/Athens</SelectItem>
+                        <SelectItem value="America/New_York">America/New York</SelectItem>
+                        <SelectItem value="America/Los_Angeles">America/Los Angeles</SelectItem>
+                        <SelectItem value="America/Miami">America/Miami (Eastern)</SelectItem>
+                        <SelectItem value="America/Antigua">Caribbean/Antigua</SelectItem>
+                        <SelectItem value="Asia/Dubai">Asia/Dubai</SelectItem>
+                        <SelectItem value="Asia/Singapore">Asia/Singapore</SelectItem>
+                        <SelectItem value="Asia/Hong_Kong">Asia/Hong Kong</SelectItem>
+                        <SelectItem value="Australia/Sydney">Australia/Sydney</SelectItem>
+                        <SelectItem value="Pacific/Auckland">Pacific/Auckland</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-sm text-muted-foreground">
+                      Set the timezone for displaying times throughout the system
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <Separator />
+              
+              <div>
                 <h3 className="mb-4">Preferences</h3>
                 
                 <div className="space-y-4">
@@ -316,8 +354,8 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
                   <div className="space-y-2">
                     <Label htmlFor="serving-timeout">Serving Now Timeout</Label>
                     <Select 
-                      value={String(servingNowTimeout)} 
-                      onValueChange={(value) => setServingNowTimeout(Number(value))}
+                      value={String(servingNowTimeout)}
+                      onValueChange={(value: string) => setServingNowTimeout(Number(value))}
                     >
                       <SelectTrigger id="serving-timeout">
                         <SelectValue />
@@ -339,8 +377,8 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
                   <div className="space-y-2">
                     <Label htmlFor="request-repeat">Unaccepted Request Reminder</Label>
                     <Select 
-                      value={String(requestDialogRepeatInterval)} 
-                      onValueChange={(value) => setRequestDialogRepeatInterval(Number(value))}
+                      value={String(requestDialogRepeatInterval)}
+                      onValueChange={(value: string) => setRequestDialogRepeatInterval(Number(value))}
                     >
                       <SelectTrigger id="request-repeat">
                         <SelectValue />

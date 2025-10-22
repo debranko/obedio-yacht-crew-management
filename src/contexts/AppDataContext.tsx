@@ -2,10 +2,12 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Assignment, CrewMember, ShiftConfig } from '../components/duty-roster/types';
-import { mockCrewMembers, defaultShiftConfig } from '../components/duty-roster/mock-data';
+// Removed defaultShiftConfig import - will use API data
 import { useCrewMembers as useCrewMembersApi } from '../hooks/useCrewMembers';
 import { useGuestsApi } from '../hooks/useGuestsApi';
 import { useServiceRequestsApi } from '../hooks/useServiceRequestsApi';
+import { useShifts as useShiftsApi } from '../hooks/useShifts';
+import { useLocations } from '../hooks/useLocations';
 import { api, GuestDTO } from '../services/api';
 import { Location, LocationType } from '../domain/locations';
 import { locationsService } from '../services/locations';
@@ -37,13 +39,7 @@ import { YachtLocation } from '../types/yacht-locations';
 
 // Import organized mock data generators
 import {
-  generateMockGuests,
-  generateMockServiceRequests,
-  simulateNewServiceRequest,
-  generateMockDeviceLogs,
-  generateMockCallLogs,
-  generateMockRecentActivity,
-  generateMockLocations
+  simulateNewServiceRequest
 } from '../mock-data';
 
 // Re-export types for backward compatibility
@@ -172,55 +168,25 @@ interface AppDataContextType {
 
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
 
-// Default permissions for each role (mock data - will be replaced by API)
-const defaultRolePermissions: Record<Role, string[]> = {
-  "admin": [
-    "crew.view", "crew.add", "crew.edit", "crew.delete", "crew.create-account",
-    "guests.view", "guests.add", "guests.edit", "guests.delete",
-    "duty.view", "duty.manage", "duty.configure",
-    "devices.view", "devices.add", "devices.edit", "devices.delete", "devices.assign",
-    "locations.view", "locations.add", "locations.edit", "locations.delete",
-    "communication.send", "communication.broadcast", "communication.emergency",
-    "system.view-logs", "system.settings", "system.roles", "system.backup",
-  ],
-  "eto": [
-    "devices.view", "devices.add", "devices.edit", "devices.delete", "devices.assign",
-    "locations.view", "locations.add", "locations.edit", "locations.delete",
-    "system.view-logs", "crew.view", "duty.view",
-  ],
-  "chief-stewardess": [
-    "crew.view", "crew.add", "crew.edit", "crew.create-account",
-    "guests.view", "guests.add", "guests.edit", "guests.delete",
-    "duty.view", "duty.manage", "duty.configure",
-    "devices.view", "devices.assign", "locations.view",
-    "communication.send", "communication.broadcast", "communication.emergency",
-    "system.view-logs",
-  ],
-  "stewardess": [
-    "crew.view", "guests.view", "guests.edit", "duty.view",
-    "devices.view", "locations.view", "communication.send", "system.view-logs",
-  ],
-  "crew": ["crew.view", "duty.view"],
-};
-
-// Mock locations generator moved to src/mock-data/locations.ts
+// Role permissions are defined in backend auth middleware
+// TODO: Create API endpoint to fetch role permissions dynamically
 
 // Generate default assignments for the next 7 days
-function generateDefaultAssignments(): Assignment[] {
+function generateDefaultAssignments(crewMembers: CrewMemberExtended[], shifts: ShiftConfig[]): Assignment[] {
   const assignments: Assignment[] = [];
   const now = new Date();
   
-  // Get shifts from default config (match by ID, not name)
-  const morningShift = defaultShiftConfig.find(s => s.id === 'morning');
-  const afternoonShift = defaultShiftConfig.find(s => s.id === 'afternoon');
-  const nightShift = defaultShiftConfig.find(s => s.id === 'night');
+  // Get shifts from passed shifts array (match by ID, not name)
+  const morningShift = shifts.find((s: ShiftConfig) => s.id === 'morning');
+  const afternoonShift = shifts.find((s: ShiftConfig) => s.id === 'afternoon');
+  const nightShift = shifts.find((s: ShiftConfig) => s.id === 'night');
   
   if (!morningShift || !afternoonShift || !nightShift) {
     return [];
   }
   
-  // Interior crew members (from mock data) - EXCLUDE on-leave crew
-  const interiorCrew = mockCrewMembers.filter(
+  // Interior crew members (from actual crew state) - EXCLUDE on-leave crew
+  const interiorCrew = crewMembers.filter(
     c => c.department === 'Interior' && c.status !== 'on-leave'
   );
   
@@ -326,71 +292,6 @@ function generateDefaultAssignments(): Assignment[] {
   return assignments;
 }
 
-function generateMockYachtLocations(): YachtLocation[] {
-  // For initial state, we need to load synchronously from localStorage
-  // The locations service will be initialized with mock data later
-  const stored = localStorage.getItem('obedio-locations');
-  let allLocations: any[] = [];
-  
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored);
-      allLocations = parsed.map((loc: any) => ({
-        ...loc,
-        createdAt: new Date(loc.createdAt),
-        updatedAt: new Date(loc.updatedAt)
-      }));
-    } catch (error) {
-      console.error('Failed to load locations:', error);
-      allLocations = [];
-    }
-  }
-  
-  // If no stored locations, return empty array (will be initialized later)
-  if (allLocations.length === 0) {
-    return [];
-  }
-  
-  const yachtLocations: YachtLocation[] = allLocations.map(loc => {
-    // Map floor to deck type
-    const deckMap: Record<string, "main" | "upper" | "lower" | "sun"> = {
-      'Main Deck': 'main',
-      'Upper Deck': 'upper',
-      'Lower Deck': 'lower',
-      'Sun Deck': 'sun',
-      'Bridge Deck': 'main', // Fallback to main
-      'Tank Deck': 'lower', // Fallback to lower
-    };
-    
-    // Map type to category
-    const categoryMap: Record<string, "cabin" | "public" | "service" | "operational" | "exterior" | "entertainment"> = {
-      'cabin': 'cabin',
-      'common': 'public',
-      'service': 'service',
-      'outdoor': 'exterior',
-      'technical': 'operational',
-    };
-    
-    return {
-      id: loc.id,
-      name: loc.name,
-      category: categoryMap[loc.type] || 'public',
-      deck: deckMap[loc.floor || ''] || 'main',
-      capacity: loc.capacity,
-      hasDevice: !!loc.smartButtonId,
-      deviceStatus: 'online', // Default to online
-      deviceId: loc.smartButtonId,
-      lastActivity: 'Just now',
-      activeRequests: 0,
-      allowedAccess: loc.type === 'cabin' || loc.type === 'common' ? ['guest', 'crew'] : ['crew'],
-      doNotDisturb: loc.doNotDisturb,
-      floor: loc.floor,
-    };
-  });
-
-  return yachtLocations;
-}
-
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   
@@ -403,30 +304,19 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   // Fetch service requests from API
   const { serviceRequests: apiServiceRequests, isLoading: isLoadingServiceRequests } = useServiceRequestsApi();
   
-  // Initialize crew members with API data or fallback to mock
-  const [crewMembers, setCrewMembers] = useState<CrewMemberExtended[]>(() => {
-    const stored = localStorage.getItem('obedio-crew-members');
-    if (stored) {
-      return JSON.parse(stored);
-    }
-    
-    // Map mock crew members to extended format (fallback)
-    return mockCrewMembers.map(member => ({
-      ...member,
-      role: member.position,
-      status: 'off-duty' as const,
-      shift: '08:00 - 20:00',
-      contact: '+1 555 0100',
-      email: `${member.name.toLowerCase().replace(' ', '.')}@yacht.com`,
-      joinDate: '2023-01-15',
-    }));
-  });
+  // Fetch shifts from API
+  const { data: apiShifts = [], isLoading: isLoadingShifts } = useShiftsApi();
   
-  // Update crew members when API data arrives
+  // Fetch locations from API
+  const { locations: apiLocations, isLoading: isLoadingLocations } = useLocations();
+  
+  // Initialize crew members with empty array - will be populated from API
+  const [crewMembers, setCrewMembers] = useState<CrewMemberExtended[]>([]);
+  
+  // Update crew members when API data arrives - no localStorage
   useEffect(() => {
     if (apiCrewMembers.length > 0) {
       const extendedCrew = apiCrewMembers.map(member => ({
-        ...member,
         id: member.id,
         name: member.name,
         position: member.position,
@@ -437,204 +327,102 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         contact: member.contact || '+1 555 0100',
         email: member.email || `${member.name.toLowerCase().replace(' ', '.')}@yacht.com`,
         joinDate: member.joinDate || '2023-01-15',
-        nickname: member.name.split(' ')[0],
+        nickname: member.name.split(' ')[0], // Generate from name
+        // Extended fields not in API - use defaults
+        avatar: undefined,
+        color: '#A8A8A8', // Default gray color
+        languages: ['English'], // Default language
+        skills: [], // Empty skills array
+        onBoardContact: undefined,
+        phone: member.contact || undefined, // Use contact as phone fallback
       }));
       setCrewMembers(extendedCrew);
-      localStorage.setItem('obedio-crew-members', JSON.stringify(extendedCrew));
     }
   }, [apiCrewMembers]);
 
-  const [assignments, setAssignments] = useState<Assignment[]>(() => {
-    const stored = localStorage.getItem('obedio-assignments');
-    
-    // FORCE REGENERATE if stored data exists but might be corrupted
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        const hasValidShifts = parsed.some((a: Assignment) => 
-          a.shiftId === 'morning' || a.shiftId === 'afternoon' || a.shiftId === 'night'
-        );
-        const hasBackupCrew = parsed.some((a: Assignment) => a.type === 'backup');
-        
-        // If no valid shift IDs found OR no backup crew, regenerate
-        if (!hasValidShifts || !hasBackupCrew || parsed.length < 10) {
-          const defaults = generateDefaultAssignments();
-          localStorage.setItem('obedio-assignments', JSON.stringify(defaults));
-          return defaults;
-        }
-        
-        return parsed;
-      } catch (e) {
-        const defaults = generateDefaultAssignments();
-        localStorage.setItem('obedio-assignments', JSON.stringify(defaults));
-        return defaults;
-      }
+  // Initialize assignments with empty array - will be populated from API
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+
+  // Initialize shifts with empty array - will be populated from API
+  const [shifts, setShifts] = useState<ShiftConfig[]>([]);
+  
+  // Update shifts when API data arrives
+  useEffect(() => {
+    if (apiShifts && apiShifts.length > 0) {
+      setShifts(apiShifts);
     }
-    
-    // No stored data, generate fresh
-    const defaults = generateDefaultAssignments();
-    localStorage.setItem('obedio-assignments', JSON.stringify(defaults));
-    return defaults;
-  });
+  }, [apiShifts]);
 
-  const [shifts, setShifts] = useState<ShiftConfig[]>(() => {
-    const stored = localStorage.getItem('obedio-shifts');
-    return stored ? JSON.parse(stored) : defaultShiftConfig;
-  });
-
-  const [lastSaved, setLastSaved] = useState<Date | null>(() => {
-    const stored = localStorage.getItem('obedio-last-saved');
-    return stored ? new Date(stored) : null;
-  });
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   const [isSaving, setIsSaving] = useState(false);
   const [previousAssignments, setPreviousAssignments] = useState<Assignment[]>([]);
   
-  // Locations data - generated mock locations
-  const [locations] = useState<Location[]>(() => generateMockLocations());
+  // Use locations from API instead of mock data
+  const locations = apiLocations;
 
-  // Activity Logs - using imported generators
-  const [deviceLogs, setDeviceLogs] = useState<DeviceLog[]>(() => {
-    const stored = localStorage.getItem('obedio-device-logs');
-    if (stored) return JSON.parse(stored, (key, value) => 
-      key === 'timestamp' ? new Date(value) : value
-    );
-    return generateMockDeviceLogs();
+  // Device logs are now fetched from backend via useDeviceLogs hook
+  // Keeping empty array for backward compatibility - will be removed
+  const [deviceLogs, setDeviceLogs] = useState<DeviceLog[]>([]);
+
+  // Call logs will be fetched from backend via useCallLogs hook
+  // Keeping empty array for backward compatibility - will be removed
+  const [callLogs, setCallLogs] = useState<CallLog[]>([]);
+
+  // Crew change logs will be fetched from backend via useCrewChangeLogs hook
+  // TODO: Create backend API endpoint and hook to fetch crew change logs
+  const [crewChangeLogs, setCrewChangeLogs] = useState<CrewChangeLog[]>([]);
+
+  // Device assignments will be fetched from backend via useDeviceAssignments hook
+  // Keeping empty array for backward compatibility - will be removed
+  const [deviceAssignments, setDeviceAssignments] = useState<CrewDeviceAssignment[]>([]);
+
+  // Messages will be fetched from backend via useMessages hook and WebSocket
+  // Keeping empty array for backward compatibility - will be removed
+  const [messages, setMessages] = useState<Message[]>([]);
+
+  // Recent activity will be fetched from backend via unified activity feed
+  // Keeping empty array for backward compatibility - will be removed
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+
+  // Yacht Locations - deprecated, use locations from useLocations hook instead
+  // TODO: Remove this completely once all components are migrated
+  const [yachtLocations, setYachtLocations] = useState<YachtLocation[]>([]);
+
+  // User Preferences - will be fetched from backend via useUserPreferences hook
+  // TODO: Create backend API endpoint and hook to fetch user preferences
+  const [userPreferences, setUserPreferences] = useState<UserPreferences>({
+    serviceRequestDisplayMode: 'guest-name',
+    servingNowTimeout: 5,
+    requestDialogRepeatInterval: 60,
   });
 
-  const [callLogs, setCallLogs] = useState<CallLog[]>(() => {
-    const stored = localStorage.getItem('obedio-call-logs');
-    if (stored) return JSON.parse(stored, (key, value) => 
-      key === 'timestamp' ? new Date(value) : value
-    );
-    return generateMockCallLogs();
+  // Service Request History - will be fetched from backend via useServiceRequestHistory hook
+  // Keeping empty array for backward compatibility - will be removed
+  const [serviceRequestHistory, setServiceRequestHistory] = useState<ServiceRequestHistory[]>([]);
+
+  // Role Permissions - will be fetched from backend via useRolePermissions hook
+  // TODO: Create backend API endpoint and hook to fetch role permissions
+  const [rolePermissions, setRolePermissions] = useState<Record<Role, string[]>>({
+    "admin": [],
+    "eto": [],
+    "chief-stewardess": [],
+    "stewardess": [],
+    "crew": [],
   });
 
-  const [crewChangeLogs, setCrewChangeLogs] = useState<CrewChangeLog[]>(() => {
-    const stored = localStorage.getItem('obedio-crew-change-logs');
-    if (stored) return JSON.parse(stored, (key, value) => 
-      key === 'timestamp' ? new Date(value) : value
-    );
-    return [];
+  // Notification Settings - will be fetched from backend via useNotificationSettings hook
+  // TODO: Create backend API endpoint and hook to fetch notification settings
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
+    enabled: true,
+    shiftStartAdvanceTime: '1hour',
+    shiftEndAdvanceTime: '30min',
+    shiftStartEnabled: true,
+    shiftEndEnabled: true,
   });
 
-  const [deviceAssignments, setDeviceAssignments] = useState<CrewDeviceAssignment[]>(() => {
-    const stored = localStorage.getItem('obedio-device-assignments');
-    if (stored) return JSON.parse(stored, (key, value) => 
-      key === 'assignedAt' || key === 'lastSync' ? new Date(value) : value
-    );
-    return [];
-  });
-
-  const [messages, setMessages] = useState<Message[]>(() => {
-    const stored = localStorage.getItem('obedio-messages');
-    if (stored) return JSON.parse(stored, (key, value) => 
-      key === 'timestamp' ? new Date(value) : value
-    );
-    return [];
-  });
-
-  // Recent Activity - using imported generator
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>(() => {
-    const stored = localStorage.getItem('obedio-recent-activity');
-    if (stored) return JSON.parse(stored, (key, value) => 
-      key === 'timestamp' ? new Date(value) : value
-    );
-    return generateMockRecentActivity();
-  });
-
-  // Yacht Locations
-  const [yachtLocations, setYachtLocations] = useState<YachtLocation[]>(() => {
-    const stored = localStorage.getItem('obedio-yacht-locations');
-    if (stored) return JSON.parse(stored);
-    return generateMockYachtLocations();
-  });
-
-  // User Preferences
-  const [userPreferences, setUserPreferences] = useState<UserPreferences>(() => {
-    const stored = localStorage.getItem('obedio-user-preferences');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        return {
-          serviceRequestDisplayMode: parsed.serviceRequestDisplayMode || 'guest-name',
-          servingNowTimeout: parsed.servingNowTimeout || 5,
-          requestDialogRepeatInterval: parsed.requestDialogRepeatInterval ?? 60,
-        };
-      } catch (e) {
-        return { 
-          serviceRequestDisplayMode: 'guest-name',
-          servingNowTimeout: 5,
-          requestDialogRepeatInterval: 60,
-        };
-      }
-    }
-    return { 
-      serviceRequestDisplayMode: 'guest-name',
-      servingNowTimeout: 5,
-      requestDialogRepeatInterval: 60,
-    };
-  });
-
-  // Service Request History
-  const [serviceRequestHistory, setServiceRequestHistory] = useState<ServiceRequestHistory[]>(() => {
-    const stored = localStorage.getItem('obedio-service-request-history');
-    if (stored) return JSON.parse(stored, (key, value) => 
-      key === 'completedAt' ? new Date(value) : value
-    );
-    return [];
-  });
-
-  // Role Permissions
-  const [rolePermissions, setRolePermissions] = useState<Record<Role, string[]>>(() => {
-    const stored = localStorage.getItem('obedio-role-permissions');
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch (e) {
-        return defaultRolePermissions;
-      }
-    }
-    return defaultRolePermissions;
-  });
-
-  // Notification Settings
-  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(() => {
-    const stored = localStorage.getItem('obedio-notification-settings');
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch (e) {
-        return {
-          enabled: true,
-          shiftStartAdvanceTime: '1hour',
-          shiftEndAdvanceTime: '30min',
-          shiftStartEnabled: true,
-          shiftEndEnabled: true,
-        };
-      }
-    }
-    return {
-      enabled: true,
-      shiftStartAdvanceTime: '1hour',
-      shiftEndAdvanceTime: '30min',
-      shiftStartEnabled: true,
-      shiftEndEnabled: true,
-    };
-  });
-
-  // Guest Management - initialize with stored or empty
-  const [guests, setGuests] = useState<Guest[]>(() => {
-    const stored = localStorage.getItem('obedio-guests');
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch (e) {
-        return generateMockGuests(); // Fallback to mock only if stored data is corrupt
-      }
-    }
-    return []; // Start empty, will be filled by API
-  });
+  // Guest Management - empty array, will be filled by API
+  const [guests, setGuests] = useState<Guest[]>([]);
   
   // Sync guests from API when data arrives
   useEffect(() => {
@@ -685,45 +473,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       }));
       
       setGuests(mappedGuests);
-      localStorage.setItem('obedio-guests', JSON.stringify(mappedGuests));
     }
   }, [apiGuests]);
 
-  // Service Requests - initialize with stored or empty (will be filled by API)
-  const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>(() => {
-    const stored = localStorage.getItem('obedio-service-requests');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored, (key, value) => 
-          key === 'timestamp' || key === 'acceptedAt' || key === 'completedAt' ? new Date(value) : value
-        );
-        
-        // Clean up stale requests
-        const now = new Date();
-        const staleThresholdMs = 60 * 60 * 1000; // 1 hour
-        
-        const cleaned = parsed.filter((req: ServiceRequest) => {
-          if (req.status === 'completed') return false;
-          
-          if (req.status === 'accepted' || req.status === 'delegated') {
-            const acceptedTime = req.acceptedAt instanceof Date ? req.acceptedAt : (req.acceptedAt ? new Date(req.acceptedAt) : null);
-            
-            if (acceptedTime && acceptedTime instanceof Date && !isNaN(acceptedTime.getTime())) {
-              const timeSinceAccepted = now.getTime() - acceptedTime.getTime();
-              if (timeSinceAccepted > staleThresholdMs) return false;
-            }
-          }
-          
-          return true;
-        });
-        
-        return cleaned;
-      } catch (e) {
-        return generateMockServiceRequests(); // Fallback only if corrupt
-      }
-    }
-    return []; // Start empty, will be filled by API
-  });
+  // Service Requests - empty array, will be filled by API
+  const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
   
   // Sync service requests from API when data arrives
   useEffect(() => {
@@ -761,22 +515,16 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       });
       
       setServiceRequests(mappedRequests);
-      localStorage.setItem('obedio-service-requests', JSON.stringify(mappedRequests));
     }
   }, [apiServiceRequests, guests, locations, crewMembers]);
 
   // Activity logs state
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
 
-  // Persist data to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem('obedio-crew-members', JSON.stringify(crewMembers));
-  }, [crewMembers]);
+  // Removed localStorage persistence for crew members - using API as single source of truth
 
-  // Auto-reset crew statuses when assignments change
+  // Auto-reset crew statuses when assignments change (no localStorage)
   useEffect(() => {
-    localStorage.setItem('obedio-assignments', JSON.stringify(assignments));
-    
     const now = new Date();
     const today = now.toISOString().split('T')[0];
     const todayAssignments = assignments.filter(a => a.date === today);
@@ -787,8 +535,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       
       const updated = prevCrew.map(member => {
         if (
-          member.department === 'Interior' && 
-          member.status === 'on-duty' && 
+          member.department === 'Interior' &&
+          member.status === 'on-duty' &&
           !assignedCrewIds.has(member.id)
         ) {
           hasChanges = true;
@@ -801,21 +549,19 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     });
   }, [assignments, setCrewMembers]);
 
-  // Persist other data
-  useEffect(() => { localStorage.setItem('obedio-shifts', JSON.stringify(shifts)); }, [shifts]);
-  useEffect(() => { localStorage.setItem('obedio-device-logs', JSON.stringify(deviceLogs)); }, [deviceLogs]);
-  useEffect(() => { localStorage.setItem('obedio-call-logs', JSON.stringify(callLogs)); }, [callLogs]);
-  useEffect(() => { localStorage.setItem('obedio-crew-change-logs', JSON.stringify(crewChangeLogs)); }, [crewChangeLogs]);
-  useEffect(() => { localStorage.setItem('obedio-device-assignments', JSON.stringify(deviceAssignments)); }, [deviceAssignments]);
-  useEffect(() => { localStorage.setItem('obedio-messages', JSON.stringify(messages)); }, [messages]);
-  useEffect(() => { localStorage.setItem('obedio-recent-activity', JSON.stringify(recentActivity)); }, [recentActivity]);
-  useEffect(() => { localStorage.setItem('obedio-role-permissions', JSON.stringify(rolePermissions)); }, [rolePermissions]);
-  useEffect(() => { localStorage.setItem('obedio-notification-settings', JSON.stringify(notificationSettings)); }, [notificationSettings]);
-  useEffect(() => { localStorage.setItem('obedio-user-preferences', JSON.stringify(userPreferences)); }, [userPreferences]);
-  useEffect(() => { localStorage.setItem('obedio-service-request-history', JSON.stringify(serviceRequestHistory)); }, [serviceRequestHistory]);
-  useEffect(() => { localStorage.setItem('obedio-guests', JSON.stringify(guests)); }, [guests]);
-  useEffect(() => { localStorage.setItem('obedio-yacht-locations', JSON.stringify(yachtLocations)); }, [yachtLocations]);
-  useEffect(() => { localStorage.setItem('obedio-service-requests', JSON.stringify(serviceRequests)); }, [serviceRequests]);
+  // Removed localStorage persistence for shifts - will use API
+  // Persist other data (device logs and call logs removed - now from API)
+  // Crew change logs removed - will use API
+  // Device assignments removed - will use API
+  // Messages removed - will use API and WebSocket
+  // Recent activity now from API - no localStorage persistence
+  // Role permissions removed - will use API
+  // Notification settings removed - will use API
+  // User preferences removed - will use API
+  // Service request history removed - will use API
+  // Guests removed - now using API
+  // Yacht locations removed - use locations from useLocations hook
+  // Service requests removed - will use API
 
   // Initialize locations service - Let it load from backend API first
   // Only use localStorage as emergency fallback if backend is unavailable
@@ -947,17 +693,17 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  // Save function (simulates API call)
+  // Save function - TODO: Replace with API call to save assignments
   const saveAssignments = async () => {
     setIsSaving(true);
     setPreviousAssignments([...assignments]);
     
-    // Simulate API call delay
+    // TODO: Replace with actual API call
+    // await api.dutyRoster.saveAssignments(assignments);
     await new Promise(resolve => setTimeout(resolve, 800));
     
     const now = new Date();
     setLastSaved(now);
-    localStorage.setItem('obedio-last-saved', now.toISOString());
     setIsSaving(false);
   };
 
@@ -1114,7 +860,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return { onDuty, nextShift, backup, nextBackup };
   }, [assignments, shifts, crewMembers]);
 
-  // Device Assignment Functions
+  // Device Assignment Functions - TODO: Replace with API calls
   const assignDeviceToCrew = (assignment: Omit<CrewDeviceAssignment, 'id' | 'assignedAt' | 'lastSync'>) => {
     const now = new Date();
     const newAssignment: CrewDeviceAssignment = {
@@ -1451,7 +1197,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         updateLocation,
         deleteLocation,
         updateLocationDeviceStatus,
-        locations, // Mock locations from generator
+        locations, // Locations from API
         serviceRequests,
         addServiceRequest,
         acceptServiceRequest,
