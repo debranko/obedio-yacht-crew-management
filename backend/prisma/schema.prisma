@@ -22,6 +22,9 @@ model User {
   crewMember   CrewMember?
   activityLogs ActivityLog[]
   preferences  UserPreferences?
+  messages     Message[]        @relation("MessageSender")
+  receivedMessages Message[]    @relation("MessageReceiver")
+  notifications NotificationSettings?
 }
 
 model UserPreferences {
@@ -113,6 +116,21 @@ model Guest {
   
   location        Location?        @relation(fields: [locationId], references: [id])
   serviceRequests ServiceRequest[]
+}
+
+model ServiceRequestHistory {
+  id               String   @id @default(cuid())
+  serviceRequestId String
+  action           String   // "created", "accepted", "completed", "cancelled"
+  previousStatus   String?
+  newStatus        String
+  notes            String?
+  userId           String?  // Who performed the action
+  metadata         Json?    // Additional data like response times, etc.
+  createdAt        DateTime @default(now())
+  
+  @@index([serviceRequestId])
+  @@index([createdAt])
 }
 
 model ServiceRequest {
@@ -210,4 +228,104 @@ model ActivityLog {
   createdAt  DateTime @default(now())
   
   user User? @relation(fields: [userId], references: [id])
+}
+
+model YachtSettings {
+  id           String   @id @default(cuid())
+  vesselName   String
+  vesselType   String   @default("motor-yacht")
+  timezone     String   @default("Europe/Monaco")
+  floors       String[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  senderId   String
+  receiverId String?  // Null for broadcast messages
+  
+  // Message Content
+  content    String
+  type       String   @default("text") // "text", "alert", "announcement"
+  priority   String   @default("normal") // "low", "normal", "high", "urgent"
+  
+  // Status
+  isRead     Boolean  @default(false)
+  readAt     DateTime?
+  
+  // Relations
+  sender     User     @relation("MessageSender", fields: [senderId], references: [id])
+  receiver   User?    @relation("MessageReceiver", fields: [receiverId], references: [id])
+  
+  createdAt  DateTime @default(now())
+  
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([createdAt])
+}
+
+model NotificationSettings {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Push Notification Settings
+  pushEnabled       Boolean  @default(true)
+  pushToken         String?  // FCM/APNS token
+  
+  // Notification Preferences by Type
+  serviceRequests   Boolean  @default(true)
+  emergencyAlerts   Boolean  @default(true)
+  systemMessages    Boolean  @default(true)
+  guestMessages     Boolean  @default(true)
+  crewMessages      Boolean  @default(true)
+  
+  // Quiet Hours
+  quietHoursEnabled Boolean  @default(false)
+  quietHoursStart   String?  // "22:00"
+  quietHoursEnd     String?  // "08:00"
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model CrewChangeLog {
+  id           String   @id @default(cuid())
+  crewMemberId String
+  
+  changeType   String   // "status_change", "position_change", "department_change", "assignment_change"
+  fieldName    String   // Which field was changed
+  oldValue     String?
+  newValue     String
+  
+  changedBy    String?  // User ID who made the change
+  reason       String?  // Optional reason for change
+  
+  createdAt    DateTime @default(now())
+  
+  @@index([crewMemberId])
+  @@index([changeType])
+  @@index([createdAt])
+}
+
+// RolePermissions stores the permissions for each role
+// Example permissions JSON structure:
+// {
+//   "dashboard": { "view": true, "customize": true },
+//   "serviceRequests": { "view": true, "create": true, "accept": true, "complete": true, "delete": false },
+//   "guests": { "view": true, "create": true, "edit": true, "delete": false },
+//   "crew": { "view": true, "edit": false, "manage": false },
+//   "devices": { "view": true, "manage": false },
+//   "settings": { "view": true, "edit": false }
+// }
+model RolePermissions {
+  id         String   @id @default(cuid())
+  role       String   @unique // "admin", "chief-stewardess", "stewardess", "crew", "eto"
+  
+  // Feature Access
+  permissions Json     // Flexible JSON structure for permissions
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }

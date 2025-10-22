@@ -1,0 +1,290 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  Int                    @id @default(autoincrement())
+  username            String                 @unique
+  email               String                 @unique
+  password            String
+  role                String
+  firstName           String?
+  lastName            String?
+  avatarUrl           String?
+  color               String?
+  position            String?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  tokens              RefreshToken[]
+  serviceRequests     ServiceRequest[]       @relation("ServiceRequestHandler")
+  createdRequests     ServiceRequest[]       @relation("ServiceRequestCreator")
+  deviceAssignments   DeviceAssignment[]
+  locationAssignments LocationAssignment[]
+  devices             Device[]               @relation("DeviceCreator")
+  createdShifts       Shift[]                @relation("ShiftCreator")
+  shiftAssignments    ShiftAssignment[]
+  notifications       NotificationRecipient[]
+  activityLogs        ActivityLog[]
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Guest {
+  id               Int               @id @default(autoincrement())
+  name             String
+  preferredName    String?
+  cabin            String
+  avatarUrl        String?
+  preferences      Json?
+  dietaryRestrictions String[]
+  allergies        String[]
+  notes            String?
+  status           String            @default("checked-in")
+  vipStatus        String?
+  checkInDate      DateTime?
+  checkOutDate     DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  serviceRequests  ServiceRequest[]
+}
+
+model ServiceRequest {
+  id              Int      @id @default(autoincrement())
+  guestId         Int?
+  guest           Guest?   @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  location        String
+  type            String
+  status          String   @default("pending")
+  priority        String   @default("normal")
+  description     String?
+  handlerId       Int?
+  handler         User?    @relation("ServiceRequestHandler", fields: [handlerId], references: [id], onDelete: SetNull)
+  createdBy       Int?
+  creator         User?    @relation("ServiceRequestCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  acceptedAt      DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model DeviceType {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  category    String
+  iconUrl     String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  devices     Device[]
+}
+
+model Device {
+  id               Int                 @id @default(autoincrement())
+  serialNumber     String              @unique
+  deviceTypeId     Int
+  deviceType       DeviceType          @relation(fields: [deviceTypeId], references: [id])
+  name             String?
+  status           String              @default("active")
+  batteryLevel     Int?
+  lastSeen         DateTime?
+  firmwareVersion  String?
+  location         String?
+  metadata         Json?
+  createdBy        Int?
+  creator          User?               @relation("DeviceCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  assignments      DeviceAssignment[]
+  locationAssignments LocationDeviceAssignment[]
+  logs             DeviceLog[]
+}
+
+model DeviceAssignment {
+  id         Int      @id @default(autoincrement())
+  deviceId   Int
+  device     Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedAt DateTime @default(now())
+  assignedBy Int?
+  
+  @@unique([deviceId, userId])
+}
+
+model Location {
+  id            Int                 @id @default(autoincrement())
+  name          String              @unique
+  floor         String
+  zone          String?
+  type          String
+  allowsDND     Boolean             @default(true)
+  isDNDActive   Boolean             @default(false)
+  metadata      Json?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  assignments   LocationAssignment[]
+  devices       LocationDeviceAssignment[]
+}
+
+model LocationAssignment {
+  id         Int      @id @default(autoincrement())
+  locationId Int
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       String?
+  assignedAt DateTime @default(now())
+  
+  @@unique([locationId, userId])
+}
+
+model LocationDeviceAssignment {
+  id         Int      @id @default(autoincrement())
+  locationId Int
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  deviceId   Int
+  device     Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  assignedAt DateTime @default(now())
+  
+  @@unique([locationId, deviceId])
+}
+
+model Shift {
+  id              Int               @id @default(autoincrement())
+  name            String
+  description     String?
+  startTime       String
+  endTime         String
+  color           String
+  isActive        Boolean           @default(true)
+  createdBy       Int?
+  creator         User?             @relation("ShiftCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  assignments     ShiftAssignment[]
+}
+
+model ShiftAssignment {
+  id         Int      @id @default(autoincrement())
+  shiftId    Int
+  shift      Shift    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date       DateTime
+  status     String   @default("scheduled")
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  @@unique([shiftId, userId, date])
+}
+
+model NotificationSettings {
+  id                    Int      @id @default(autoincrement())
+  userId                Int      @unique
+  serviceRequests       Boolean  @default(true)
+  dutyChanges          Boolean  @default(true)
+  emergencyAlerts      Boolean  @default(true)
+  systemUpdates        Boolean  @default(false)
+  quietHoursEnabled    Boolean  @default(false)
+  quietHoursStart      String?
+  quietHoursEnd        String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model Notification {
+  id          Int                    @id @default(autoincrement())
+  type        String
+  title       String
+  message     String
+  priority    String                 @default("normal")
+  data        Json?
+  createdAt   DateTime               @default(now())
+  recipients  NotificationRecipient[]
+}
+
+model NotificationRecipient {
+  id             Int          @id @default(autoincrement())
+  notificationId Int
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  userId         Int
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isRead         Boolean      @default(false)
+  readAt         DateTime?
+  
+  @@unique([notificationId, userId])
+}
+
+model ActivityLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action      String
+  entityType  String
+  entityId    Int?
+  details     Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model DeviceLog {
+  id         Int      @id @default(autoincrement())
+  deviceId   Int
+  device     Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  event      String
+  level      String   @default("info")
+  message    String?
+  data       Json?
+  createdAt  DateTime @default(now())
+  
+  @@index([deviceId])
+  @@index([createdAt])
+}
+
+model YachtSettings {
+  id           Int      @id @default(autoincrement())
+  vesselName   String
+  vesselType   String   @default("motor-yacht")
+  timezone     String   @default("Europe/Monaco")
+  floors       String[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model SystemSettings {
+  id                          Int      @id @default(autoincrement())
+  maintenanceMode            Boolean  @default(false)
+  maintenanceMessage         String?
+  autoBackupEnabled          Boolean  @default(true)
+  backupFrequency            String   @default("daily")
+  dataRetentionDays         Int      @default(90)
+  maxLoginAttempts          Int      @default(5)
+  sessionTimeout            Int      @default(1440)
+  passwordMinLength         Int      @default(8)
+  passwordRequireSpecial    Boolean  @default(true)
+  passwordRequireNumbers    Boolean  @default(true)
+  passwordRequireUppercase  Boolean  @default(true)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+}

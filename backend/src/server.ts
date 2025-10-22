@@ -15,6 +15,14 @@ import deviceRoutes from './routes/devices';
 import userPreferencesRoutes from './routes/user-preferences';
 import serviceRequestRoutes from './routes/service-requests';
 import yachtSettingsRoutes from './routes/yacht-settings';
+import rolePermissionsRoutes from './routes/role-permissions';
+import notificationSettingsRoutes from './routes/notification-settings';
+import messagesRoutes from './routes/messages';
+import serviceRequestHistoryRoutes from './routes/service-request-history';
+import crewChangeLogsRoutes from './routes/crew-change-logs';
+import activityLogsRoutes from './routes/activity-logs';
+import settingsRoutes from './routes/settings';
+import smartButtonsRoutes from './routes/smart-buttons';
 
 dotenv.config();
 
@@ -53,6 +61,14 @@ app.use('/api/devices', deviceRoutes);
 app.use('/api/user-preferences', userPreferencesRoutes);
 app.use('/api/service-requests', serviceRequestRoutes);
 app.use('/api/yacht-settings', yachtSettingsRoutes);
+app.use('/api/permissions', rolePermissionsRoutes);
+app.use('/api/notification-settings', notificationSettingsRoutes);
+app.use('/api/messages', messagesRoutes);
+app.use('/api/service-request-history', serviceRequestHistoryRoutes);
+app.use('/api/crew-change-logs', crewChangeLogsRoutes);
+app.use('/api/activity-logs', activityLogsRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/smart-buttons', smartButtonsRoutes);
 
 // Error handling
 app.use((err: any, req: any, res: any, next: any) => {

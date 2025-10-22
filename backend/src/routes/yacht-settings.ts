@@ -8,22 +8,29 @@ const prisma = new PrismaClient();
 // Get yacht settings
 router.get('/', authMiddleware, async (req: Request, res: Response) => {
   try {
-    // For now, return from a settings table or use defaults
-    // TODO: Create YachtSettings table in Prisma schema
-    const settings = {
-      name: 'Serenity',
-      type: 'motor',
-      timezone: 'Europe/Monaco',
-      floors: ['Lower Deck', 'Main Deck', 'Upper Deck', 'Sun Deck'],
-      dateFormat: 'DD/MM/YYYY',
-      timeFormat: '24h',
-      weatherUnits: 'metric',
-      windSpeedUnits: 'knots',
-    };
+    // Get settings from database or create default if not exists
+    let settings = await prisma.yachtSettings.findFirst();
+    
+    if (!settings) {
+      // Create default settings
+      settings = await prisma.yachtSettings.create({
+        data: {
+          vesselName: 'M/Y Serenity',
+          vesselType: 'motor-yacht',
+          timezone: 'Europe/Monaco',
+          floors: ['Lower Deck', 'Main Deck', 'Upper Deck', 'Sun Deck'],
+        },
+      });
+    }
 
     res.json({
       success: true,
-      data: settings,
+      data: {
+        vesselName: settings.vesselName,
+        vesselType: settings.vesselType,
+        timezone: settings.timezone,
+        floors: settings.floors,
+      },
     });
   } catch (error) {
     console.error('Error fetching yacht settings:', error);
@@ -37,27 +44,51 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 // Update yacht settings
 router.put('/', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { name, type, timezone, floors, dateFormat, timeFormat, weatherUnits, windSpeedUnits } = req.body;
+    const { vesselName, vesselType, timezone, floors } = req.body;
 
-    // TODO: Validate input
-    // TODO: Store in database
-    console.log('Updating yacht settings:', req.body);
+    // Validate input
+    if (!vesselName || !vesselType || !timezone) {
+      return res.status(400).json({
+        success: false,
+        error: 'Vessel name, type, and timezone are required',
+      });
+    }
 
-    const updatedSettings = {
-      name: name || 'Serenity',
-      type: type || 'motor',
-      timezone: timezone || 'Europe/Monaco',
-      floors: floors || ['Lower Deck', 'Main Deck', 'Upper Deck', 'Sun Deck'],
-      dateFormat: dateFormat || 'DD/MM/YYYY',
-      timeFormat: timeFormat || '24h',
-      weatherUnits: weatherUnits || 'metric',
-      windSpeedUnits: windSpeedUnits || 'knots',
-      updatedAt: new Date().toISOString(),
-    };
+    // Get existing settings or create if not exists
+    let settings = await prisma.yachtSettings.findFirst();
+    
+    if (settings) {
+      // Update existing settings
+      settings = await prisma.yachtSettings.update({
+        where: { id: settings.id },
+        data: {
+          vesselName,
+          vesselType,
+          timezone,
+          floors: floors || [],
+        },
+      });
+    } else {
+      // Create new settings
+      settings = await prisma.yachtSettings.create({
+        data: {
+          vesselName,
+          vesselType,
+          timezone,
+          floors: floors || [],
+        },
+      });
+    }
 
     res.json({
       success: true,
-      data: updatedSettings,
+      data: {
+        vesselName: settings.vesselName,
+        vesselType: settings.vesselType,
+        timezone: settings.timezone,
+        floors: settings.floors,
+        updatedAt: settings.updatedAt,
+      },
     });
   } catch (error) {
     console.error('Error updating yacht settings:', error);

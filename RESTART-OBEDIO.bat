@@ -38,7 +38,7 @@ echo ========================================
 echo    RESTART COMPLETE!
 echo ========================================
 echo.
-echo Backend API:  http://localhost:3001/api
+echo Backend API:  http://localhost:8080/api
 echo Frontend App: http://localhost:5173
 echo.
 echo Opening browser...

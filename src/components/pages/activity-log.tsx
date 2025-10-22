@@ -6,6 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Badge } from "../ui/badge";
 import { useAppData } from "../../contexts/AppDataContext";
 import { useDeviceLogs } from "../../hooks/useDeviceLogs";
+import { useServiceRequestHistory } from "../../hooks/useServiceRequestHistoryApi";
+import { useCrewChangeLogs } from "../../hooks/useCrewChangeLogsApi";
 import { Search, Smartphone, Bell, Users, Circle, User, MapPin, Loader2 } from "lucide-react";
 
 // Simple date formatting helper
@@ -18,12 +20,13 @@ const formatDate = (date: Date | string) => {
 };
 
 export function ActivityLogPage() {
-  const { serviceRequestHistory, crewChangeLogs, crewMembers } = useAppData();
+  const { crewMembers } = useAppData();
   
   const [searchQuery, setSearchQuery] = useState("");
   const [filterUser, setFilterUser] = useState("all");
   const [itemsPerPage, setItemsPerPage] = useState(50);
   const [deviceLogStatus, setDeviceLogStatus] = useState<string | undefined>();
+  const [crewChangeAction, setCrewChangeAction] = useState<string | undefined>();
   
   // Fetch device logs from backend API
   const { data: deviceLogs = [], isLoading: isLoadingDeviceLogs, error: deviceLogsError } = useDeviceLogs({
@@ -32,14 +35,40 @@ export function ActivityLogPage() {
     limit: itemsPerPage,
   });
 
+  // Fetch service request history from backend API
+  const {
+    data: serviceRequestHistoryResponse,
+    isLoading: isLoadingServiceRequests,
+    error: serviceRequestsError
+  } = useServiceRequestHistory({
+    search: searchQuery || undefined,
+    limit: itemsPerPage,
+    page: 1,
+  });
+
+  // Fetch crew change logs from backend API
+  const {
+    data: crewChangeLogsResponse,
+    isLoading: isLoadingCrewChanges,
+    error: crewChangesError
+  } = useCrewChangeLogs({
+    search: searchQuery || undefined,
+    limit: itemsPerPage,
+    action: crewChangeAction,
+    page: 1,
+  });
+
+  const serviceRequestHistory = serviceRequestHistoryResponse?.data || [];
+  const crewChangeLogs = crewChangeLogsResponse?.data || [];
+
   // Get unique users for filter
   const allUsers = useMemo(() => {
     const users = new Set<string>();
     if (Array.isArray(deviceLogs)) {
       deviceLogs.forEach((log: any) => log.user && users.add(log.user));
     }
-    crewChangeLogs.forEach(log => users.add(log.performedBy));
-    serviceRequestHistory.forEach(log => log.completedBy && users.add(log.completedBy));
+    crewChangeLogs.forEach((log: any) => log.performedBy && users.add(log.performedBy));
+    serviceRequestHistory.forEach((log: any) => log.completedBy && users.add(log.completedBy));
     return Array.from(users);
   }, [deviceLogs, crewChangeLogs, serviceRequestHistory]);
 
@@ -54,43 +83,22 @@ export function ActivityLogPage() {
     });
   }, [deviceLogs, filterUser]);
 
-  // Filter and search service request history
+  // Filter service request history by user (search is handled by API)
   const filteredServiceRequests = useMemo(() => {
-    return serviceRequestHistory
-      .filter(log => {
-        const req = log.originalRequest;
-        const matchesSearch = searchQuery === "" || 
-          req.guestName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          req.guestCabin.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (req.voiceTranscript && req.voiceTranscript.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          (req.notes && req.notes.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          (req.assignedTo && req.assignedTo.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          log.completedBy.toLowerCase().includes(searchQuery.toLowerCase());
-        
-        const matchesUser = filterUser === "all" || 
-          req.assignedTo === filterUser || 
-          log.completedBy === filterUser;
-        
-        return matchesSearch && matchesUser;
-      })
-      .slice(0, itemsPerPage);
-  }, [serviceRequestHistory, searchQuery, filterUser, itemsPerPage]);
+    if (filterUser === "all") return serviceRequestHistory;
+    
+    return serviceRequestHistory.filter((log: any) => {
+      const req = log.originalRequest || log;
+      return req.assignedTo === filterUser || log.completedBy === filterUser;
+    });
+  }, [serviceRequestHistory, filterUser]);
 
-  // Filter and search crew change logs
+  // Filter crew change logs by user (search is handled by API)
   const filteredCrewChangeLogs = useMemo(() => {
-    return crewChangeLogs
-      .filter(log => {
-        const matchesSearch = searchQuery === "" || 
-          log.crewMember.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          log.shift.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          log.performedBy.toLowerCase().includes(searchQuery.toLowerCase());
-        
-        const matchesUser = filterUser === "all" || log.performedBy === filterUser;
-        
-        return matchesSearch && matchesUser;
-      })
-      .slice(0, itemsPerPage);
-  }, [crewChangeLogs, searchQuery, filterUser, itemsPerPage]);
+    if (filterUser === "all") return crewChangeLogs;
+    
+    return crewChangeLogs.filter((log: any) => log.performedBy === filterUser);
+  }, [crewChangeLogs, filterUser]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -291,19 +299,34 @@ export function ActivityLogPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredServiceRequests.length === 0 ? (
+                  {isLoadingServiceRequests ? (
+                    <tr>
+                      <td colSpan={8} className="p-8">
+                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading service request history...
+                        </div>
+                      </td>
+                    </tr>
+                  ) : serviceRequestsError ? (
+                    <tr>
+                      <td colSpan={8} className="p-8 text-center text-error">
+                        Failed to load service request history. Please try again.
+                      </td>
+                    </tr>
+                  ) : filteredServiceRequests.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="p-8 text-center text-muted-foreground">
                         No completed service requests found
                       </td>
                     </tr>
                   ) : (
-                    filteredServiceRequests.map((log) => {
-                      const req = log.originalRequest;
+                    filteredServiceRequests.map((log: any) => {
+                      const req = log.originalRequest || log;
                       return (
                         <tr key={log.id} className="border-b border-border hover:bg-accent/50 transition-colors">
                           <td className="p-4 text-sm">
-                            {formatDateTime(log.completedAt)}
+                            {formatDateTime(new Date(log.completedAt))}
                           </td>
                           <td className="p-4">
                             <div className="flex items-center gap-2">
@@ -343,54 +366,70 @@ export function ActivityLogPage() {
         {/* Crew Changes */}
         <TabsContent value="crew-changes" className="space-y-0">
           <Card>
+            {/* Action Filter for Crew Change Logs */}
+            <div className="p-4 border-b border-border">
+              <Select value={crewChangeAction || "all"} onValueChange={(v: string) => setCrewChangeAction(v === "all" ? undefined : v)}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Filter by action" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Actions</SelectItem>
+                  <SelectItem value="added">Added</SelectItem>
+                  <SelectItem value="removed">Removed</SelectItem>
+                  <SelectItem value="status_changed">Status Changed</SelectItem>
+                  <SelectItem value="duty_started">Duty Started</SelectItem>
+                  <SelectItem value="duty_ended">Duty Ended</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="border-b border-border">
                   <tr className="text-left">
                     <th className="p-4 font-medium text-muted-foreground">Timestamp</th>
                     <th className="p-4 font-medium text-muted-foreground">Crew Member</th>
-                    <th className="p-4 font-medium text-muted-foreground">Change Type</th>
-                    <th className="p-4 font-medium text-muted-foreground">Date</th>
-                    <th className="p-4 font-medium text-muted-foreground">Shift</th>
+                    <th className="p-4 font-medium text-muted-foreground">Action</th>
                     <th className="p-4 font-medium text-muted-foreground">Details</th>
                     <th className="p-4 font-medium text-muted-foreground">Performed By</th>
-                    <th className="p-4 font-medium text-muted-foreground">Notified</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredCrewChangeLogs.length === 0 ? (
+                  {isLoadingCrewChanges ? (
                     <tr>
-                      <td colSpan={8} className="p-8 text-center text-muted-foreground">
-                        No crew change logs found. Changes will appear here after using "Notify Crew" feature.
+                      <td colSpan={5} className="p-8">
+                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading crew change logs...
+                        </div>
+                      </td>
+                    </tr>
+                  ) : crewChangesError ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-error">
+                        Failed to load crew change logs. Please try again.
+                      </td>
+                    </tr>
+                  ) : filteredCrewChangeLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                        No crew change logs found. Changes will appear here after duty roster updates.
                       </td>
                     </tr>
                   ) : (
-                    filteredCrewChangeLogs.map((log) => (
+                    filteredCrewChangeLogs.map((log: any) => (
                       <tr key={log.id} className="border-b border-border hover:bg-accent/50 transition-colors">
                         <td className="p-4 text-sm">
-                          {formatDateTime(log.timestamp)}
+                          {formatDateTime(new Date(log.timestamp))}
                         </td>
-                        <td className="p-4 text-sm font-medium">{log.crewMember}</td>
+                        <td className="p-4 text-sm font-medium">{log.crewMemberName}</td>
                         <td className="p-4">
-                          <Badge variant="outline" className={getChangeTypeColor(log.changeType)}>
-                            {log.changeType.replace('_', ' ')}
+                          <Badge variant="outline" className={getChangeTypeColor(log.action)}>
+                            {log.action.replace(/_/g, ' ')}
                           </Badge>
                         </td>
-                        <td className="p-4 text-sm">{formatDate(log.date)}</td>
-                        <td className="p-4 text-sm">{log.shift}</td>
                         <td className="p-4 text-sm text-muted-foreground">{log.details || '—'}</td>
                         <td className="p-4 text-sm">{log.performedBy}</td>
-                        <td className="p-4">
-                          {log.notified ? (
-                            <Badge variant="outline" className="bg-success/10 text-success border-success/20">
-                              ✓ Notified
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="bg-muted text-muted-foreground border-border">
-                              Not sent
-                            </Badge>
-                          )}
-                        </td>
                       </tr>
                     ))
                   )}

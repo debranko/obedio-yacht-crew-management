@@ -43,7 +43,7 @@ export interface GuestMetaResponse {
 }
 
 export class GuestsService {
-  private static baseUrl = 'http://localhost:3001/api/guests';
+  private static baseUrl = 'http://localhost:8080/api/guests';
 
   /**
    * Get JWT token for API authentication

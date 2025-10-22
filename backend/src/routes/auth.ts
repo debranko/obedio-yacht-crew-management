@@ -22,11 +22,12 @@ const loginLimiter = rateLimit({
 router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
+    console.log('🔐 Login attempt:', { username, passwordLength: password?.length });
     
     if (!username || !password) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Username and password are required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Username and password are required'
       });
     }
 
@@ -40,19 +41,24 @@ router.post('/login', loginLimiter, async (req, res) => {
       }
     });
 
+    console.log('👤 User found:', user ? { id: user.id, username: user.username } : 'NOT FOUND');
+
     if (!user) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Invalid credentials' 
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
       });
     }
 
     // Check password
+    console.log('🔑 Checking password...');
     const isValidPassword = await bcrypt.compare(password, user.password);
+    console.log('✅ Password valid:', isValidPassword);
+    
     if (!isValidPassword) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Invalid credentials' 
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
       });
     }
 

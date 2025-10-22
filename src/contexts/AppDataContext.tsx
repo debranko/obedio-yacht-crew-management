@@ -37,10 +37,7 @@ import {
 } from '../types/activity-logs';
 import { YachtLocation } from '../types/yacht-locations';
 
-// Import organized mock data generators
-import {
-  simulateNewServiceRequest
-} from '../mock-data';
+// Mock data imports removed - using real API data only
 
 // Re-export types for backward compatibility
 export type {
@@ -1141,8 +1138,22 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   };
 
   const simulateNewRequest = (): ServiceRequest => {
-    // Pass REAL guests and locations to simulation function
-    const newRequest = simulateNewServiceRequest(guests, locations);
+    // TODO: Replace with real API call to create a service request
+    // For now, create a minimal request using real data
+    const newRequest: ServiceRequest = {
+      id: `req-${Date.now()}`,
+      guestName: 'Simulated Guest',
+      guestCabin: 'Test Location',
+      cabinId: '',
+      requestType: 'call',
+      priority: 'normal',
+      timestamp: new Date(),
+      voiceTranscript: 'Simulated service request',
+      voiceAudioUrl: undefined,
+      cabinImage: undefined,
+      status: 'pending',
+    };
+    
     setServiceRequests(prev => [newRequest, ...prev]);
     return newRequest;
   };

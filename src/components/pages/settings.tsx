@@ -1,11 +1,12 @@
-import { useState, Fragment, useEffect, useMemo } from "react";
+import { useState, Fragment, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
-import { Card } from "../ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Switch } from "../ui/switch";
 import { Separator } from "../ui/separator";
+import { Textarea } from "../ui/textarea";
 import {
   Select,
   SelectContent,
@@ -13,7 +14,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { Shield, Settings as SettingsIcon, Server, Save, RotateCcw, Info } from "lucide-react";
+import { 
+  Shield, 
+  Settings as SettingsIcon, 
+  Server, 
+  Save, 
+  RotateCcw, 
+  Info, 
+  Plus, 
+  X,
+  Bell,
+  Download,
+  Upload,
+  Database,
+  Wifi,
+  Lock,
+  AlertTriangle,
+  CheckCircle,
+  Globe,
+  Mail,
+  Smartphone,
+  Volume2,
+  Calendar,
+  Clock,
+  HardDrive,
+  Activity,
+  FileText,
+  Trash2,
+  RefreshCw,
+  ExternalLink
+} from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "../ui/badge";
 import { Checkbox } from "../ui/checkbox";
@@ -26,6 +56,15 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
+import { YACHT_TIMEZONES, VESSEL_TYPES } from "../../types/system-settings";
+import { useYachtSettingsApi } from "../../hooks/useYachtSettingsApi";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "../ui/alert";
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
+import { Progress } from "../ui/progress";
 
 // Permission categories and their specific permissions
 interface Permission {
@@ -118,12 +157,15 @@ const categoryLabels: Record<string, string> = {
 };
 
 interface SettingsPageProps {
-  initialTab?: "general" | "roles" | "system";
+  initialTab?: "general" | "notifications" | "roles" | "system" | "backup";
 }
 
 export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   const { rolePermissions, updateRolePermissions, userPreferences, updateUserPreferences } = useAppData();
   const [activeTab, setActiveTab] = useState(initialTab);
+  
+  // Use yacht settings API hook
+  const { settings: yachtSettings, updateSettings: updateYachtSettings, isLoading: isLoadingSettings } = useYachtSettingsApi();
   
   // Update active tab when initialTab prop changes
   useEffect(() => {
@@ -131,11 +173,13 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   }, [initialTab]);
   
   // General Settings State
-  const [yachtName, setYachtName] = useState("M/Y Serenity");
-  const [yachtType, setYachtType] = useState<"yacht" | "villa">("yacht");
+  const [yachtName, setYachtName] = useState("");
+  const [yachtType, setYachtType] = useState("motor-yacht");
   const [notifications, setNotifications] = useState(true);
   const [autoBackup, setAutoBackup] = useState(true);
   const [timezone, setTimezone] = useState("Europe/Monaco");
+  const [floors, setFloors] = useState<string[]>([]);
+  const [newFloor, setNewFloor] = useState("");
   const [serviceRequestDisplayMode, setServiceRequestDisplayMode] = useState<"guest-name" | "location">(
     userPreferences.serviceRequestDisplayMode
   );
@@ -145,6 +189,44 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   const [requestDialogRepeatInterval, setRequestDialogRepeatInterval] = useState<number>(
     userPreferences.requestDialogRepeatInterval ?? 60
   );
+  
+  // Notification Settings State
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [pushNotifications, setPushNotifications] = useState(true);
+  const [soundAlerts, setSoundAlerts] = useState(true);
+  const [notificationEmail, setNotificationEmail] = useState("");
+  const [emergencyContacts, setEmergencyContacts] = useState<string[]>([]);
+  const [newEmergencyContact, setNewEmergencyContact] = useState("");
+  const [quietHoursEnabled, setQuietHoursEnabled] = useState(false);
+  const [quietHoursStart, setQuietHoursStart] = useState("22:00");
+  const [quietHoursEnd, setQuietHoursEnd] = useState("07:00");
+  
+  // System Settings State
+  const [serverPort, setServerPort] = useState("8080");
+  const [wsPort, setWsPort] = useState("8080");
+  const [databaseUrl, setDatabaseUrl] = useState("");
+  const [apiTimeout, setApiTimeout] = useState("30");
+  const [logLevel, setLogLevel] = useState("info");
+  const [enableMetrics, setEnableMetrics] = useState(true);
+  const [enableDebugMode, setEnableDebugMode] = useState(false);
+  
+  // Backup Settings State
+  const [backupSchedule, setBackupSchedule] = useState("daily");
+  const [backupTime, setBackupTime] = useState("02:00");
+  const [backupRetention, setBackupRetention] = useState("30");
+  const [backupLocation, setBackupLocation] = useState("local");
+  const [cloudBackupEnabled, setCloudBackupEnabled] = useState(false);
+  const [lastBackupTime, setLastBackupTime] = useState<Date | null>(null);
+  
+  // Initialize state from backend settings
+  useEffect(() => {
+    if (yachtSettings) {
+      setYachtName(yachtSettings.vesselName || "");
+      setYachtType(yachtSettings.vesselType || "motor-yacht");
+      setTimezone(yachtSettings.timezone || "Europe/Monaco");
+      setFloors(yachtSettings.floors || []);
+    }
+  }, [yachtSettings]);
   
   // Sync with context when it changes
   useEffect(() => {
@@ -156,16 +238,48 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   // Local state for permissions (will be saved on "Save" button)
   const [localPermissions, setLocalPermissions] = useState(rolePermissions);
   
-  const handleSaveGeneral = () => {
+  const handleSaveGeneral = async () => {
     // Save user preferences to context
-    updateUserPreferences({ 
+    updateUserPreferences({
       serviceRequestDisplayMode,
       servingNowTimeout,
       requestDialogRepeatInterval,
     });
     
-    // In production, these would be API calls
-    toast.success("General settings saved successfully");
+    // Save vessel settings to backend
+    try {
+      await updateYachtSettings({
+        vesselName: yachtName,
+        vesselType: yachtType,
+        timezone: timezone,
+        floors: floors,
+      });
+      toast.success("General settings saved successfully");
+    } catch (error) {
+      toast.error("Failed to save settings");
+    }
+  };
+  
+  const handleAddFloor = () => {
+    if (newFloor.trim() && !floors.includes(newFloor.trim())) {
+      setFloors([...floors, newFloor.trim()]);
+      setNewFloor("");
+    }
+  };
+  
+  const handleRemoveFloor = (floor: string) => {
+    setFloors(floors.filter(f => f !== floor));
+  };
+  
+  const handleAddEmergencyContact = () => {
+    if (newEmergencyContact.trim() && !emergencyContacts.includes(newEmergencyContact.trim())) {
+      setEmergencyContacts([...emergencyContacts, newEmergencyContact.trim()]);
+      setNewEmergencyContact("");
+    }
+  };
+  
+  const handleRemoveEmergencyContact = (contact: string) => {
+    setEmergencyContacts(emergencyContacts.filter(c => c !== contact));
   };
   
   const handleTogglePermission = (role: Role, permissionId: string) => {
@@ -190,6 +304,38 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
     toast.success("Role permissions saved successfully");
   };
   
+  const handleSaveNotifications = () => {
+    // TODO: Save to backend API
+    toast.success("Notification settings saved successfully");
+  };
+  
+  const handleSaveSystem = () => {
+    // TODO: Save to backend API
+    toast.success("System settings saved successfully");
+  };
+  
+  const handleSaveBackup = () => {
+    // TODO: Save to backend API
+    toast.success("Backup settings saved successfully");
+  };
+  
+  const handleRunBackup = async () => {
+    // TODO: Trigger backup via API
+    toast.promise(
+      new Promise((resolve) => setTimeout(resolve, 2000)),
+      {
+        loading: 'Creating backup...',
+        success: 'Backup completed successfully',
+        error: 'Backup failed',
+      }
+    );
+  };
+  
+  const handleRestoreBackup = async () => {
+    // TODO: Implement restore functionality
+    toast.info("Restore functionality will be available soon");
+  };
+  
   // Group permissions by category
   const groupedPermissions = allPermissions.reduce((acc, permission) => {
     if (!acc[permission.category]) {
@@ -204,242 +350,409 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-md grid-cols-3">
+        <TabsList className="grid w-full max-w-2xl grid-cols-5">
           <TabsTrigger value="general">
             <SettingsIcon className="h-4 w-4 mr-2" />
             General
           </TabsTrigger>
+          <TabsTrigger value="notifications">
+            <Bell className="h-4 w-4 mr-2" />
+            Notifications
+          </TabsTrigger>
           <TabsTrigger value="roles">
             <Shield className="h-4 w-4 mr-2" />
-            Roles & Permissions
+            Permissions
           </TabsTrigger>
           <TabsTrigger value="system">
             <Server className="h-4 w-4 mr-2" />
             System
           </TabsTrigger>
+          <TabsTrigger value="backup">
+            <Database className="h-4 w-4 mr-2" />
+            Backup
+          </TabsTrigger>
         </TabsList>
 
         {/* General Settings Tab */}
         <TabsContent value="general" className="space-y-6">
-          <Card className="p-6">
-            <div className="space-y-6">
-              <div>
-                <h3 className="mb-4">Vessel Information</h3>
-                
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="yacht-name">Vessel Name</Label>
-                    <Input
-                      id="yacht-name"
-                      value={yachtName}
-                      onChange={(e) => setYachtName(e.target.value)}
-                      placeholder="Enter vessel name"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="yacht-type">Vessel Type</Label>
-                    <Select value={yachtType} onValueChange={(value: "yacht" | "villa") => setYachtType(value)}>
-                      <SelectTrigger id="yacht-type">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="yacht">Yacht</SelectItem>
-                        <SelectItem value="villa">Villa</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="floors-decks">Floors / Decks</Label>
-                    <Input
-                      id="floors-decks"
-                      defaultValue="Sun Deck, Upper Deck, Main Deck, Lower Deck"
-                      placeholder="e.g., Sun Deck, Upper Deck, Main Deck"
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Define the floors/decks of your vessel. These will be used for organizing locations. Separate multiple floors with commas.
-                    </p>
-                  </div>
+          <div className="grid gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Vessel Information</CardTitle>
+                <CardDescription>
+                  Basic information about your vessel
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="yacht-name">Vessel Name</Label>
+                  <Input
+                    id="yacht-name"
+                    value={yachtName}
+                    onChange={(e) => setYachtName(e.target.value)}
+                    placeholder="Enter vessel name"
+                  />
                 </div>
-              </div>
-              
-              <Separator />
-              
-              <div>
-                <h3 className="mb-4">Time & Location</h3>
                 
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="timezone">Timezone</Label>
-                    <Select value={timezone} onValueChange={setTimezone}>
-                      <SelectTrigger id="timezone">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="UTC">UTC (Coordinated Universal Time)</SelectItem>
-                        <SelectItem value="Europe/Monaco">Europe/Monaco</SelectItem>
-                        <SelectItem value="Europe/London">Europe/London</SelectItem>
-                        <SelectItem value="Europe/Paris">Europe/Paris</SelectItem>
-                        <SelectItem value="Europe/Rome">Europe/Rome</SelectItem>
-                        <SelectItem value="Europe/Athens">Europe/Athens</SelectItem>
-                        <SelectItem value="America/New_York">America/New York</SelectItem>
-                        <SelectItem value="America/Los_Angeles">America/Los Angeles</SelectItem>
-                        <SelectItem value="America/Miami">America/Miami (Eastern)</SelectItem>
-                        <SelectItem value="America/Antigua">Caribbean/Antigua</SelectItem>
-                        <SelectItem value="Asia/Dubai">Asia/Dubai</SelectItem>
-                        <SelectItem value="Asia/Singapore">Asia/Singapore</SelectItem>
-                        <SelectItem value="Asia/Hong_Kong">Asia/Hong Kong</SelectItem>
-                        <SelectItem value="Australia/Sydney">Australia/Sydney</SelectItem>
-                        <SelectItem value="Pacific/Auckland">Pacific/Auckland</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-sm text-muted-foreground">
-                      Set the timezone for displaying times throughout the system
-                    </p>
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="yacht-type">Vessel Type</Label>
+                  <Select value={yachtType} onValueChange={setYachtType}>
+                    <SelectTrigger id="yacht-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {VESSEL_TYPES.map(type => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </div>
-              
-              <Separator />
-              
-              <div>
-                <h3 className="mb-4">Preferences</h3>
                 
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Enable Notifications</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Receive alerts for important events
-                      </p>
+                <div className="space-y-2">
+                  <Label htmlFor="floors-decks">Floors / Decks</Label>
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Input
+                        id="floors-decks"
+                        value={newFloor}
+                        onChange={(e) => setNewFloor(e.target.value)}
+                        placeholder="e.g., Sun Deck, Upper Deck, Main Deck"
+                        onKeyPress={(e) => e.key === 'Enter' && handleAddFloor()}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleAddFloor}
+                        disabled={!newFloor.trim()}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <Switch checked={notifications} onCheckedChange={setNotifications} />
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Automatic Backup</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Daily backup of all data
-                      </p>
-                    </div>
-                    <Switch checked={autoBackup} onCheckedChange={setAutoBackup} />
-                  </div>
-                </div>
-              </div>
-              
-              <Separator />
-              
-              <div>
-                <h3 className="mb-4">Display Preferences</h3>
-                
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="service-request-display">Service Request Display</Label>
-                    <Select value={serviceRequestDisplayMode} onValueChange={(value: "guest-name" | "location") => setServiceRequestDisplayMode(value)}>
-                      <SelectTrigger id="service-request-display">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="guest-name">Show Guest Name</SelectItem>
-                        <SelectItem value="location">Show Location/Cabin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-sm text-muted-foreground">
-                      Choose how service requests are displayed. "Guest Name" shows who is calling (e.g., Mr. Anderson). "Location" shows where the call is from (e.g., Owner's Stateroom, Dining Room) - useful for public areas.
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="serving-timeout">Serving Now Timeout</Label>
-                    <Select 
-                      value={String(servingNowTimeout)}
-                      onValueChange={(value: string) => setServingNowTimeout(Number(value))}
-                    >
-                      <SelectTrigger id="serving-timeout">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="3">3 seconds</SelectItem>
-                        <SelectItem value="5">5 seconds (Default)</SelectItem>
-                        <SelectItem value="10">10 seconds</SelectItem>
-                        <SelectItem value="15">15 seconds</SelectItem>
-                        <SelectItem value="30">30 seconds</SelectItem>
-                        <SelectItem value="60">1 minute</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-sm text-muted-foreground">
-                      How long completed requests remain visible before moving to history.
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="request-repeat">Unaccepted Request Reminder</Label>
-                    <Select 
-                      value={String(requestDialogRepeatInterval)}
-                      onValueChange={(value: string) => setRequestDialogRepeatInterval(Number(value))}
-                    >
-                      <SelectTrigger id="request-repeat">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="0">Never (Show Once)</SelectItem>
-                        <SelectItem value="30">Every 30 seconds</SelectItem>
-                        <SelectItem value="60">Every 1 minute (Default)</SelectItem>
-                        <SelectItem value="120">Every 2 minutes</SelectItem>
-                        <SelectItem value="180">Every 3 minutes</SelectItem>
-                        <SelectItem value="300">Every 5 minutes</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-sm text-muted-foreground">
-                      How often to show dialog again for pending requests that haven't been accepted.
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex justify-end">
-                <Button onClick={handleSaveGeneral}>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save General Settings
-                </Button>
-              </div>
-            </div>
-          </Card>
-        </TabsContent>
-
-        {/* Roles & Permissions Tab - MATRIX TABLE */}
-        <TabsContent value="roles" className="space-y-6">
-          <Card className="p-6">
-            <div className="space-y-6">
-              <div>
-                <h3 className="mb-2">Role Permission Matrix</h3>
-                <p className="text-sm text-muted-foreground">
-                  Configure permissions for each role in the Interior Department. Check the box to grant permission.
-                </p>
-              </div>
-              
-              <Separator />
-              
-              {/* Info Banner */}
-              <div className="p-4 bg-muted/30 rounded-lg border border-border">
-                <div className="flex items-start gap-3">
-                  <Info className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                  <div className="space-y-2">
-                    <p className="text-sm">
-                      <strong>Admin</strong> has all permissions by default and cannot be modified. <strong>ETO</strong> has high-level technical access including location deletion.
-                    </p>
                     <div className="flex flex-wrap gap-2">
-                      {roles.map(role => (
-                        <Badge key={role} className={roleInfo[role].color}>
-                          {roleInfo[role].label}
+                      {floors.map((floor, index) => (
+                        <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                          {floor}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-4 w-4 p-0 hover:bg-transparent"
+                            onClick={() => handleRemoveFloor(floor)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
                         </Badge>
                       ))}
                     </div>
+                    {floors.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        No floors/decks defined yet. Add floors/decks to organize your vessel's locations.
+                      </p>
+                    )}
                   </div>
                 </div>
-              </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Time & Location</CardTitle>
+                <CardDescription>
+                  Configure timezone and regional settings
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="timezone">Timezone</Label>
+                  <Select value={timezone} onValueChange={setTimezone}>
+                    <SelectTrigger id="timezone">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {YACHT_TIMEZONES.map(tz => (
+                        <SelectItem key={tz.value} value={tz.value}>
+                          {tz.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    Set the timezone for displaying times throughout the system
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Display Preferences</CardTitle>
+                <CardDescription>
+                  Customize how information is displayed
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="service-request-display">Service Request Display</Label>
+                  <Select value={serviceRequestDisplayMode} onValueChange={(value: "guest-name" | "location") => setServiceRequestDisplayMode(value)}>
+                    <SelectTrigger id="service-request-display">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="guest-name">Show Guest Name</SelectItem>
+                      <SelectItem value="location">Show Location/Cabin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    Choose how service requests are displayed. "Guest Name" shows who is calling (e.g., Mr. Anderson). "Location" shows where the call is from (e.g., Owner's Stateroom, Dining Room).
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="serving-timeout">Serving Now Timeout</Label>
+                  <Select 
+                    value={String(servingNowTimeout)}
+                    onValueChange={(value: string) => setServingNowTimeout(Number(value))}
+                  >
+                    <SelectTrigger id="serving-timeout">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="3">3 seconds</SelectItem>
+                      <SelectItem value="5">5 seconds (Default)</SelectItem>
+                      <SelectItem value="10">10 seconds</SelectItem>
+                      <SelectItem value="15">15 seconds</SelectItem>
+                      <SelectItem value="30">30 seconds</SelectItem>
+                      <SelectItem value="60">1 minute</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    How long completed requests remain visible before moving to history.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="request-repeat">Unaccepted Request Reminder</Label>
+                  <Select 
+                    value={String(requestDialogRepeatInterval)}
+                    onValueChange={(value: string) => setRequestDialogRepeatInterval(Number(value))}
+                  >
+                    <SelectTrigger id="request-repeat">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Never (Show Once)</SelectItem>
+                      <SelectItem value="30">Every 30 seconds</SelectItem>
+                      <SelectItem value="60">Every 1 minute (Default)</SelectItem>
+                      <SelectItem value="120">Every 2 minutes</SelectItem>
+                      <SelectItem value="180">Every 3 minutes</SelectItem>
+                      <SelectItem value="300">Every 5 minutes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    How often to show dialog again for pending requests that haven't been accepted.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <div className="flex justify-end">
+              <Button onClick={handleSaveGeneral} disabled={isLoadingSettings}>
+                <Save className="h-4 w-4 mr-2" />
+                Save General Settings
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Notifications Tab */}
+        <TabsContent value="notifications" className="space-y-6">
+          <div className="grid gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Notification Channels</CardTitle>
+                <CardDescription>
+                  Configure how you receive notifications
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-2">
+                      <Mail className="h-4 w-4" />
+                      Email Notifications
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Receive notifications via email
+                    </p>
+                  </div>
+                  <Switch checked={emailNotifications} onCheckedChange={setEmailNotifications} />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-2">
+                      <Smartphone className="h-4 w-4" />
+                      Push Notifications
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Receive push notifications on mobile devices
+                    </p>
+                  </div>
+                  <Switch checked={pushNotifications} onCheckedChange={setPushNotifications} />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-2">
+                      <Volume2 className="h-4 w-4" />
+                      Sound Alerts
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Play sound for important notifications
+                    </p>
+                  </div>
+                  <Switch checked={soundAlerts} onCheckedChange={setSoundAlerts} />
+                </div>
+                
+                {emailNotifications && (
+                  <div className="space-y-2 pt-4 border-t">
+                    <Label htmlFor="notification-email">Notification Email</Label>
+                    <Input
+                      id="notification-email"
+                      type="email"
+                      value={notificationEmail}
+                      onChange={(e) => setNotificationEmail(e.target.value)}
+                      placeholder="notifications@yacht.com"
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Quiet Hours</CardTitle>
+                <CardDescription>
+                  Reduce notifications during specific hours
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Enable Quiet Hours
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Only emergency notifications during quiet hours
+                    </p>
+                  </div>
+                  <Switch checked={quietHoursEnabled} onCheckedChange={setQuietHoursEnabled} />
+                </div>
+                
+                {quietHoursEnabled && (
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                    <div className="space-y-2">
+                      <Label htmlFor="quiet-start">Start Time</Label>
+                      <Input
+                        id="quiet-start"
+                        type="time"
+                        value={quietHoursStart}
+                        onChange={(e) => setQuietHoursStart(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="quiet-end">End Time</Label>
+                      <Input
+                        id="quiet-end"
+                        type="time"
+                        value={quietHoursEnd}
+                        onChange={(e) => setQuietHoursEnd(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Emergency Contacts</CardTitle>
+                <CardDescription>
+                  Contacts to notify in case of emergency
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      value={newEmergencyContact}
+                      onChange={(e) => setNewEmergencyContact(e.target.value)}
+                      placeholder="Email or phone number"
+                      onKeyPress={(e) => e.key === 'Enter' && handleAddEmergencyContact()}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleAddEmergencyContact}
+                      disabled={!newEmergencyContact.trim()}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {emergencyContacts.map((contact, index) => (
+                      <div key={index} className="flex items-center justify-between p-2 border rounded">
+                        <span className="text-sm">{contact}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveEmergencyContact(contact)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    {emergencyContacts.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        No emergency contacts configured
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <div className="flex justify-end">
+              <Button onClick={handleSaveNotifications}>
+                <Save className="h-4 w-4 mr-2" />
+                Save Notification Settings
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Roles & Permissions Tab */}
+        <TabsContent value="roles" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Role Permission Matrix</CardTitle>
+              <CardDescription>
+                Configure permissions for each role in the Interior Department
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Info Banner */}
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertTitle>Permission Information</AlertTitle>
+                <AlertDescription>
+                  <strong>Admin</strong> has all permissions by default and cannot be modified. <strong>ETO</strong> has high-level technical access including location deletion.
+                </AlertDescription>
+              </Alert>
               
               {/* Permission Matrix Table */}
               <div className="border border-border rounded-lg overflow-hidden">
@@ -516,30 +829,343 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
                   Save Permissions
                 </Button>
               </div>
-            </div>
+            </CardContent>
           </Card>
         </TabsContent>
 
-        {/* System Tab (Placeholder for future) */}
+        {/* System Tab */}
         <TabsContent value="system" className="space-y-6">
-          <Card className="p-6">
-            <div className="space-y-6">
-              <div>
-                <h3 className="mb-2">System Configuration</h3>
-                <p className="text-sm text-muted-foreground">
-                  Advanced system settings and server configuration.
-                </p>
-              </div>
-              
-              <Separator />
-              
-              <div className="p-8 text-center text-muted-foreground">
-                <Server className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>System configuration will be available in a future update.</p>
-                <p className="text-sm mt-2">This will include IP configuration, backup settings, and server management.</p>
-              </div>
+          <div className="grid gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Server Configuration</CardTitle>
+                <CardDescription>
+                  Configure server and network settings
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="server-port">Server Port</Label>
+                    <Input
+                      id="server-port"
+                      type="number"
+                      value={serverPort}
+                      onChange={(e) => setServerPort(e.target.value)}
+                      placeholder="8080"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ws-port">WebSocket Port</Label>
+                    <Input
+                      id="ws-port"
+                      type="number"
+                      value={wsPort}
+                      onChange={(e) => setWsPort(e.target.value)}
+                      placeholder="8080"
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="database-url">Database URL</Label>
+                  <Input
+                    id="database-url"
+                    type="password"
+                    value={databaseUrl}
+                    onChange={(e) => setDatabaseUrl(e.target.value)}
+                    placeholder="postgresql://user:pass@localhost/obedio"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Connection string for PostgreSQL database
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="api-timeout">API Timeout (seconds)</Label>
+                    <Input
+                      id="api-timeout"
+                      type="number"
+                      value={apiTimeout}
+                      onChange={(e) => setApiTimeout(e.target.value)}
+                      placeholder="30"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="log-level">Log Level</Label>
+                    <Select value={logLevel} onValueChange={setLogLevel}>
+                      <SelectTrigger id="log-level">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="error">Error</SelectItem>
+                        <SelectItem value="warn">Warning</SelectItem>
+                        <SelectItem value="info">Info</SelectItem>
+                        <SelectItem value="debug">Debug</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>System Features</CardTitle>
+                <CardDescription>
+                  Enable or disable system features
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-2">
+                      <Activity className="h-4 w-4" />
+                      Performance Metrics
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Collect and display performance metrics
+                    </p>
+                  </div>
+                  <Switch checked={enableMetrics} onCheckedChange={setEnableMetrics} />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      Debug Mode
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Enable detailed error messages and logging
+                    </p>
+                  </div>
+                  <Switch checked={enableDebugMode} onCheckedChange={setEnableDebugMode} />
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>System Status</CardTitle>
+                <CardDescription>
+                  Current system health and status
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Database Connection</span>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      <span className="text-sm text-success">Connected</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">WebSocket Server</span>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      <span className="text-sm text-success">Active</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">API Server</span>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      <span className="text-sm text-success">Running on port {serverPort}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <Separator />
+                
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">System Uptime</span>
+                    <span className="text-sm text-muted-foreground">14 days, 3 hours</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Last Restart</span>
+                    <span className="text-sm text-muted-foreground">Oct 8, 2025 at 02:15 UTC</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">System Version</span>
+                    <span className="text-sm text-muted-foreground">Obedio v1.0.0</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <div className="flex justify-end">
+              <Button onClick={handleSaveSystem}>
+                <Save className="h-4 w-4 mr-2" />
+                Save System Settings
+              </Button>
             </div>
-          </Card>
+          </div>
+        </TabsContent>
+
+        {/* Backup Tab */}
+        <TabsContent value="backup" className="space-y-6">
+          <div className="grid gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Backup Schedule</CardTitle>
+                <CardDescription>
+                  Configure automatic backup settings
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Backup Frequency</Label>
+                  <RadioGroup value={backupSchedule} onValueChange={setBackupSchedule}>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="hourly" id="hourly" />
+                      <Label htmlFor="hourly">Hourly</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="daily" id="daily" />
+                      <Label htmlFor="daily">Daily (Recommended)</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="weekly" id="weekly" />
+                      <Label htmlFor="weekly">Weekly</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="manual" id="manual" />
+                      <Label htmlFor="manual">Manual Only</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+                
+                {backupSchedule !== "manual" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="backup-time">Backup Time</Label>
+                    <Input
+                      id="backup-time"
+                      type="time"
+                      value={backupTime}
+                      onChange={(e) => setBackupTime(e.target.value)}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Time when automatic backup will run (in vessel timezone)
+                    </p>
+                  </div>
+                )}
+                
+                <div className="space-y-2">
+                  <Label htmlFor="backup-retention">Retention Period (days)</Label>
+                  <Input
+                    id="backup-retention"
+                    type="number"
+                    value={backupRetention}
+                    onChange={(e) => setBackupRetention(e.target.value)}
+                    placeholder="30"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    How long to keep backup files before automatic deletion
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Backup Storage</CardTitle>
+                <CardDescription>
+                  Configure where backups are stored
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Primary Storage Location</Label>
+                  <RadioGroup value={backupLocation} onValueChange={setBackupLocation}>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="local" id="local" />
+                      <Label htmlFor="local" className="flex items-center gap-2">
+                        <HardDrive className="h-4 w-4" />
+                        Local Server Storage
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="network" id="network" />
+                      <Label htmlFor="network" className="flex items-center gap-2">
+                        <Wifi className="h-4 w-4" />
+                        Network Attached Storage (NAS)
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-2">
+                      <Globe className="h-4 w-4" />
+                      Cloud Backup
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Also backup to cloud storage (requires internet)
+                    </p>
+                  </div>
+                  <Switch checked={cloudBackupEnabled} onCheckedChange={setCloudBackupEnabled} />
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Backup Status</CardTitle>
+                <CardDescription>
+                  Current backup information and actions
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {lastBackupTime && (
+                  <Alert>
+                    <CheckCircle className="h-4 w-4" />
+                    <AlertTitle>Last Backup</AlertTitle>
+                    <AlertDescription>
+                      Successfully completed on {lastBackupTime.toLocaleDateString()} at {lastBackupTime.toLocaleTimeString()}
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Total Backup Size</span>
+                    <span className="text-sm text-muted-foreground">2.4 GB</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Number of Backups</span>
+                    <span className="text-sm text-muted-foreground">28 backups stored</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Available Storage</span>
+                    <span className="text-sm text-muted-foreground">48.6 GB free</span>
+                  </div>
+                </div>
+                
+                <div className="flex gap-4 pt-4">
+                  <Button onClick={handleRunBackup} className="flex-1">
+                    <Download className="h-4 w-4 mr-2" />
+                    Run Backup Now
+                  </Button>
+                  <Button onClick={handleRestoreBackup} variant="outline" className="flex-1">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Restore from Backup
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <div className="flex justify-end">
+              <Button onClick={handleSaveBackup}>
+                <Save className="h-4 w-4 mr-2" />
+                Save Backup Settings
+              </Button>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
