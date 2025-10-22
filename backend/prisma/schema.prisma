@@ -139,14 +139,32 @@ model ServiceRequest {
   guestId     String?
   locationId  String?
   cabinId     String?
+  categoryId  String?  // Service category
   priority    String   @default("normal")
   status      String   @default("open")
   notes       String?
+  voiceTranscript String? // Voice command transcript
+  assignedTo  String?  // Crew member assigned
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
   guest    Guest?    @relation(fields: [guestId], references: [id])
   location Location? @relation(fields: [locationId], references: [id])
+  category ServiceCategory? @relation(fields: [categoryId], references: [id])
+}
+
+model ServiceCategory {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  icon        String   @default("tag")
+  color       String   @default("gray")
+  description String?
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  requests    ServiceRequest[]
 }
 
 model Device {
@@ -231,13 +249,17 @@ model ActivityLog {
 }
 
 model YachtSettings {
-  id           String   @id @default(cuid())
-  vesselName   String
-  vesselType   String   @default("motor-yacht")
-  timezone     String   @default("Europe/Monaco")
-  floors       String[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id              String   @id @default(cuid())
+  name            String   @default("Serenity")
+  type            String   @default("motor")  // "motor", "sailing", "catamaran"
+  timezone        String   @default("Europe/Monaco")
+  floors          String[] @default(["Lower Deck", "Main Deck", "Upper Deck", "Sun Deck"])
+  dateFormat      String   @default("DD/MM/YYYY")
+  timeFormat      String   @default("24h")  // "12h" or "24h"
+  weatherUnits    String   @default("metric")  // "metric" or "imperial"
+  windSpeedUnits  String   @default("knots")  // "knots", "km/h", "mph"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model Message {

@@ -12,62 +12,72 @@ echo.
 echo Stopping servers...
 echo.
 
-REM Check if any Node.js processes are running
-tasklist | findstr "node.exe" >nul
-if %errorlevel%==1 (
-    echo No Node.js processes found running.
-    echo System is already stopped.
-    goto :already_stopped
+REM Function to kill process by port
+echo [1/3] Stopping Backend API Server (Port 8080)...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8080" ^| findstr "LISTENING"') do (
+    set PID=%%a
 )
-
-REM Close specific window titles
-echo [1/4] Closing Backend API window...
-taskkill /FI "WINDOWTITLE eq OBEDIO Backend API*" /F >nul 2>&1
-timeout /t 1 /nobreak >nul
-
-echo [2/4] Closing Frontend window...
-taskkill /FI "WINDOWTITLE eq OBEDIO Frontend*" /F >nul 2>&1
-timeout /t 1 /nobreak >nul
-
-echo [3/4] Checking for remaining Node.js processes...
-tasklist | findstr "node.exe" >nul
-if %errorlevel%==0 (
-    echo Found remaining Node.js processes. Stopping them...
-    taskkill /F /IM node.exe >nul 2>&1
-    timeout /t 2 /nobreak >nul
+if defined PID (
+    taskkill /F /PID %PID% >nul 2>&1
+    echo      Backend stopped.
 ) else (
-    echo No remaining Node.js processes.
-)
-
-echo [4/4] Verifying ports are free...
-timeout /t 1 /nobreak >nul
-netstat -ano | findstr ":3001" >nul
-if %errorlevel%==0 (
-    echo WARNING: Port 3001 still in use. Finding and killing process...
-    for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3001"') do (
-        taskkill /F /PID %%a >nul 2>&1
-    )
-)
-
-netstat -ano | findstr ":5173" >nul
-if %errorlevel%==0 (
-    echo WARNING: Port 5173 still in use. Finding and killing process...
-    for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":5173"') do (
-        taskkill /F /PID %%a >nul 2>&1
-    )
+    echo      Backend not running.
 )
 
 timeout /t 1 /nobreak >nul
 
-:already_stopped
+echo [2/3] Stopping Frontend Server (Port 5173)...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":5173" ^| findstr "LISTENING"') do (
+    set PID2=%%a
+)
+if defined PID2 (
+    taskkill /F /PID %PID2% >nul 2>&1
+    echo      Frontend stopped.
+) else (
+    echo      Frontend not running.
+)
+
+timeout /t 1 /nobreak >nul
+
+echo [3/3] Cleaning up any remaining OBEDIO processes...
+REM Kill by window title as backup
+taskkill /FI "WINDOWTITLE eq OBEDIO Backend API*" /F >nul 2>&1
+taskkill /FI "WINDOWTITLE eq OBEDIO Frontend*" /F >nul 2>&1
+taskkill /FI "WINDOWTITLE eq Administrator:  OBEDIO Backend API*" /F >nul 2>&1
+taskkill /FI "WINDOWTITLE eq Administrator:  OBEDIO Frontend*" /F >nul 2>&1
+
+timeout /t 2 /nobreak >nul
+
+REM Verify ports are free
+set BACKEND_STILL_RUNNING=0
+set FRONTEND_STILL_RUNNING=0
+
+netstat -ano | findstr ":8080" | findstr "LISTENING" >nul
+if %errorlevel%==0 set BACKEND_STILL_RUNNING=1
+
+netstat -ano | findstr ":5173" | findstr "LISTENING" >nul
+if %errorlevel%==0 set FRONTEND_STILL_RUNNING=1
 
 echo.
 echo ========================================
-echo    ALL SERVERS STOPPED!
+echo    SHUTDOWN COMPLETE
 echo ========================================
 echo.
-echo Backend API:  OFFLINE
-echo Frontend App: OFFLINE
+
+if %BACKEND_STILL_RUNNING%==1 (
+    echo WARNING: Port 8080 still in use!
+    echo         Another process may be using this port.
+) else (
+    echo Backend API:  OFFLINE ✓
+)
+
+if %FRONTEND_STILL_RUNNING%==1 (
+    echo WARNING: Port 5173 still in use!
+    echo         Another process may be using this port.
+) else (
+    echo Frontend App: OFFLINE ✓
+)
+
 echo Database:     Still running (PostgreSQL)
 echo.
 echo System is now offline.

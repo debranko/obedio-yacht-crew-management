@@ -1,9 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../services/db';
 import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Get yacht settings
 router.get('/', authMiddleware, async (req: Request, res: Response) => {
@@ -26,10 +25,14 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: {
-        vesselName: settings.vesselName,
-        vesselType: settings.vesselType,
+        name: settings.vesselName,
+        type: settings.vesselType,
         timezone: settings.timezone,
         floors: settings.floors,
+        dateFormat: 'DD/MM/YYYY', // Return default values for now
+        timeFormat: '24h',
+        weatherUnits: 'metric',
+        windSpeedUnits: 'knots',
       },
     });
   } catch (error) {
@@ -44,13 +47,13 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 // Update yacht settings
 router.put('/', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { vesselName, vesselType, timezone, floors } = req.body;
+    const { name, type, timezone, floors } = req.body;
 
     // Validate input
-    if (!vesselName || !vesselType || !timezone) {
+    if (!name || !type || !timezone) {
       return res.status(400).json({
         success: false,
-        error: 'Vessel name, type, and timezone are required',
+        error: 'Yacht name, type, and timezone are required',
       });
     }
 
@@ -62,20 +65,20 @@ router.put('/', authMiddleware, async (req: Request, res: Response) => {
       settings = await prisma.yachtSettings.update({
         where: { id: settings.id },
         data: {
-          vesselName,
-          vesselType,
+          vesselName: name,
+          vesselType: type,
           timezone,
-          floors: floors || [],
+          floors: floors || ['Lower Deck', 'Main Deck', 'Upper Deck', 'Sun Deck'],
         },
       });
     } else {
       // Create new settings
       settings = await prisma.yachtSettings.create({
         data: {
-          vesselName,
-          vesselType,
+          vesselName: name,
+          vesselType: type,
           timezone,
-          floors: floors || [],
+          floors: floors || ['Lower Deck', 'Main Deck', 'Upper Deck', 'Sun Deck'],
         },
       });
     }
@@ -83,10 +86,14 @@ router.put('/', authMiddleware, async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: {
-        vesselName: settings.vesselName,
-        vesselType: settings.vesselType,
+        name: settings.vesselName,
+        type: settings.vesselType,
         timezone: settings.timezone,
         floors: settings.floors,
+        dateFormat: 'DD/MM/YYYY', // Return default values for now
+        timeFormat: '24h',
+        weatherUnits: 'metric',
+        windSpeedUnits: 'knots',
         updatedAt: settings.updatedAt,
       },
     });

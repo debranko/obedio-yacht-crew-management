@@ -1,11 +1,65 @@
-const BASE_URL = "/api";
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // Get auth token from localStorage
+  const token = localStorage.getItem('obedio-auth-token');
+  
+  // Build headers with auth token
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...(init?.headers || {})
+  };
+
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
-    credentials: "include",
     ...init,
+    headers,
+    credentials: "include",
   });
+  
+  // Handle 401 unauthorized - token might be expired
+  if (res.status === 401) {
+    const refreshToken = localStorage.getItem('obedio-auth-token');
+    if (refreshToken) {
+      try {
+        // Try to refresh the token
+        const refreshRes = await fetch(`${BASE_URL}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        });
+        
+        if (refreshRes.ok) {
+          const refreshData = await refreshRes.json();
+          if (refreshData.success && refreshData.data?.token) {
+            // Save new token
+            localStorage.setItem('obedio-auth-token', refreshData.data.token);
+            
+            // Retry original request with new token
+            const retryHeaders = {
+              ...headers,
+              Authorization: `Bearer ${refreshData.data.token}`
+            };
+            
+            const retryRes = await fetch(`${BASE_URL}${path}`, {
+              ...init,
+              headers: retryHeaders,
+              credentials: "include",
+            });
+            
+            if (!retryRes.ok) {
+              const text = await retryRes.text().catch(() => "");
+              throw new Error(text || `HTTP ${retryRes.status}`);
+            }
+            return retryRes.json() as Promise<T>;
+          }
+        }
+      } catch (error) {
+        console.error('Token refresh failed:', error);
+      }
+    }
+  }
+  
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(text || `HTTP ${res.status}`);

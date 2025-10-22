@@ -77,7 +77,6 @@ export function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={isLoading}
-              required
               autoComplete="email"
             />
           </div>
@@ -88,11 +87,10 @@ export function LoginPage() {
             <Input
               id="password"
               type="password"
-              placeholder="••••••••"
+              placeholder="Enter password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
-              required
               autoComplete="current-password"
             />
           </div>

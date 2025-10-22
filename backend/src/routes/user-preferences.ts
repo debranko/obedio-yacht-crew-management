@@ -4,11 +4,10 @@
  */
 
 import express, { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../services/db';
 import { authMiddleware } from '../middleware/auth';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 /**
  * GET /api/user-preferences

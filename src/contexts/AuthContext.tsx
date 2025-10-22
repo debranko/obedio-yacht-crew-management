@@ -13,6 +13,7 @@ interface User {
   role: Role;
   avatar?: string;
   department?: string;
+  username?: string;
 }
 
 interface AuthContextType {
@@ -23,6 +24,8 @@ interface AuthContextType {
   logout: () => void;
   updateUser: (updates: Partial<User>) => void;
 }
+
+const API_BASE_URL = 'http://localhost:8080/api';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -43,7 +46,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     });
   }, [user, isLoading]);
 
-  // Check for existing session on mount
+  // Check for existing session on mount and verify token
   useEffect(() => {
     const checkAuth = async () => {
       console.log('🔍 Checking for existing session...');
@@ -51,19 +54,96 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const storedUser = localStorage.getItem('obedio-auth-user');
         const storedToken = localStorage.getItem('obedio-auth-token');
 
-        console.log('📦 localStorage check:', { 
-          hasUser: !!storedUser, 
-          hasToken: !!storedToken 
+        console.log('📦 localStorage check:', {
+          hasUser: !!storedUser,
+          hasToken: !!storedToken
         });
 
         if (storedUser && storedToken) {
-          console.log('✅ Found stored session, restoring...');
-          // In production, verify token with backend
-          // For now, restore from localStorage
-          const userData = JSON.parse(storedUser);
-          console.log('👤 Restored user:', userData);
-          setUser(userData);
-          console.log('✅ Session restored successfully!');
+          console.log('✅ Found stored session, verifying token...');
+          
+          // Verify token with backend
+          try {
+            const response = await fetch(`${API_BASE_URL}/auth/verify`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${storedToken}`,
+                'Content-Type': 'application/json',
+              },
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              if (data.success && data.valid && data.user) {
+                console.log('✅ Token valid, updating user data');
+                // Update user data from server (might have changed)
+                const user: User = {
+                  id: data.user.id,
+                  name: data.user.name,
+                  email: data.user.email,
+                  role: data.user.role as Role,
+                  avatar: data.user.avatar,
+                  department: data.user.department,
+                  username: data.user.username,
+                };
+                setUser(user);
+                // Update localStorage with fresh user data
+                localStorage.setItem('obedio-auth-user', JSON.stringify(user));
+                console.log('✅ Session restored and verified successfully!');
+              } else {
+                throw new Error('Invalid token');
+              }
+            } else {
+              throw new Error('Token verification failed');
+            }
+          } catch (error) {
+            console.error('❌ Token verification failed:', error);
+            // Token is invalid, try to refresh it
+            try {
+              const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ refreshToken: storedToken }),
+              });
+
+              if (refreshResponse.ok) {
+                const refreshData = await refreshResponse.json();
+                if (refreshData.success && refreshData.data) {
+                  const { user: userData, token: newToken } = refreshData.data;
+                  console.log('✅ Token refreshed successfully');
+                  
+                  // Store new token
+                  localStorage.setItem('obedio-auth-token', newToken);
+                  
+                  // Update user
+                  const user: User = {
+                    id: userData.id,
+                    name: userData.name,
+                    email: userData.email,
+                    role: userData.role as Role,
+                    avatar: userData.avatar,
+                    department: userData.department,
+                    username: userData.username,
+                  };
+                  setUser(user);
+                  localStorage.setItem('obedio-auth-user', JSON.stringify(user));
+                } else {
+                  throw new Error('Failed to refresh token');
+                }
+              } else {
+                throw new Error('Token refresh failed');
+              }
+            } catch (refreshError) {
+              console.error('❌ Token refresh failed:', refreshError);
+              // Clear invalid session
+              localStorage.removeItem('obedio-auth-user');
+              localStorage.removeItem('obedio-auth-token');
+              setUser(null);
+              console.log('🗑️ Cleared invalid session');
+            }
+          }
         } else {
           console.log('❌ No stored session found');
         }
@@ -89,10 +169,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.log('⏳ Setting isLoading = true');
       setIsLoading(true);
 
-      console.log('📡 Fetching http://localhost:3001/api/auth/login...');
+      console.log('📡 Fetching http://localhost:8080/api/auth/login...');
       
       // Call backend API for authentication
-      const response = await fetch('http://localhost:3001/api/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -139,6 +219,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         role: userData.role as Role,
         avatar: userData.avatar,
         department: userData.department,
+        username: userData.username,
       };
 
       console.log('💾 Storing to localStorage...');
@@ -158,7 +239,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       // Re-throw with better message if it's a network error
       if (error instanceof TypeError && error.message.includes('fetch')) {
-        throw new Error('Cannot connect to server. Please check if backend is running on http://localhost:3001');
+        throw new Error('Cannot connect to server. Please check if backend is running on http://localhost:8080');
       }
       
       throw error;
@@ -176,7 +257,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.removeItem('obedio-auth-token');
 
     // Optional: Call backend to invalidate token
-    // fetch('http://localhost:3001/api/auth/logout', { method: 'POST', ... });
+    fetch(`${API_BASE_URL}/auth/logout`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('obedio-auth-token')}`,
+      },
+    }).catch(error => {
+      console.error('Logout error:', error);
+    });
   };
 
   const updateUser = (updates: Partial<User>) => {

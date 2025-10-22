@@ -1,10 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../services/db';
 import { authMiddleware } from '../middleware/auth';
 import { websocketService } from '../services/websocket';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Get messages for the authenticated user
 router.get('/', authMiddleware, async (req: Request, res: Response) => {

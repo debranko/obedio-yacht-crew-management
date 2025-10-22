@@ -23,6 +23,8 @@ import crewChangeLogsRoutes from './routes/crew-change-logs';
 import activityLogsRoutes from './routes/activity-logs';
 import settingsRoutes from './routes/settings';
 import smartButtonsRoutes from './routes/smart-buttons';
+import dashboardRoutes from './routes/dashboard';
+import serviceCategoriesRoutes from './routes/service-categories';
 
 dotenv.config();
 
@@ -69,6 +71,8 @@ app.use('/api/crew-change-logs', crewChangeLogsRoutes);
 app.use('/api/activity-logs', activityLogsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/smart-buttons', smartButtonsRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/service-categories', serviceCategoriesRoutes);
 
 // Error handling
 app.use((err: any, req: any, res: any, next: any) => {

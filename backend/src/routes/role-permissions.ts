@@ -1,9 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../services/db';
 import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Default permissions for each role
 const defaultPermissions = {

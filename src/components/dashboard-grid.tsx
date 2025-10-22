@@ -30,7 +30,7 @@ import { WeatherWindyWidget } from "./weather-windy-widget";
 import { DutyTimerCard } from "./duty-timer-card";
 import { useAppData } from "../contexts/AppDataContext";
 import { useDND } from "../hooks/useDND";
-import { Activity, Clock, BatteryLow, Users, BellOff, GripVertical, Bell } from "lucide-react";
+import { Activity, Clock, BatteryLow, Users, BellOff, GripVertical, Bell, Save } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 
@@ -203,8 +203,34 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
   );
 
   return (
-    <div className="space-y-2"
->
+    <div className="space-y-2">
+      {/* Dashboard Controls */}
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-2">
+          {isEditMode && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => {
+                // Force save current layout
+                updateDashboard({
+                  dashboardLayout: layout,
+                  activeWidgets: activeWidgets,
+                });
+                toast.success("Dashboard layout saved");
+              }}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Save Layout
+            </Button>
+          )}
+        </div>
+        {isEditMode && (
+          <p className="text-sm text-muted-foreground">
+            Drag widgets to rearrange • Resize from corners
+          </p>
+        )}
+      </div>
 
       {/* Grid Layout */}
       <ResponsiveGridLayout

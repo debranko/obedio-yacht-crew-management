@@ -1,10 +1,9 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/error-handler';
 import { requirePermission, authMiddleware } from '../middleware/auth';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../services/db';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Apply auth middleware to ALL device routes
 router.use(authMiddleware);
@@ -230,6 +229,159 @@ router.get('/:id/logs', requirePermission('devices.view'), asyncHandler(async (r
 
   res.json({ success: true, data: logs });
 }));
+
+/**
+ * GET /api/devices/logs
+ * Get all device logs with optional filters
+ */
+router.get('/logs', requirePermission('devices.view'), asyncHandler(async (req, res) => {
+  console.log('📱 GET /api/devices/logs - Handler called');
+  console.log('   Query params:', req.query);
+  
+  const {
+    deviceId,
+    status,
+    startDate,
+    endDate,
+    search,
+    page = 1,
+    limit = 50,
+    eventType
+  } = req.query;
+
+  const where: any = {};
+  
+  if (deviceId) where.deviceId = deviceId as string;
+  if (eventType) where.eventType = eventType as string;
+  
+  // Handle status filter - map status to eventType
+  if (status) {
+    switch (status) {
+      case 'online':
+        where.eventType = 'device_online';
+        break;
+      case 'offline':
+        where.eventType = 'device_offline';
+        break;
+      case 'alert':
+        where.eventType = { in: ['battery_low', 'error'] };
+        break;
+      case 'maintenance':
+        where.eventType = 'maintenance';
+        break;
+    }
+  }
+  
+  // Date range filter
+  if (startDate || endDate) {
+    where.createdAt = {};
+    if (startDate) where.createdAt.gte = new Date(startDate as string);
+    if (endDate) where.createdAt.lte = new Date(endDate as string);
+  }
+  
+  // Search in eventData
+  if (search) {
+    where.OR = [
+      { eventType: { contains: search as string, mode: 'insensitive' } },
+      { severity: { contains: search as string, mode: 'insensitive' } }
+    ];
+  }
+
+  const skip = (Number(page) - 1) * Number(limit);
+
+  const [logs, total] = await Promise.all([
+    prisma.deviceLog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: Number(limit),
+      include: {
+        device: {
+          select: {
+            id: true,
+            deviceId: true,
+            name: true,
+            type: true,
+            location: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        }
+      }
+    }),
+    prisma.deviceLog.count({ where })
+  ]);
+
+  // Transform logs to match frontend expectations
+  const transformedLogs = logs.map(log => ({
+    id: log.id,
+    timestamp: log.createdAt,
+    createdAt: log.createdAt,
+    deviceId: log.device.deviceId,
+    deviceName: log.device.name,
+    location: log.device.location?.name || null,
+    status: mapEventTypeToStatus(log.eventType),
+    message: formatEventMessage(log.eventType, log.eventData),
+    event: log.eventType,
+    user: (log.eventData as any)?.user || null,
+    severity: log.severity
+  }));
+
+  console.log(`✅ Returning ${transformedLogs.length} device logs`);
+  res.json({
+    success: true,
+    data: transformedLogs,
+    pagination: {
+      page: Number(page),
+      limit: Number(limit),
+      total,
+      totalPages: Math.ceil(total / Number(limit))
+    }
+  });
+}));
+
+// Helper functions for device logs
+function mapEventTypeToStatus(eventType: string): string {
+  switch (eventType) {
+    case 'device_online':
+    case 'button_press':
+      return 'online';
+    case 'device_offline':
+      return 'offline';
+    case 'battery_low':
+    case 'error':
+      return 'alert';
+    case 'maintenance':
+    case 'config_change':
+      return 'maintenance';
+    default:
+      return 'unknown';
+  }
+}
+
+function formatEventMessage(eventType: string, eventData: any): string {
+  switch (eventType) {
+    case 'button_press':
+      return `Button pressed${eventData?.location ? ` at ${eventData.location}` : ''}`;
+    case 'device_online':
+      return 'Device came online';
+    case 'device_offline':
+      return 'Device went offline';
+    case 'battery_low':
+      return `Battery low: ${eventData?.level || 'N/A'}%`;
+    case 'config_change':
+      return 'Configuration updated';
+    case 'test_signal':
+      return 'Test signal sent';
+    case 'device_added':
+      return 'Device registered';
+    default:
+      return eventType.replace(/_/g, ' ');
+  }
+}
 
 /**
  * GET /api/devices/stats

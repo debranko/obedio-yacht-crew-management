@@ -14,14 +14,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { 
-  Shield, 
-  Settings as SettingsIcon, 
-  Server, 
-  Save, 
-  RotateCcw, 
-  Info, 
-  Plus, 
+import {
+  Shield,
+  Settings as SettingsIcon,
+  Server,
+  Save,
+  RotateCcw,
+  Info,
+  Plus,
   X,
   Bell,
   Download,
@@ -42,7 +42,10 @@ import {
   FileText,
   Trash2,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  GripVertical,
+  Edit2,
+  Tag
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "../ui/badge";
@@ -65,6 +68,8 @@ import {
 } from "../ui/alert";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { Progress } from "../ui/progress";
+import { useServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useReorderServiceCategories } from "../../hooks/useServiceCategories";
+import type { ServiceCategory } from "../../hooks/useServiceCategories";
 
 // Permission categories and their specific permissions
 interface Permission {
@@ -157,7 +162,7 @@ const categoryLabels: Record<string, string> = {
 };
 
 interface SettingsPageProps {
-  initialTab?: "general" | "notifications" | "roles" | "system" | "backup";
+  initialTab?: "general" | "notifications" | "roles" | "system" | "backup" | "categories";
 }
 
 export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
@@ -237,6 +242,21 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   
   // Local state for permissions (will be saved on "Save" button)
   const [localPermissions, setLocalPermissions] = useState(rolePermissions);
+  
+  // Service Categories State
+  const { data: serviceCategories = [], isLoading: isLoadingCategories } = useServiceCategories();
+  const createCategory = useCreateServiceCategory();
+  const updateCategory = useUpdateServiceCategory();
+  const deleteCategory = useDeleteServiceCategory();
+  const reorderCategories = useReorderServiceCategories();
+  
+  const [editingCategory, setEditingCategory] = useState<ServiceCategory | null>(null);
+  const [newCategory, setNewCategory] = useState({
+    name: "",
+    icon: "",
+    color: "#007bff",
+    description: ""
+  });
   
   const handleSaveGeneral = async () => {
     // Save user preferences to context
@@ -350,10 +370,14 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-2xl grid-cols-5">
+        <TabsList className="grid w-full max-w-3xl grid-cols-6">
           <TabsTrigger value="general">
             <SettingsIcon className="h-4 w-4 mr-2" />
             General
+          </TabsTrigger>
+          <TabsTrigger value="categories">
+            <Tag className="h-4 w-4 mr-2" />
+            Categories
           </TabsTrigger>
           <TabsTrigger value="notifications">
             <Bell className="h-4 w-4 mr-2" />
@@ -563,6 +587,141 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
                 Save General Settings
               </Button>
             </div>
+          </div>
+        </TabsContent>
+
+        {/* Service Categories Tab */}
+        <TabsContent value="categories" className="space-y-6">
+          <div className="grid gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Service Request Categories</CardTitle>
+                <CardDescription>
+                  Manage categories for service requests
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Add New Category Form */}
+                <div className="space-y-4 p-4 border rounded-lg">
+                  <h4 className="font-medium">Add New Category</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="new-category-name">Category Name</Label>
+                      <Input
+                        id="new-category-name"
+                        value={newCategory.name}
+                        onChange={(e) => setNewCategory(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="e.g., Housekeeping"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="new-category-icon">Icon Name</Label>
+                      <Input
+                        id="new-category-icon"
+                        value={newCategory.icon}
+                        onChange={(e) => setNewCategory(prev => ({ ...prev, icon: e.target.value }))}
+                        placeholder="e.g., Home"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="new-category-color">Color</Label>
+                      <Input
+                        id="new-category-color"
+                        type="color"
+                        value={newCategory.color}
+                        onChange={(e) => setNewCategory(prev => ({ ...prev, color: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="new-category-description">Description</Label>
+                      <Input
+                        id="new-category-description"
+                        value={newCategory.description}
+                        onChange={(e) => setNewCategory(prev => ({ ...prev, description: e.target.value }))}
+                        placeholder="Optional description"
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      if (newCategory.name && newCategory.icon) {
+                        createCategory.mutate({
+                          name: newCategory.name,
+                          icon: newCategory.icon,
+                          color: newCategory.color,
+                          description: newCategory.description || undefined,
+                          isActive: true
+                        }, {
+                          onSuccess: () => {
+                            setNewCategory({ name: "", icon: "", color: "#007bff", description: "" });
+                            toast.success("Category created successfully");
+                          }
+                        });
+                      }
+                    }}
+                    disabled={!newCategory.name || !newCategory.icon || createCategory.isPending}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Category
+                  </Button>
+                </div>
+
+                {/* Categories List */}
+                <div className="space-y-2">
+                  <h4 className="font-medium">Existing Categories</h4>
+                  {isLoadingCategories ? (
+                    <p className="text-sm text-muted-foreground">Loading categories...</p>
+                  ) : serviceCategories.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No categories defined yet</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {serviceCategories.map((category) => (
+                        <div
+                          key={category.id}
+                          className="flex items-center gap-4 p-3 border rounded-lg"
+                        >
+                          <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
+                          <div
+                            className="w-8 h-8 rounded"
+                            style={{ backgroundColor: category.color }}
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium">{category.name}</div>
+                            {category.description && (
+                              <div className="text-sm text-muted-foreground">{category.description}</div>
+                            )}
+                          </div>
+                          <Badge variant={category.isActive ? "default" : "secondary"}>
+                            {category.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditingCategory(category)}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              deleteCategory.mutate(category.id, {
+                                onSuccess: () => toast.success("Category deleted"),
+                                onError: () => toast.error("Cannot delete category in use")
+                              });
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
