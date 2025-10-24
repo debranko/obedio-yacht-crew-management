@@ -3,11 +3,12 @@
  * Always visible for quick ESP32 firmware testing
  */
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAppData } from "../contexts/AppDataContext";
 import { useLocations } from "../hooks/useLocations";
 import { useGuests } from "../hooks/useGuests";
 import { DNDService } from "../services/dnd";
+import { mqttClient } from "../services/mqtt-client";
 import { 
   Mic, 
   Phone, 
@@ -56,6 +57,28 @@ const auxButtons: AuxButton[] = [
 ];
 
 export function ButtonSimulatorWidget() {
+  // Connect to MQTT broker on mount - REAL MQTT CONNECTION
+  useEffect(() => {
+    console.log('🔌 Button Simulator: Attempting MQTT connection...');
+    mqttClient.connect()
+      .then(() => {
+        console.log('✅ Button Simulator: MQTT connected successfully');
+        toast.success('MQTT Connected', {
+          description: 'Button simulator ready to send real MQTT messages'
+        });
+      })
+      .catch((error) => {
+        console.error('❌ Button Simulator: MQTT connection failed:', error);
+        toast.error('MQTT Connection Failed', {
+          description: 'Make sure Mosquitto is running on port 9001 (WebSocket)'
+        });
+      });
+
+    return () => {
+      // Keep connection alive (don't disconnect on unmount)
+    };
+  }, []);
+
   // Use same source of truth as Dashboard and DNDWidget
   const { locations: locationsFromService = [], updateLocation } = useLocations();
   
@@ -128,13 +151,13 @@ export function ButtonSimulatorWidget() {
     
     // Find guest by proper foreign key relationship
     // If multiple guests in same cabin, prefer owner > vip > partner > guest
-    const guestsAtLocation = guests.filter(g => g.locationId === location.id);
+    const guestsAtLocation = guests.filter((g: any) => g.locationId === location.id);
     let guestAtLocation = null;
     
     if (guestsAtLocation.length > 0) {
       // Sort by priority: owner > vip > partner > family > guest
       const priorityOrder = { owner: 1, vip: 2, partner: 3, family: 4, guest: 5 };
-      guestsAtLocation.sort((a, b) => {
+      guestsAtLocation.sort((a: any, b: any) => {
         const aPriority = priorityOrder[a.type as keyof typeof priorityOrder] || 10;
         const bPriority = priorityOrder[b.type as keyof typeof priorityOrder] || 10;
         return aPriority - bPriority;
@@ -196,7 +219,51 @@ export function ButtonSimulatorWidget() {
       }
     }
 
-    // Create actual service request and add to context
+    // ============================================
+    // REAL MQTT PUBLISH - Simulates actual OBEDIO ESP32 Smart Button
+    // ============================================
+    const deviceId = location.smartButtonId || `BTN-${location.id.slice(-8)}`;
+
+    // Determine button type
+    let button: 'main' | 'aux1' | 'aux2' | 'aux3' | 'aux4' = 'main';
+    let pressType: 'single' | 'double' | 'long' | 'shake' = 'single';
+    
+    if (isVoice) {
+      pressType = 'long';
+    } else if (requestType === 'shake') {
+      pressType = 'shake';
+    } else if (requestType === 'dnd') {
+      button = 'aux1';
+    } else if (requestType === 'lights') {
+      button = 'aux2';
+    } else if (requestType === 'prepare_food') {
+      button = 'aux3';
+    } else if (requestType === 'bring_drinks') {
+      button = 'aux4';
+    }
+
+    // ============================================
+    // EXACT ESP32 SPECIFICATION - DO NOT MODIFY
+    // See: ESP32-FIRMWARE-DETAILED-SPECIFICATION.md lines 70-88
+    // ============================================
+    console.log('📤 MQTT: Publishing ESP32 button press (EXACT SPEC)', {
+      deviceId,
+      locationId: location.id,
+      guestId: guestAtLocation?.id || null,
+      pressType,
+      button
+    });
+
+    // Send MQTT message to broker - matches real OBEDIO ESP32 Smart Button exactly
+    mqttClient.publishButtonPress(deviceId, {
+      locationId: location.id,
+      guestId: guestAtLocation?.id || null,
+      pressType,
+      button
+    });
+
+    // Backend MQTT service will receive this and create service request in database
+    // We still add it locally for immediate UI feedback (will be synced via WebSocket)
     const serviceRequest = addServiceRequest({
       guestName: guestName,
       guestCabin: location.name,
@@ -357,7 +424,7 @@ export function ButtonSimulatorWidget() {
 
       console.log('📤 Sending audio to backend for transcription...');
 
-      const response = await fetch('http://localhost:3001/api/transcribe', {
+      const response = await fetch('http://localhost:8080/api/transcribe', {
         method: 'POST',
         body: formData
       });
@@ -676,7 +743,7 @@ export function ButtonSimulatorWidget() {
               }
             }}
             onTouchStart={selectedLocation ? handleMainButtonDown : undefined}
-            onTouchEnd={selectedLocation ? handleMainButtonUp : undefined}
+            onTouchEnd={selectedLocation ? (e: any) => handleMainButtonUp(e) : undefined}
           >
             <div className="absolute inset-0 rounded-full bg-gradient-to-br from-accent via-accent to-accent/80 border border-accent/50" />
             <div className="absolute inset-1 rounded-full bg-gradient-to-br from-neutral-900 to-black flex items-center justify-center">
