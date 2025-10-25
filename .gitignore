@@ -60,4 +60,5 @@ backend/test-postgres-connection.js
 
 # Temporary files
 *.tmp
-*.temp
+*.tempnul
+backend/nul src/nul

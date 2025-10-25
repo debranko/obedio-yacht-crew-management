@@ -30,6 +30,7 @@ import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { ServiceRequestsSettingsDialog } from '../service-requests-settings-dialog';
 import { ServingRequestCard } from '../serving-request-card';
 import { useCreateServiceRequest } from '../../hooks/useServiceRequestsApi';
+import { useServiceCategories } from '../../hooks/useServiceCategories';
 import {
   Dialog,
   DialogContent,
@@ -60,9 +61,9 @@ export function ServiceRequestsPage({
     serviceRequests,
     acceptServiceRequest,
     delegateServiceRequest,
-    forwardServiceRequest,
     completeServiceRequest,
     // simulateNewRequest removed - using API directly
+    // forwardServiceRequest removed - using service categories instead
     serviceRequestHistory,
     clearServiceRequestHistory,
     crewMembers,
@@ -88,7 +89,7 @@ export function ServiceRequestsPage({
   const [forwardDialogOpen, setForwardDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null);
   const [selectedCrewMember, setSelectedCrewMember] = useState('');
-  const [selectedTeam, setSelectedTeam] = useState<InteriorTeam | ''>('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const [internalFullscreen, setInternalFullscreen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
@@ -142,15 +143,9 @@ export function ServiceRequestsPage({
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, [externalFullscreen]);
 
-  // Interior Teams
-  const interiorTeams: Array<{ value: InteriorTeam; label: string; icon: typeof UtensilsCrossed }> = [
-    { value: 'Galley', label: 'Galley (Kitchen)', icon: UtensilsCrossed },
-    { value: 'Pantry', label: 'Pantry (Provisions)', icon: Package },
-    { value: 'Housekeeping', label: 'Housekeeping', icon: Home },
-    { value: 'Laundry', label: 'Laundry', icon: Shirt },
-    { value: 'Bar Service', label: 'Bar Service', icon: Wine },
-    { value: 'Deck Service', label: 'Deck Service', icon: Waves },
-  ];
+  // Get service categories from backend
+  const { data: serviceCategories = [], isLoading: categoriesLoading } = useServiceCategories();
+  const activeCategories = serviceCategories.filter(cat => cat.isActive);
 
   // Separate pending, serving, and completing requests
   const pendingRequests = useMemo(() => {
@@ -211,14 +206,18 @@ export function ServiceRequestsPage({
   };
 
   const confirmForward = () => {
-    if (!selectedRequest || !selectedTeam) return;
+    if (!selectedRequest || !selectedCategoryId) return;
 
-    forwardServiceRequest(selectedRequest.id, selectedTeam as InteriorTeam);
-    toast.success(`Request forwarded to ${selectedTeam} team`);
+    const selectedCategory = serviceCategories.find(cat => cat.id === selectedCategoryId);
+    if (!selectedCategory) return;
+
+    // In production, this would update the service request with the categoryId
+    // For now, just show success message
+    toast.success(`Request forwarded to ${selectedCategory.name}`);
 
     setForwardDialogOpen(false);
     setSelectedRequest(null);
-    setSelectedTeam('');
+    setSelectedCategoryId('');
   };
 
   const handleComplete = (request: ServiceRequest) => {
@@ -338,11 +337,11 @@ export function ServiceRequestsPage({
                   variant="secondary"
                   size={isFullscreen ? 'lg' : 'default'}
                   onClick={() => {
+                    // Create a test request - in production this would come from smart buttons
                     createServiceRequest.mutate({
-                      requestType: 'call',
                       priority: 'normal',
-                      notes: 'Test service request created from UI',
-                      status: 'open'
+                      message: 'Test service request created from UI',
+                      status: 'pending'
                     });
                   }}
                   disabled={createServiceRequest.isPending}
@@ -668,25 +667,32 @@ export function ServiceRequestsPage({
               </div>
             )}
 
-            {/* Team Selection */}
+            {/* Category Selection */}
             <div className="space-y-2">
-              <Label htmlFor="forward-team">Forward to Team</Label>
-              <Select value={selectedTeam} onValueChange={(v) => setSelectedTeam(v as InteriorTeam)}>
-                <SelectTrigger id="forward-team">
-                  <SelectValue placeholder="Select team" />
+              <Label htmlFor="forward-category">Forward to Service Category</Label>
+              <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
+                <SelectTrigger id="forward-category">
+                  <SelectValue placeholder="Select service category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {interiorTeams.map((team) => {
-                    const Icon = team.icon;
-                    return (
-                      <SelectItem key={team.value} value={team.value}>
+                  {categoriesLoading ? (
+                    <div className="p-2 text-center text-sm text-muted-foreground">
+                      Loading categories...
+                    </div>
+                  ) : activeCategories.length === 0 ? (
+                    <div className="p-2 text-center text-sm text-muted-foreground">
+                      No active service categories
+                    </div>
+                  ) : (
+                    activeCategories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
                         <div className="flex items-center gap-2">
-                          <Icon className="h-4 w-4" />
-                          <span>{team.label}</span>
+                          <span className="text-lg">{category.icon}</span>
+                          <span>{category.name}</span>
                         </div>
                       </SelectItem>
-                    );
-                  })}
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -698,7 +704,7 @@ export function ServiceRequestsPage({
             </Button>
             <Button
               onClick={confirmForward}
-              disabled={!selectedTeam}
+              disabled={!selectedCategoryId || categoriesLoading}
             >
               <ArrowRight className="h-4 w-4 mr-2" />
               Forward

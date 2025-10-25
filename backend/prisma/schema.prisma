@@ -57,10 +57,14 @@ model CrewMember {
   userId     String?  @unique
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-  
+
   user              User?               @relation(fields: [userId], references: [id])
   deviceAssignments DeviceAssignment[]
   devices           Device[]
+
+  @@index([userId])
+  @@index([department])
+  @@index([status])
 }
 
 model Location {
@@ -78,6 +82,7 @@ model Location {
   guests          Guest[]
   serviceRequests ServiceRequest[]
   devices         Device[]
+  activityLogs    ActivityLog[]
 }
 
 model Guest {
@@ -92,6 +97,7 @@ model Guest {
   languages      String[] @default([])
   passportNumber String?
   locationId     String?
+  doNotDisturb   Boolean  @default(false) // Guest DND status
   
   // Accommodation & Check-in Info
   checkInDate    DateTime?
@@ -116,20 +122,40 @@ model Guest {
   
   location        Location?        @relation(fields: [locationId], references: [id])
   serviceRequests ServiceRequest[]
+  activityLogs    ActivityLog[]
+
+  @@index([locationId])
+  @@index([status])
+  @@index([type])
+  @@index([checkInDate])
+  @@index([checkOutDate])
 }
 
 model ServiceRequestHistory {
   id               String   @id @default(cuid())
-  serviceRequestId String
+  serviceRequestId String?
+  originalRequestId String? // Original request ID
   action           String   // "created", "accepted", "completed", "cancelled"
   previousStatus   String?
   newStatus        String
   notes            String?
   userId           String?  // Who performed the action
   metadata         Json?    // Additional data like response times, etc.
+  
+  // Fields for completed requests
+  completedBy      String?
+  completedAt      DateTime?
+  responseTime     Int?     // Seconds
+  completionTime   Int?     // Seconds
+  guestName        String?
+  location         String?
+  requestType      String?
+  priority         String?
+  
   createdAt        DateTime @default(now())
   
   @@index([serviceRequestId])
+  @@index([originalRequestId])
   @@index([createdAt])
 }
 
@@ -144,13 +170,26 @@ model ServiceRequest {
   status      String   @default("open")
   notes       String?
   voiceTranscript String? // Voice command transcript
-  assignedTo  String?  // Crew member assigned
+  assignedTo  String?  // Crew member name assigned
+  assignedToId String? // Crew member ID
+  guestName   String?  // Guest name for display
+  guestCabin  String?  // Cabin/location name for display
+  acceptedAt  DateTime?
+  completedAt DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
   guest    Guest?    @relation(fields: [guestId], references: [id])
   location Location? @relation(fields: [locationId], references: [id])
   category ServiceCategory? @relation(fields: [categoryId], references: [id])
+
+  @@index([guestId])
+  @@index([locationId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([priority])
+  @@index([assignedToId])
+  @@index([createdAt])
 }
 
 model ServiceCategory {
@@ -202,6 +241,13 @@ model Device {
   
   assignments     DeviceAssignment[]
   logs            DeviceLog[]
+  activityLogs    ActivityLog[]
+
+  @@index([locationId])
+  @@index([crewMemberId])
+  @@index([status])
+  @@index([type])
+  @@index([lastSeen])
 }
 
 model DeviceLog {
@@ -233,7 +279,44 @@ model DeviceAssignment {
   @@unique([deviceId, crewMemberId])
 }
 
-// Assignment and ShiftConfig models removed - user requested complete removal of duty timer functionality
+// Duty Roster Models - Re-added for database persistence (Phase 4)
+model Shift {
+  id          String   @id @default(cuid())
+  name        String   // "Morning", "Afternoon", "Night"
+  startTime   String   // "08:00"
+  endTime     String   // "20:00"
+  color       String   @default("#3B82F6") // Color for UI display
+  description String?
+  isActive    Boolean  @default(true)
+  order       Int      @default(0) // For sorting
+
+  assignments Assignment[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+}
+
+model Assignment {
+  id           String   @id @default(cuid())
+  date         String   // ISO date string "2025-10-23"
+  shiftId      String
+  crewMemberId String
+  type         String   // "primary" or "backup"
+  notes        String?
+
+  shift        Shift      @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([date])
+  @@index([shiftId])
+  @@index([crewMemberId])
+  @@index([type])
+  @@unique([date, shiftId, crewMemberId, type])
+}
 
 model ActivityLog {
   id         String   @id @default(cuid())
@@ -242,10 +325,16 @@ model ActivityLog {
   details    String?
   userId     String?
   locationId String?
+  guestId    String?
+  deviceId   String?
   metadata   String?
+  timestamp  DateTime @default(now())
   createdAt  DateTime @default(now())
   
-  user User? @relation(fields: [userId], references: [id])
+  user       User?     @relation(fields: [userId], references: [id])
+  location   Location? @relation(fields: [locationId], references: [id])
+  guest      Guest?    @relation(fields: [guestId], references: [id])
+  device     Device?   @relation(fields: [deviceId], references: [id])
 }
 
 model YachtSettings {

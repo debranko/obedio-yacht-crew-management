@@ -76,9 +76,11 @@ export class WebSocketService {
   private socket: Socket | null = null;
   private listeners: Map<string, ((event: AllEvents) => void)[]> = new Map();
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
+  private maxReconnectAttempts = 10;
   private reconnectDelay = 1000;
   private isConnected = false;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private isIntentionalDisconnect = false;
 
   private constructor() {}
 
@@ -105,9 +107,11 @@ export class WebSocketService {
       this.socket = io(serverUrl, {
         auth: { userId },
         reconnection: true,
-        reconnectionAttempts: this.maxReconnectAttempts,
+        reconnectionAttempts: Infinity,
         reconnectionDelay: 1000,
-        timeout: 5000 // Add timeout to fail faster
+        reconnectionDelayMax: 5000,
+        timeout: 10000,
+        transports: ['websocket', 'polling']
       });
 
       this.setupEventHandlers();
@@ -123,6 +127,11 @@ export class WebSocketService {
    * Disconnect from WebSocket server
    */
   disconnect(): void {
+    this.isIntentionalDisconnect = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
@@ -157,10 +166,29 @@ export class WebSocketService {
       this.isConnected = false;
       this.notifyListeners('connection', { type: 'disconnected', data: { reason }, timestamp: new Date().toISOString() } as ConnectionEvent);
       
-      if (reason === 'io server disconnect') {
-        // Server disconnected, try to reconnect
+      // Auto-reconnect unless it was intentional
+      if (!this.isIntentionalDisconnect && reason !== 'io client disconnect') {
         this.handleReconnect();
       }
+    });
+
+    this.socket.on('reconnect', (attemptNumber: number) => {
+      console.log('WebSocket reconnected after', attemptNumber, 'attempts');
+      this.isConnected = true;
+      this.reconnectAttempts = 0;
+    });
+
+    this.socket.on('reconnect_attempt', (attemptNumber: number) => {
+      console.log('WebSocket reconnection attempt', attemptNumber);
+    });
+
+    this.socket.on('reconnect_error', (error: any) => {
+      console.log('WebSocket reconnection error:', error.message);
+    });
+
+    this.socket.on('reconnect_failed', () => {
+      console.log('WebSocket reconnection failed - will keep trying');
+      // Socket.io will continue trying with its built-in logic
     });
 
     this.socket.on('connect_error', (error: any) => {
@@ -258,18 +286,27 @@ export class WebSocketService {
    * Handle reconnection logic
    */
   private handleReconnect(): void {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log('WebSocket reconnection stopped - max attempts reached');
+    if (this.isIntentionalDisconnect) {
       return;
     }
 
-    this.reconnectAttempts++;
-    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1); // Exponential backoff
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+    }
 
-    // Silent reconnection attempts
-    setTimeout(() => {
-      if (!this.isConnected) {
-        this.connect();
+    this.reconnectAttempts++;
+    const delay = Math.min(this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1), 30000); // Max 30s
+
+    console.log(`WebSocket reconnection attempt ${this.reconnectAttempts} in ${delay}ms`);
+
+    this.reconnectTimer = setTimeout(() => {
+      if (!this.isConnected && !this.isIntentionalDisconnect) {
+        console.log('Attempting WebSocket reconnection...');
+        if (this.socket) {
+          this.socket.connect();
+        } else {
+          this.connect();
+        }
       }
     }, delay);
   }

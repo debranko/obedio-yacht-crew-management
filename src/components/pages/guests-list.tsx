@@ -335,16 +335,7 @@ export function GuestsListPage() {
       <div className="grid grid-cols-4 gap-4">
         {/* Guest Status Widget - 3/4 width */}
         <div className="col-span-3">
-          <GuestStatusWidget 
-            guestsOnboard={stats?.onboard ? stats.onboard > 0 : false}
-            guestCount={stats?.onboard || 0}
-            expectedGuests={stats?.expected || 0}
-            expectedArrival={stats?.expected > 0 ? "Next 7 days" : undefined}
-            onToggle={(onboard) => {
-              console.log('Guest status toggled on guests page:', onboard);
-              // TODO: Connect to state management
-            }}
-          />
+          <GuestStatusWidget />
         </div>
         
         {/* Dietary Alerts - 1/4 width */}
@@ -424,7 +415,7 @@ export function GuestsListPage() {
         {/* Page Size Selector */}
         <Select
           value={qp.limit.toString()}
-          onValueChange={(v) => set({ limit: parseInt(v) })}
+          onValueChange={(v: string) => set({ limit: parseInt(v) })}
         >
           <SelectTrigger className="w-[100px]">
             <SelectValue />
@@ -510,7 +501,7 @@ export function GuestsListPage() {
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Checkbox
                         checked={selectedIds.has(guest.id)}
-                        onCheckedChange={(checked) => {
+                        onCheckedChange={(checked: boolean) => {
                           const newSet = new Set(selectedIds);
                           if (checked) {
                             newSet.add(guest.id);
@@ -533,8 +524,14 @@ export function GuestsListPage() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div>
-                          <div className="font-medium">
+                          <div className="font-medium flex items-center gap-2">
                             {guest.firstName} {guest.lastName}
+                            {guest.doNotDisturb && (
+                              <Badge variant="destructive" className="h-5 px-1.5 flex items-center gap-1">
+                                <BellOff className="h-3 w-3" />
+                                <span className="text-[10px] font-bold">DND</span>
+                              </Badge>
+                            )}
                           </div>
                           {guest.preferredName && (
                             <div className="text-xs text-muted-foreground">
@@ -572,8 +569,18 @@ export function GuestsListPage() {
                     </TableCell>
                     <TableCell>
                       <span className="text-sm">
-                        {guest.locationId 
-                          ? (locations.find(l => l.id === guest.locationId)?.name || '—')
+                        {guest.locationId
+                          ? (() => {
+                              const location = locations.find(l => l.id === guest.locationId);
+                              return location ? (
+                                <span className="flex items-center gap-1">
+                                  {location.name}
+                                  {location.doNotDisturb && (
+                                    <BellOff className="h-3 w-3 text-destructive" />
+                                  )}
+                                </span>
+                              ) : '—';
+                            })()
                           : '—'
                         }
                       </span>

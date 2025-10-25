@@ -11,7 +11,10 @@ export function useLocations() {
 
   const locationsQuery = useQuery({
     queryKey: ['locations'],
-    queryFn: () => locationsService.getAll()
+    queryFn: () => locationsService.getAll(),
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time DND updates
+    refetchOnWindowFocus: true,
+    staleTime: 2000, // Consider data stale after 2 seconds
   });
 
   const createMutation = useMutation({

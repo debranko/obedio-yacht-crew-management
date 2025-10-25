@@ -9,34 +9,68 @@ import mqtt, { MqttClient } from 'mqtt';
 class MQTTClientService {
   private client: MqttClient | null = null;
   private isConnected: boolean = false;
+  private isConnecting: boolean = false;
   private subscribers: Map<string, ((topic: string, message: any) => void)[]> = new Map();
-
-  // MQTT Configuration - WebSocket connection to Mosquitto
-  private readonly MQTT_BROKER = import.meta.env.VITE_MQTT_BROKER || 'ws://localhost:9001';
-  private readonly CLIENT_ID = `obedio-simulator-${Date.now()}`;
+  private clientId: string = '';
+  
+  private getMqttBroker(): string {
+    // Resolve broker URL at runtime, not module load time
+    return import.meta.env.VITE_MQTT_BROKER || 'ws://localhost:9001';
+  }
 
   /**
    * Connect to MQTT broker via WebSocket
    */
   async connect(): Promise<void> {
-    if (this.isConnected) {
-      console.log('🔌 MQTT already connected');
+    console.log('🔧 MQTT connect() called');
+
+    // If already connected, return immediately
+    if (this.isConnected && this.client) {
+      console.log('🔌 MQTT already connected with client ID:', this.clientId);
       return;
     }
 
-    console.log('🔌 Connecting to MQTT broker:', this.MQTT_BROKER);
+    // If currently connecting, wait for that connection to complete
+    if (this.isConnecting) {
+      console.log('⏳ MQTT connection already in progress, waiting...');
+      return;
+    }
+
+    // Generate a NEW client ID for this connection attempt
+    // This prevents conflicts with stale connections
+    this.clientId = `obedio-simulator-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    console.log('📍 Environment variables check:');
+    console.log('  - VITE_MQTT_BROKER:', import.meta.env.VITE_MQTT_BROKER || 'NOT SET');
+    console.log('  - Using broker URL:', this.getMqttBroker());
+    console.log('  - Client ID:', this.clientId);
+
+    console.log('🔌 Connecting to MQTT broker:', this.getMqttBroker());
+
+    this.isConnecting = true;
 
     return new Promise((resolve, reject) => {
-      this.client = mqtt.connect(this.MQTT_BROKER, {
-        clientId: this.CLIENT_ID,
+      // Disconnect any existing connection first
+      if (this.client) {
+        console.log('🔌 Disconnecting old MQTT client first...');
+        this.client.end(true);
+        this.client = null;
+        this.isConnected = false;
+      }
+
+      this.client = mqtt.connect(this.getMqttBroker(), {
+        clientId: this.clientId,
         clean: true,
         connectTimeout: 10000,
-        reconnectPeriod: 5000,
+        reconnectPeriod: 5000, // Auto-reconnect every 5 seconds if connection drops
+        keepalive: 60, // Send keepalive ping every 60 seconds
       });
 
       this.client.on('connect', () => {
         console.log('✅ MQTT connected successfully from frontend');
+        console.log('✅ Client ID:', this.clientId);
         this.isConnected = true;
+        this.isConnecting = false;
         resolve();
       });
 
@@ -58,12 +92,14 @@ class MQTTClientService {
 
       this.client.on('error', (error) => {
         console.error('❌ MQTT connection error:', error);
+        this.isConnecting = false;
         reject(error);
       });
 
       this.client.on('close', () => {
         console.log('🔌 MQTT disconnected');
         this.isConnected = false;
+        this.isConnecting = false;
       });
 
       this.client.on('reconnect', () => {
@@ -73,6 +109,7 @@ class MQTTClientService {
       // Timeout after 10 seconds
       setTimeout(() => {
         if (!this.isConnected) {
+          this.isConnecting = false;
           reject(new Error('MQTT connection timeout'));
         }
       }, 10000);

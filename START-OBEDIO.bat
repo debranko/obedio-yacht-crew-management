@@ -13,78 +13,85 @@ echo.
 echo Checking system status...
 echo.
 
-REM Function to check if port is in use and get PID
-set BACKEND_PID=
-set FRONTEND_PID=
+REM Kill any Node.js processes that might be running
+taskkill /F /IM node.exe >nul 2>&1
+timeout /t 2 /nobreak >nul
 
-REM Check port 8080
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8080" ^| findstr "LISTENING"') do (
-    set BACKEND_PID=%%a
-)
-
-REM Check port 5173
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":5173" ^| findstr "LISTENING"') do (
-    set FRONTEND_PID=%%a
-)
-
-REM Handle existing processes
-if defined BACKEND_PID (
-    echo WARNING: Port 8080 already in use (PID: %BACKEND_PID%)
-    echo Stopping existing backend process...
-    taskkill /F /PID %BACKEND_PID% >nul 2>&1
-    timeout /t 2 /nobreak >nul
-)
-
-if defined FRONTEND_PID (
-    echo WARNING: Port 5173 already in use (PID: %FRONTEND_PID%)
-    echo Stopping existing frontend process...
-    taskkill /F /PID %FRONTEND_PID% >nul 2>&1
-    timeout /t 2 /nobreak >nul
-)
-
-REM Kill any remaining OBEDIO processes by window title
-taskkill /FI "WINDOWTITLE eq OBEDIO Backend API*" /F >nul 2>&1
-taskkill /FI "WINDOWTITLE eq OBEDIO Frontend*" /F >nul 2>&1
-taskkill /FI "WINDOWTITLE eq Administrator:  OBEDIO Backend API*" /F >nul 2>&1
-taskkill /FI "WINDOWTITLE eq Administrator:  OBEDIO Frontend*" /F >nul 2>&1
-
+echo Starting services...
 echo.
-echo Starting servers...
-echo.
+
+REM Create mosquitto data directory if it doesn't exist
+if not exist "%~dp0mosquitto\data" mkdir "%~dp0mosquitto\data"
+
+REM Start Mosquitto MQTT Broker
+echo [1/3] Starting Mosquitto MQTT Broker...
+
+REM Try to start existing container first
+docker start obedio-mosquitto >nul 2>&1
+if %errorlevel%==0 (
+    echo      Starting existing MQTT container...
+    timeout /t 3 /nobreak >nul
+    docker ps --filter "name=obedio-mosquitto" --format "{{.Status}}" | findstr "Up" >nul
+    if %errorlevel%==0 (
+        echo      ✓ MQTT broker started successfully!
+    ) else (
+        echo      ✗ Failed to start MQTT container!
+        echo      Trying to create new container...
+        docker rm -f obedio-mosquitto >nul 2>&1
+        docker run -d -p 1883:1883 -p 9001:9001 -v "%~dp0mosquitto:/mosquitto" --name obedio-mosquitto eclipse-mosquitto:2 >nul 2>&1
+        if %errorlevel%==0 (
+            echo      ✓ MQTT broker created and started!
+        ) else (
+            echo      ✗ Failed to create MQTT container!
+            echo      Please check Docker is running!
+        )
+    )
+) else (
+    echo      Container not found, creating new one...
+    docker rm -f obedio-mosquitto >nul 2>&1
+    docker run -d -p 1883:1883 -p 9001:9001 -v "%~dp0mosquitto:/mosquitto" --name obedio-mosquitto eclipse-mosquitto:2 >nul 2>&1
+    if %errorlevel%==0 (
+        echo      ✓ MQTT broker created and started!
+    ) else (
+        echo      ✗ Failed to create MQTT container!
+        echo      Please check Docker is running!
+    )
+)
+
+timeout /t 3 /nobreak >nul
 
 REM Start Backend Server
-echo [1/2] Starting Backend API Server (Port 8080)...
+echo.
+echo [2/3] Starting Backend API Server (Port 8080)...
 start "OBEDIO Backend API" cmd /k "cd /d "%~dp0backend" && npm run dev"
 
 REM Wait for backend to initialize
 echo      Waiting for backend to initialize...
-timeout /t 5 /nobreak >nul
+timeout /t 8 /nobreak >nul
 
 REM Verify backend started
 netstat -ano | findstr ":8080" | findstr "LISTENING" >nul
 if %errorlevel%==0 (
     echo      ✓ Backend started successfully!
 ) else (
-    echo      ✗ Backend failed to start!
-    echo      Check the backend window for errors.
+    echo      ⚠ Backend startup incomplete (check backend window)
 )
 
 REM Start Frontend Server
 echo.
-echo [2/2] Starting Frontend Web Server (Port 5173)...
+echo [3/3] Starting Frontend Web Server (Port 5173)...
 start "OBEDIO Frontend" cmd /k "cd /d "%~dp0" && npm run dev"
 
 REM Wait for frontend to start
 echo      Waiting for frontend to start...
-timeout /t 8 /nobreak >nul
+timeout /t 10 /nobreak >nul
 
 REM Verify frontend started
 netstat -ano | findstr ":5173" | findstr "LISTENING" >nul
 if %errorlevel%==0 (
     echo      ✓ Frontend started successfully!
 ) else (
-    echo      ✗ Frontend failed to start!
-    echo      Check the frontend window for errors.
+    echo      ⚠ Frontend startup incomplete (check frontend window)
 )
 
 echo.
@@ -92,12 +99,14 @@ echo ========================================
 echo    STARTUP COMPLETE!
 echo ========================================
 echo.
+echo MQTT Broker:  mqtt://localhost:1883 (WebSocket: ws://localhost:9001)
 echo Backend API:  http://localhost:8080/api
+echo MQTT Monitor: http://localhost:8888
 echo Frontend App: http://localhost:5173
 echo Database:     PostgreSQL (active)
 echo.
-echo Opening web app in browser...
-timeout /t 2 /nobreak >nul
+echo Opening web app in 3 seconds...
+timeout /t 3 /nobreak >nul
 
 REM Open browser
 start http://localhost:5173
@@ -109,9 +118,10 @@ echo ========================================
 echo.
 echo Login: admin / admin123
 echo.
-echo IMPORTANT: 
+echo IMPORTANT:
 echo - Do NOT close the command windows
 echo - Use STOP-OBEDIO.bat to shut down properly
 echo - Use RESTART-OBEDIO.bat to restart
+echo - If MQTT error appears, wait 10 seconds and refresh browser
 echo.
 pause

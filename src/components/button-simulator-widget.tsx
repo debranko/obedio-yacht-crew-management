@@ -59,23 +59,44 @@ const auxButtons: AuxButton[] = [
 export function ButtonSimulatorWidget() {
   // Connect to MQTT broker on mount - REAL MQTT CONNECTION
   useEffect(() => {
-    console.log('🔌 Button Simulator: Attempting MQTT connection...');
+    // Check if already connected BEFORE attempting connection
+    const wasConnected = mqttClient.getConnectionStatus();
+
+    console.log('🔌 Button Simulator: Checking MQTT connection...');
+    console.log('📍 MQTT Broker URL from env:', import.meta.env.VITE_MQTT_BROKER || 'NOT SET - using default ws://localhost:9001');
+    console.log('🔍 Current MQTT connection status:', wasConnected);
+
+    // Only show toast if we're establishing a NEW connection
     mqttClient.connect()
       .then(() => {
-        console.log('✅ Button Simulator: MQTT connected successfully');
-        toast.success('MQTT Connected', {
-          description: 'Button simulator ready to send real MQTT messages'
-        });
+        const isConnected = mqttClient.getConnectionStatus();
+        console.log('✅ Button Simulator: MQTT connection verified');
+        console.log('🔍 MQTT connection status after connect:', isConnected);
+
+        // Only show notification if we just connected (was disconnected before)
+        if (!wasConnected && isConnected) {
+          toast.success('MQTT Connected', {
+            description: 'Button simulator ready to send real MQTT messages'
+          });
+        } else if (wasConnected) {
+          console.log('📌 MQTT already connected, no notification shown');
+        }
       })
       .catch((error) => {
         console.error('❌ Button Simulator: MQTT connection failed:', error);
-        toast.error('MQTT Connection Failed', {
-          description: 'Make sure Mosquitto is running on port 9001 (WebSocket)'
-        });
+        console.error('🔍 Error details:', error.message, error.stack);
+
+        // Only show error if we weren't connected before (avoid spam on reconnect attempts)
+        if (!wasConnected) {
+          toast.error('MQTT Connection Failed', {
+            description: 'Make sure Mosquitto is running on port 9001 (WebSocket)'
+          });
+        }
       });
 
     return () => {
       // Keep connection alive (don't disconnect on unmount)
+      // This prevents reconnection spam when sidebar collapses/expands
     };
   }, []);
 
@@ -424,7 +445,8 @@ export function ButtonSimulatorWidget() {
 
       console.log('📤 Sending audio to backend for transcription...');
 
-      const response = await fetch('http://localhost:8080/api/transcribe', {
+      const apiUrl = import.meta.env.VITE_API_URL || '/api';
+      const response = await fetch(`${apiUrl}/transcribe`, {
         method: 'POST',
         body: formData
       });

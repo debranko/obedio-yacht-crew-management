@@ -19,9 +19,7 @@ async function fetchApi<T>(
   options?: RequestInit
 ): Promise<T> {
   const token = localStorage.getItem('obedio-auth-token');
-  
-  console.log('🔐 API Call:', endpoint, { hasToken: !!token, token: token?.substring(0, 20) + '...' });
-  
+
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...(token && { Authorization: `Bearer ${token}` }),
@@ -40,14 +38,14 @@ async function fetchApi<T>(
     }
 
     const result: ApiResponse<T> = await response.json();
-    
+
     if (!result.success) {
       throw new Error(result.error || 'API request failed');
     }
 
     return result.data as T;
   } catch (error) {
-    console.error(`API Error [${endpoint}]:`, error);
+    console.error(`[API] ${endpoint}:`, error);
     throw error;
   }
 }
@@ -191,12 +189,14 @@ export interface ServiceRequestDTO {
   id: string;
   guestId: string;
   locationId?: string | null;
-  status: 'pending' | 'in-progress' | 'completed' | 'cancelled';
+  status: 'pending' | 'in-progress' | 'completed' | 'cancelled' | 'serving' | 'accepted' | 'delegated';
   priority: 'low' | 'normal' | 'urgent' | 'emergency';
   message?: string | null;
   voiceTranscript?: string | null;
   voiceAudioUrl?: string | null;
-  assignedCrewId?: string | null;
+  assignedToId?: string | null; // Backend uses assignedToId, not assignedCrewId
+  assignedTo?: string | null; // Crew member name
+  acceptedAt?: string | null; // When request was accepted
   createdAt: string;
   updatedAt: string;
   completedAt?: string | null;
@@ -338,6 +338,193 @@ export const devicesApi = {
 };
 
 // =====================
+// SHIFTS API (Duty Roster)
+// =====================
+
+export interface ShiftDTO {
+  id: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  color: string;
+  description?: string | null;
+  isActive: boolean;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const shiftsApi = {
+  /**
+   * Get all shifts
+   */
+  getAll: () => fetchApi<ShiftDTO[]>('/shifts'),
+
+  /**
+   * Get active shifts only
+   */
+  getActive: () => fetchApi<ShiftDTO[]>('/shifts/active'),
+
+  /**
+   * Get shift by ID
+   */
+  getById: (id: string) => fetchApi<ShiftDTO>(`/shifts/${id}`),
+
+  /**
+   * Create new shift
+   */
+  create: (data: Omit<ShiftDTO, 'id' | 'createdAt' | 'updatedAt'>) =>
+    fetchApi<ShiftDTO>('/shifts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Update shift
+   */
+  update: (id: string, data: Partial<ShiftDTO>) =>
+    fetchApi<ShiftDTO>(`/shifts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Delete shift
+   */
+  delete: (id: string) =>
+    fetchApi<void>(`/shifts/${id}`, {
+      method: 'DELETE',
+    }),
+
+  /**
+   * Toggle shift active status
+   */
+  toggleActive: (id: string, isActive: boolean) =>
+    fetchApi<ShiftDTO>(`/shifts/${id}/toggle-active`, {
+      method: 'POST',
+      body: JSON.stringify({ isActive }),
+    }),
+
+  /**
+   * Reorder shifts
+   */
+  reorder: (shifts: { id: string; order: number }[]) =>
+    fetchApi<void>('/shifts/reorder', {
+      method: 'POST',
+      body: JSON.stringify({ shifts }),
+    }),
+};
+
+// =====================
+// ASSIGNMENTS API (Duty Roster)
+// =====================
+
+export interface AssignmentDTO {
+  id: string;
+  date: string; // ISO date string "2025-10-23"
+  shiftId: string;
+  crewMemberId: string;
+  type: 'primary' | 'backup';
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  shift?: ShiftDTO; // Populated when included
+}
+
+export const assignmentsApi = {
+  /**
+   * Get all assignments with optional filters
+   */
+  getAll: (params?: {
+    date?: string;
+    shiftId?: string;
+    crewMemberId?: string;
+    type?: 'primary' | 'backup';
+    startDate?: string;
+    endDate?: string;
+  }) => {
+    const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+    return fetchApi<AssignmentDTO[]>(`/assignments${query}`);
+  },
+
+  /**
+   * Get assignments for a specific date
+   */
+  getByDate: (date: string) => fetchApi<AssignmentDTO[]>(`/assignments/by-date/${date}`),
+
+  /**
+   * Get assignments for a week starting from date
+   */
+  getByWeek: (startDate: string) => fetchApi<AssignmentDTO[]>(`/assignments/by-week/${startDate}`),
+
+  /**
+   * Get assignments for a specific crew member
+   */
+  getByCrew: (crewMemberId: string, params?: { startDate?: string; endDate?: string }) => {
+    const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+    return fetchApi<AssignmentDTO[]>(`/assignments/crew/${crewMemberId}${query}`);
+  },
+
+  /**
+   * Get assignment by ID
+   */
+  getById: (id: string) => fetchApi<AssignmentDTO>(`/assignments/${id}`),
+
+  /**
+   * Create new assignment
+   */
+  create: (data: Omit<AssignmentDTO, 'id' | 'createdAt' | 'updatedAt' | 'shift'>) =>
+    fetchApi<AssignmentDTO>('/assignments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Create multiple assignments at once
+   */
+  createBulk: (assignments: Omit<AssignmentDTO, 'id' | 'createdAt' | 'updatedAt' | 'shift'>[]) =>
+    fetchApi<AssignmentDTO[]>('/assignments/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ assignments }),
+    }),
+
+  /**
+   * Update assignment
+   */
+  update: (id: string, data: Partial<AssignmentDTO>) =>
+    fetchApi<AssignmentDTO>(`/assignments/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Delete assignment
+   */
+  delete: (id: string) =>
+    fetchApi<void>(`/assignments/${id}`, {
+      method: 'DELETE',
+    }),
+
+  /**
+   * Delete all assignments for a specific date
+   */
+  deleteByDate: (date: string) =>
+    fetchApi<void>(`/assignments/by-date/${date}`, {
+      method: 'DELETE',
+    }),
+
+  /**
+   * Delete assignments for a crew member
+   */
+  deleteByCrew: (crewMemberId: string, params?: { startDate?: string; endDate?: string }) => {
+    const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+    return fetchApi<void>(`/assignments/crew/${crewMemberId}${query}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// =====================
 // EXPORT ALL
 // =====================
 
@@ -346,10 +533,12 @@ export const api = {
   guests: guestsApi,
   serviceRequests: serviceRequestsApi,
   devices: devicesApi,
-  
+  shifts: shiftsApi,
+  assignments: assignmentsApi,
+
   // Direct methods for convenience
   get: (endpoint: string) => fetchApi<any>(endpoint),
-  post: (endpoint: string, data?: any) => 
+  post: (endpoint: string, data?: any) =>
     fetchApi<any>(endpoint, {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,

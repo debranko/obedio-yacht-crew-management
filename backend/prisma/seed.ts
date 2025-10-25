@@ -341,23 +341,198 @@ async function seedServiceRequests() {
   }
 }
 
+async function seedDevices() {
+  console.log(' Seeding devices...');
+  
+  const locations = await prisma.location.findMany();
+  const crewMembers = await prisma.crewMember.findMany();
+  
+  const devices: any[] = [];
+  
+  // Smart buttons for each cabin
+  const cabinLocations = locations.filter(l => l.type === 'cabin');
+  for (const location of cabinLocations) {
+    devices.push({
+      deviceId: `BTN-${location.name.replace(/\s+/g, '-').toUpperCase()}`,
+      name: `${location.name} Smart Button`,
+      type: 'smart_button',
+      status: 'online',
+      locationId: location.id,
+      config: {
+        version: '1.0.0',
+        batteryLevel: 85 + Math.floor(Math.random() * 15),
+        firmwareVersion: 'v2.1.0',
+        lastSync: new Date().toISOString()
+      }
+    });
+  }
+  
+  // Add some common area buttons
+  const commonAreas = locations.filter(l => l.type === 'common').slice(0, 4);
+  for (const location of commonAreas) {
+    devices.push({
+      deviceId: `BTN-${location.name.replace(/\s+/g, '-').toUpperCase()}`,
+      name: `${location.name} Smart Button`,
+      type: 'smart_button',
+      status: Math.random() > 0.8 ? 'offline' : 'online',
+      locationId: location.id,
+      config: {
+        version: '1.0.0',
+        batteryLevel: 70 + Math.floor(Math.random() * 30),
+        firmwareVersion: 'v2.1.0',
+        lastSync: new Date().toISOString()
+      }
+    });
+  }
+  
+  // Add some wearable devices for crew
+  const activeStaff = crewMembers.filter(c => c.status === 'active').slice(0, 5);
+  for (const crew of activeStaff) {
+    devices.push({
+      deviceId: `WEAR-${crew.name.split(' ')[1].toUpperCase()}-001`,
+      name: `${crew.name}'s Watch`,
+      type: 'wearable',
+      status: 'online',
+      crewMemberId: crew.id,
+      config: {
+        version: '1.0.0',
+        model: 'Apple Watch Series 8',
+        batteryLevel: 60 + Math.floor(Math.random() * 40),
+        lastSync: new Date().toISOString()
+      }
+    });
+  }
+  
+  // Create devices
+  const createdDevices: any[] = [];
+  for (const device of devices) {
+    const created = await prisma.device.create({
+      data: device
+    });
+    createdDevices.push(created);
+  }
+  
+  console.log(` Created ${createdDevices.length} devices`);
+  
+  // Create device logs
+  console.log(' Seeding device logs...');
+  
+  const logs: any[] = [];
+  const now = new Date();
+  
+  for (const device of createdDevices) {
+    // Add various log events for each device
+    const eventTypes = ['device_online', 'button_press', 'config_change', 'battery_low', 'device_offline'];
+    const numLogs = 5 + Math.floor(Math.random() * 10);
+    
+    for (let i = 0; i < numLogs; i++) {
+      const hoursAgo = Math.floor(Math.random() * 48); // Random time within last 48 hours
+      const timestamp = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
+      const eventType = eventTypes[Math.floor(Math.random() * eventTypes.length)];
+      
+      let eventData: any = {};
+      
+      switch (eventType) {
+        case 'button_press':
+          eventData = {
+            location: device.name.replace(' Smart Button', ''),
+            user: activeStaff[Math.floor(Math.random() * activeStaff.length)]?.name || 'System'
+          };
+          break;
+        case 'battery_low':
+          eventData = { level: 10 + Math.floor(Math.random() * 10) };
+          break;
+        case 'config_change':
+          eventData = { changes: { firmwareVersion: 'v2.1.1' } };
+          break;
+        case 'device_online':
+        case 'device_offline':
+          eventData = { reason: 'scheduled' };
+          break;
+      }
+      
+      logs.push({
+        deviceId: device.id,
+        eventType,
+        eventData,
+        severity: eventType === 'battery_low' ? 'warning' : 'info',
+        createdAt: timestamp
+      });
+    }
+  }
+  
+  await prisma.deviceLog.createMany({
+    data: logs,
+    skipDuplicates: true
+  });
+  
+  console.log(` Created ${logs.length} device logs`);
+}
+
+async function seedShifts() {
+  console.log(' Seeding duty roster shifts...');
+
+  const shifts = [
+    {
+      name: 'Morning',
+      startTime: '06:00',
+      endTime: '14:00',
+      color: '#D4B877',
+      description: 'Morning shift - breakfast and early afternoon service',
+      isActive: true,
+      order: 0,
+    },
+    {
+      name: 'Afternoon',
+      startTime: '14:00',
+      endTime: '22:00',
+      color: '#06B6D4',
+      description: 'Afternoon shift - lunch, dinner, and evening service',
+      isActive: true,
+      order: 1,
+    },
+    {
+      name: 'Night',
+      startTime: '22:00',
+      endTime: '06:00',
+      color: '#7C3AED',
+      description: 'Night shift - late evening and overnight service',
+      isActive: true,
+      order: 2,
+    },
+  ];
+
+  await prisma.shift.createMany({
+    data: shifts,
+    skipDuplicates: true,
+  });
+
+  console.log(` Created ${shifts.length} shifts (Morning, Afternoon, Night)`);
+}
+
 async function main() {
   console.log(' Starting database seed...\n');
-  
+
   try {
     // Clean up existing data (except users)
     console.log(' Cleaning up existing data...');
+    await prisma.assignment.deleteMany({});
+    await prisma.shift.deleteMany({});
+    await prisma.deviceLog.deleteMany({});
+    await prisma.device.deleteMany({});
     await prisma.serviceRequest.deleteMany({});
     await prisma.guest.deleteMany({});
     await prisma.crewMember.deleteMany({});
     await prisma.location.deleteMany({});
     console.log(' Cleanup complete!\n');
-    
+
     await seedAdmin();
     await seedLocations();
     await seedCrew();
     await seedGuests();
     await seedServiceRequests();
+    await seedDevices();
+    await seedShifts();
     
     console.log('\n Database seeded successfully!');
     console.log('\n Summary:');
@@ -366,6 +541,10 @@ async function main() {
     console.log(`   • Crew: ${await prisma.crewMember.count()}`);
     console.log(`   • Guests: ${await prisma.guest.count()}`);
     console.log(`   • Service Requests: ${await prisma.serviceRequest.count()}`);
+    console.log(`   • Devices: ${await prisma.device.count()}`);
+    console.log(`   • Device Logs: ${await prisma.deviceLog.count()}`);
+    console.log(`   • Shifts: ${await prisma.shift.count()}`);
+    console.log(`   • Assignments: ${await prisma.assignment.count()}`);
   } catch (error) {
     console.error(' Seed failed:', error);
     throw error;

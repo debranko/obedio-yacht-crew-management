@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../services/api';
 
 export interface DeviceLogParams {
   deviceId?: string;
@@ -9,6 +8,16 @@ export interface DeviceLogParams {
   search?: string;
   page?: number;
   limit?: number;
+}
+
+interface DeviceLogsResponse {
+  data: any[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export function useDeviceLogs(params?: DeviceLogParams) {
@@ -27,7 +36,30 @@ export function useDeviceLogs(params?: DeviceLogParams) {
   
   return useQuery({
     queryKey: ['device-logs', params],
-    queryFn: () => api.get(endpoint),
+    queryFn: async () => {
+      const token = localStorage.getItem('obedio-auth-token');
+      const apiUrl = import.meta.env.VITE_API_URL || '/api';
+      const response = await fetch(`${apiUrl}${endpoint}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Request failed' }));
+        throw new Error(error.error || `HTTP ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch device logs');
+      }
+      
+      // Return just the data array for compatibility with the activity log component
+      return result.data || [];
+    },
     staleTime: 1000 * 30, // 30 seconds
     refetchInterval: 1000 * 60, // Refetch every minute for real-time updates
   });

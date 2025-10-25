@@ -38,23 +38,26 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
  * Permission-based authorization middleware
  * For now: ADMIN has all permissions, others need specific permissions
  */
+// Alias for backward compatibility
+export const authenticate = authMiddleware;
+
 export function requirePermission(permission: string) {
   return (req: Request, res: Response, next: NextFunction) => {
     const user = (req as any).user;
-    
+
     if (!user) {
-      return res.status(401).json({ 
-        success: false, 
-        error: 'Authentication required' 
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required'
       });
     }
-    
+
     // Admin role has all permissions
     const adminRoles = ['admin', 'ADMIN'];
     if (adminRoles.includes(user.role)) {
       return next();
     }
-    
+
     // Permission mapping for different roles
     const rolePermissions: Record<string, string[]> = {
       'chief-stewardess': [
@@ -84,16 +87,16 @@ export function requirePermission(permission: string) {
         'guests.view'
       ]
     };
-    
+
     const userPermissions = rolePermissions[user.role] || [];
-    
+
     if (userPermissions.includes(permission)) {
       return next();
     }
-    
-    return res.status(403).json({ 
-      success: false, 
-      error: 'Insufficient permissions' 
+
+    return res.status(403).json({
+      success: false,
+      error: 'Insufficient permissions'
     });
   };
 }

@@ -26,10 +26,10 @@ export function ServingNowWidget({ onNavigate }: ServingNowWidgetProps) {
     return () => clearInterval(interval);
   }, []);
 
-  // Get accepted/delegated requests (currently being served)
+  // Get accepted/delegated/serving requests (currently being served)
   // Note: Completed requests are auto-removed by AppDataContext after timeout
   const servingNow = serviceRequests.filter(
-    req => req.status === 'accepted' || req.status === 'delegated'
+    req => req.status === 'accepted' || req.status === 'delegated' || req.status === 'serving'
   );
 
   const handleHeaderClick = () => {

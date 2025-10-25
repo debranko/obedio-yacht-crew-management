@@ -124,7 +124,7 @@ export function LoginPage() {
         {/* Demo Credentials Info */}
         <div className="pt-4 border-t border-border">
           <p className="text-xs text-muted-foreground text-center">
-            Login: <span className="font-medium">admin</span> / <span className="font-medium">password</span>
+            Login: <span className="font-medium">admin</span> / <span className="font-medium">admin123</span>
           </p>
         </div>
       </Card>

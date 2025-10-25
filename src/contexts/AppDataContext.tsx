@@ -7,7 +7,9 @@ import { useCrewMembers as useCrewMembersApi } from '../hooks/useCrewMembers';
 import { useGuestsApi } from '../hooks/useGuestsApi';
 import { useServiceRequestsApi } from '../hooks/useServiceRequestsApi';
 import { useShifts as useShiftsApi } from '../hooks/useShifts';
+import { useAssignments as useAssignmentsApi, useCreateBulkAssignments } from '../hooks/useAssignments';
 import { useLocations } from '../hooks/useLocations';
+import { useWebSocket } from '../hooks/useWebSocket';
 import { api, GuestDTO } from '../services/api';
 import { Location, LocationType } from '../domain/locations';
 import { locationsService } from '../services/locations';
@@ -155,10 +157,10 @@ interface AppDataContextType {
   addServiceRequest: (request: Omit<ServiceRequest, 'id' | 'timestamp'>) => ServiceRequest;
   acceptServiceRequest: (requestId: string, crewMemberName: string) => void;
   delegateServiceRequest: (requestId: string, toCrewMember: string) => void;
-  forwardServiceRequest: (requestId: string, toTeam: InteriorTeam) => void;
   completeServiceRequest: (requestId: string, crewMemberName?: string) => void;
   // simulateNewRequest removed - use API directly
-  getPendingRequestsForService: (serviceName: string) => ServiceRequest[];
+  // forwardServiceRequest removed - use service categories instead
+  // getPendingRequestsForService removed - use API filters instead
   serviceRequestHistory: ServiceRequestHistory[];
   clearServiceRequestHistory: () => void;
 }
@@ -291,7 +293,10 @@ function generateDefaultAssignments(crewMembers: CrewMemberExtended[], shifts: S
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
-  
+
+  // Initialize WebSocket for real-time updates
+  const { isConnected: wsConnected } = useWebSocket();
+
   // Fetch crew members from API
   const { crewMembers: apiCrewMembers, isLoading: isLoadingCrew } = useCrewMembersApi();
   
@@ -303,7 +308,16 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   
   // Fetch shifts from API
   const { data: apiShifts = [], isLoading: isLoadingShifts } = useShiftsApi();
-  
+
+  // Fetch assignments from API (get current week)
+  const today = new Date().toISOString().split('T')[0];
+  const { data: apiAssignments = [], isLoading: isLoadingAssignments } = useAssignmentsApi({
+    startDate: today,
+  });
+
+  // Mutation for bulk creating assignments
+  const createBulkAssignments = useCreateBulkAssignments();
+
   // Fetch locations from API
   const { locations: apiLocations, isLoading: isLoadingLocations } = useLocations();
   
@@ -349,6 +363,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setShifts(apiShifts);
     }
   }, [apiShifts]);
+
+  // Update assignments when API data arrives
+  useEffect(() => {
+    if (apiAssignments && apiAssignments.length > 0) {
+      setAssignments(apiAssignments);
+    }
+  }, [apiAssignments]);
 
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
@@ -489,9 +510,6 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         const location = locations.find(l => l.id === apiReq.locationId);
         const cabinName = location?.name || 'Unknown Location';
         
-        // Find assigned crew member
-        const assignedCrew = crewMembers.find(c => c.id === apiReq.assignedCrewId);
-        
         return {
           id: apiReq.id,
           guestName,
@@ -504,8 +522,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           voiceAudioUrl: apiReq.voiceAudioUrl || undefined,
           cabinImage: location?.image || undefined,
           status: apiReq.status as any,
-          assignedTo: assignedCrew?.name || undefined,
-          acceptedAt: apiReq.assignedCrewId ? new Date(apiReq.updatedAt) : undefined,
+          assignedTo: apiReq.assignedTo || undefined, // Use backend's assignedTo field directly
+          acceptedAt: apiReq.acceptedAt ? new Date(apiReq.acceptedAt) : undefined,
           completedAt: apiReq.completedAt ? new Date(apiReq.completedAt) : undefined,
           notes: apiReq.message || undefined,
         };
@@ -690,18 +708,24 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  // Save function - TODO: Replace with API call to save assignments
+  // Save assignments to database
   const saveAssignments = async () => {
     setIsSaving(true);
     setPreviousAssignments([...assignments]);
-    
-    // TODO: Replace with actual API call
-    // await api.dutyRoster.saveAssignments(assignments);
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    const now = new Date();
-    setLastSaved(now);
-    setIsSaving(false);
+
+    try {
+      // Save all assignments to database using bulk create
+      // This will replace any existing assignments for the same dates
+      await createBulkAssignments.mutateAsync(assignments);
+
+      const now = new Date();
+      setLastSaved(now);
+    } catch (error) {
+      console.error('[AppData] Failed to save assignments:', error);
+      throw error;
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Get current duty status based on assignments AND manual crew status
@@ -1052,15 +1076,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     );
   };
 
-  const forwardServiceRequest = (requestId: string, toTeam: InteriorTeam) => {
-    setServiceRequests(prev =>
-      prev.map(req =>
-        req.id === requestId
-          ? { ...req, status: 'forwarded' as const, forwardedToTeam: toTeam, forwardedAt: new Date() }
-          : req
-      )
-    );
-  };
+  // forwardServiceRequest removed - components should update service request with categoryId via API
 
   const completeServiceRequest = (requestId: string, crewMemberName?: string) => {
     const now = new Date();
@@ -1127,11 +1143,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, [userPreferences.servingNowTimeout]);
 
-  const getPendingRequestsForService = (serviceName: string): ServiceRequest[] => {
-    return serviceRequests.filter(req =>
-      req.status === 'forwarded' && req.forwardedToTeam === serviceName
-    );
-  };
+  // getPendingRequestsForService removed - use API filters instead
 
   const clearServiceRequestHistory = () => {
     setServiceRequestHistory([]);
@@ -1195,10 +1207,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         addServiceRequest,
         acceptServiceRequest,
         delegateServiceRequest,
-        forwardServiceRequest,
         completeServiceRequest,
         // simulateNewRequest removed - use API directly
-        getPendingRequestsForService,
+        // forwardServiceRequest removed - use service categories instead
+        // getPendingRequestsForService removed - use API filters instead
         serviceRequestHistory,
         clearServiceRequestHistory,
       }}

@@ -15,6 +15,7 @@ echo.
 REM Check current system status
 set BACKEND_STATUS=OFFLINE
 set FRONTEND_STATUS=OFFLINE
+set MQTT_STATUS=OFFLINE
 
 netstat -ano | findstr ":8080" | findstr "LISTENING" >nul
 if %errorlevel%==0 set BACKEND_STATUS=ONLINE
@@ -22,7 +23,11 @@ if %errorlevel%==0 set BACKEND_STATUS=ONLINE
 netstat -ano | findstr ":5173" | findstr "LISTENING" >nul
 if %errorlevel%==0 set FRONTEND_STATUS=ONLINE
 
+docker ps --filter "name=obedio-mosquitto" --format "{{.Status}}" | findstr "Up" >nul 2>&1
+if %errorlevel%==0 set MQTT_STATUS=ONLINE
+
 echo System Status:
+echo   MQTT:     %MQTT_STATUS%
 echo   Backend:  %BACKEND_STATUS%
 echo   Frontend: %FRONTEND_STATUS%
 echo.
@@ -39,6 +44,7 @@ echo  [7] Open Prisma Studio
 echo  [8] Fix Admin Password
 echo.
 echo  [9] Open Web App (Browser)
+echo  [M] Open MQTT Monitor Dashboard
 echo  [C] View Celebrity Guests
 echo  [S] System Status Details
 echo.
@@ -58,6 +64,7 @@ if /i "%choice%"=="6" goto seed_only
 if /i "%choice%"=="7" goto prisma_studio
 if /i "%choice%"=="8" goto fix_admin
 if /i "%choice%"=="9" goto open_browser
+if /i "%choice%"=="m" goto mqtt_monitor
 if /i "%choice%"=="c" goto show_guests
 if /i "%choice%"=="s" goto system_status
 if /i "%choice%"=="0" goto exit
@@ -203,6 +210,19 @@ echo.
 pause
 goto menu
 
+:mqtt_monitor
+cls
+echo Opening MQTT Monitor Dashboard...
+start http://localhost:8888
+echo.
+if "%MQTT_STATUS%"=="OFFLINE" (
+    echo WARNING: MQTT Broker is not running!
+    echo Start the system first (Option 1)
+)
+echo.
+pause
+goto menu
+
 :show_guests
 cls
 echo.
@@ -251,6 +271,21 @@ echo    SYSTEM STATUS DETAILS
 echo ========================================
 echo.
 
+REM Check MQTT Broker
+echo Mosquitto MQTT Broker:
+docker ps --filter "name=obedio-mosquitto" --format "{{.Names}} - {{.Status}}" 2>nul | findstr "obedio-mosquitto" >nul
+if %errorlevel%==0 (
+    for /f "delims=" %%a in ('docker ps --filter "name=obedio-mosquitto" --format "{{.Status}}"') do (
+        echo   Status: ONLINE (%%a)
+    )
+) else (
+    echo   Status: OFFLINE
+)
+echo   TCP Port: 1883 (devices/backend)
+echo   WebSocket: 9001 (browser/frontend)
+
+echo.
+
 REM Check Backend
 echo Backend API Server (Port 8080):
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8080" ^| findstr "LISTENING"') do (
@@ -285,6 +320,17 @@ if %errorlevel%==0 (
     ) else (
         echo   Status: UNKNOWN (check manually)
     )
+)
+
+echo.
+
+REM Check MQTT Monitor
+echo MQTT Monitor Dashboard (Port 8888):
+netstat -ano | findstr ":8888" | findstr "LISTENING" >nul
+if %errorlevel%==0 (
+    echo   Status: ONLINE
+) else (
+    echo   Status: OFFLINE (launches with backend)
 )
 
 echo.

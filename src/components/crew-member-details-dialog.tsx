@@ -49,6 +49,7 @@ import { formatDate, parseDate, formatDateDisplay, getDayName } from './duty-ros
 import { toast } from 'sonner';
 import { useAppData } from '../contexts/AppDataContext';
 import { CameraDialog } from './camera-dialog';
+import { useDevices } from '../hooks/useDevices';
 
 interface CrewMemberDetailsDialogProps {
   open: boolean;
@@ -79,38 +80,50 @@ export function CrewMemberDetailsDialog({
   });
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [isCameraDialogOpen, setIsCameraDialogOpen] = useState(false);
-  
+
   // Get current device assignment
   const currentDevice = getCrewDevice(crewMember.id);
-  
-  // Mock available devices - In production, this would come from AppDataContext
-  const availableDevices = [
-    { id: 'watch-001', name: 'Apple Watch Series 9', type: 'watch' as const },
-    { id: 'watch-002', name: 'Samsung Galaxy Watch 6', type: 'watch' as const },
-    { id: 'watch-003', name: 'Apple Watch Ultra 2', type: 'watch' as const },
-    { id: 'tablet-001', name: 'iPad Pro 12.9"', type: 'tablet' as const },
-    { id: 'tablet-002', name: 'Samsung Galaxy Tab S9', type: 'tablet' as const },
-    { id: 'phone-001', name: 'iPhone 15 Pro', type: 'phone' as const },
-  ];
+
+  // Fetch real devices from database (only unassigned devices)
+  const { data: allDevices = [], isLoading: devicesLoading } = useDevices();
+
+  // Filter to show only unassigned devices (no crewMemberId)
+  const availableDevices = allDevices
+    .filter(device => !device.crewMemberId)
+    .map(device => ({
+      id: device.id,
+      deviceId: device.deviceId,
+      name: device.name,
+      type: device.type
+    }));
   
   const handleAssignDevice = () => {
     if (!selectedDeviceId) {
       toast.error('Please select a device');
       return;
     }
-    
+
     const device = availableDevices.find(d => d.id === selectedDeviceId);
     if (!device) return;
-    
+
+    // Map device type to AppDataContext expected types
+    const mapDeviceType = (type: string): 'watch' | 'tablet' | 'phone' | 'other' => {
+      if (type === 'watch') return 'watch';
+      if (type === 'mobile_app') return 'phone';
+      if (type === 'smart_button') return 'other';
+      if (type === 'repeater') return 'other';
+      return 'other';
+    };
+
     assignDeviceToCrew({
       crewMemberId: crewMember.id,
       crewMemberName: crewMember.name,
-      deviceId: device.id,
+      deviceId: device.deviceId,
       deviceName: device.name,
-      deviceType: device.type,
+      deviceType: mapDeviceType(device.type),
       status: 'connected',
     });
-    
+
     toast.success(`${device.name} assigned to ${crewMember.name.split(' ')[0]}`);
     setSelectedDeviceId('');
   };
@@ -129,7 +142,12 @@ export function CrewMemberDetailsDialog({
       case 'tablet':
         return Tablet;
       case 'phone':
+      case 'mobile_app':
         return Smartphone;
+      case 'smart_button':
+        return Radio;
+      case 'repeater':
+        return Wifi;
       default:
         return Smartphone;
     }

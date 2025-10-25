@@ -23,6 +23,7 @@ import {
   Info,
   Plus,
   X,
+  XCircle,
   Bell,
   Download,
   Upload,
@@ -45,7 +46,9 @@ import {
   ExternalLink,
   GripVertical,
   Edit2,
-  Tag
+  Tag,
+  User,
+  Users
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "../ui/badge";
@@ -70,6 +73,14 @@ import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { Progress } from "../ui/progress";
 import { useServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useReorderServiceCategories } from "../../hooks/useServiceCategories";
 import type { ServiceCategory } from "../../hooks/useServiceCategories";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
 
 // Permission categories and their specific permissions
 interface Permission {
@@ -206,6 +217,14 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   const [quietHoursStart, setQuietHoursStart] = useState("22:00");
   const [quietHoursEnd, setQuietHoursEnd] = useState("07:00");
   
+  // Backend notification settings
+  const [serviceRequests, setServiceRequests] = useState(true);
+  const [emergencyAlerts, setEmergencyAlerts] = useState(true);
+  const [systemMessages, setSystemMessages] = useState(true);
+  const [guestMessages, setGuestMessages] = useState(true);
+  const [crewMessages, setCrewMessages] = useState(true);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
+  
   // System Settings State
   const [serverPort, setServerPort] = useState("8080");
   const [wsPort, setWsPort] = useState("8080");
@@ -222,6 +241,8 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   const [backupLocation, setBackupLocation] = useState("local");
   const [cloudBackupEnabled, setCloudBackupEnabled] = useState(false);
   const [lastBackupTime, setLastBackupTime] = useState<Date | null>(null);
+  const [backupStatus, setBackupStatus] = useState<any>(null);
+  const [systemStatus, setSystemStatus] = useState<any>(null);
   
   // Initialize state from backend settings
   useEffect(() => {
@@ -251,12 +272,32 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   const reorderCategories = useReorderServiceCategories();
   
   const [editingCategory, setEditingCategory] = useState<ServiceCategory | null>(null);
+  const [editingCategoryData, setEditingCategoryData] = useState({
+    name: "",
+    icon: "",
+    color: "#007bff",
+    description: "",
+    isActive: true
+  });
   const [newCategory, setNewCategory] = useState({
     name: "",
     icon: "",
     color: "#007bff",
     description: ""
   });
+  
+  // When editing category changes, update the form data
+  useEffect(() => {
+    if (editingCategory) {
+      setEditingCategoryData({
+        name: editingCategory.name,
+        icon: editingCategory.icon,
+        color: editingCategory.color,
+        description: editingCategory.description || "",
+        isActive: editingCategory.isActive
+      });
+    }
+  }, [editingCategory]);
   
   const handleSaveGeneral = async () => {
     // Save user preferences to context
@@ -324,36 +365,272 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
     toast.success("Role permissions saved successfully");
   };
   
-  const handleSaveNotifications = () => {
-    // TODO: Save to backend API
-    toast.success("Notification settings saved successfully");
+  // Load system status and settings from backend
+  useEffect(() => {
+    const loadSystemSettings = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/system-settings', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setSystemStatus(data.status);
+          if (data.settings) {
+            setServerPort(data.settings.serverPort);
+            setWsPort(data.settings.wsPort);
+            setApiTimeout(data.settings.apiTimeout);
+            setLogLevel(data.settings.logLevel);
+            setEnableMetrics(data.settings.enableMetrics);
+            setEnableDebugMode(data.settings.enableDebugMode);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load system settings:', error);
+      }
+    };
+
+    loadSystemSettings();
+  }, []);
+
+  // Load backup status and settings from backend
+  useEffect(() => {
+    const loadBackupSettings = async () => {
+      try {
+        const token = localStorage.getItem('token');
+
+        // Load backup settings
+        const settingsRes = await fetch('/api/backup/settings', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (settingsRes.ok) {
+          const data = await settingsRes.json();
+          if (data.settings) {
+            setBackupSchedule(data.settings.backupSchedule);
+            setBackupTime(data.settings.backupTime);
+            setBackupRetention(String(data.settings.backupRetention));
+            setBackupLocation(data.settings.backupLocation);
+            setCloudBackupEnabled(data.settings.cloudBackupEnabled);
+          }
+        }
+
+        // Load backup status
+        const statusRes = await fetch('/api/backup/status', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (statusRes.ok) {
+          const data = await statusRes.json();
+          setBackupStatus(data.status);
+          if (data.status?.lastBackup) {
+            setLastBackupTime(new Date(data.status.lastBackup));
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load backup settings:', error);
+      }
+    };
+
+    loadBackupSettings();
+  }, []);
+
+  // Load notification settings from backend
+  useEffect(() => {
+    const loadNotificationSettings = async () => {
+      setIsLoadingNotifications(true);
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/notification-settings', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+          const settings = await response.json();
+          setPushNotifications(settings.pushEnabled);
+          setServiceRequests(settings.serviceRequests);
+          setEmergencyAlerts(settings.emergencyAlerts);
+          setSystemMessages(settings.systemMessages);
+          setGuestMessages(settings.guestMessages);
+          setCrewMessages(settings.crewMessages);
+          setQuietHoursEnabled(settings.quietHoursEnabled);
+          if (settings.quietHoursStart) setQuietHoursStart(settings.quietHoursStart);
+          if (settings.quietHoursEnd) setQuietHoursEnd(settings.quietHoursEnd);
+          
+          // Get email from user preferences (since backend doesn't store it)
+          const userEmail = localStorage.getItem('userEmail');
+          if (userEmail) setNotificationEmail(userEmail);
+          
+          // Emergency contacts are stored separately in localStorage for now
+          const savedContacts = localStorage.getItem('emergencyContacts');
+          if (savedContacts) {
+            try {
+              setEmergencyContacts(JSON.parse(savedContacts));
+            } catch (e) {
+              console.error('Failed to parse emergency contacts');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load notification settings:', error);
+      } finally {
+        setIsLoadingNotifications(false);
+      }
+    };
+    
+    loadNotificationSettings();
+  }, [yachtSettings]);
+
+  const handleSaveNotifications = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Save notification settings to backend
+      const response = await fetch('/api/notification-settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          pushEnabled: pushNotifications,
+          serviceRequests,
+          emergencyAlerts,
+          systemMessages,
+          guestMessages,
+          crewMessages,
+          quietHoursEnabled,
+          quietHoursStart: quietHoursEnabled ? quietHoursStart : null,
+          quietHoursEnd: quietHoursEnabled ? quietHoursEnd : null
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to save notification settings');
+      }
+      
+      // Save email notification preference to user preferences
+      if (emailNotifications && notificationEmail) {
+        localStorage.setItem('userEmail', notificationEmail);
+        localStorage.setItem('emailNotifications', String(emailNotifications));
+      }
+      
+      // Save emergency contacts to localStorage for now
+      if (emergencyContacts.length > 0) {
+        localStorage.setItem('emergencyContacts', JSON.stringify(emergencyContacts));
+      }
+      
+      toast.success("Notification settings saved successfully");
+    } catch (error) {
+      toast.error("Failed to save notification settings");
+      console.error('Error saving notifications:', error);
+    }
   };
   
-  const handleSaveSystem = () => {
-    // TODO: Save to backend API
-    toast.success("System settings saved successfully");
+  const handleSaveSystem = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/system-settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          serverPort,
+          wsPort,
+          databaseUrl,
+          apiTimeout,
+          logLevel,
+          enableMetrics,
+          enableDebugMode
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save system settings');
+      }
+
+      const data = await response.json();
+      toast.success(data.message || "System settings saved successfully");
+    } catch (error) {
+      toast.error("Failed to save system settings");
+      console.error('Error saving system settings:', error);
+    }
   };
   
-  const handleSaveBackup = () => {
-    // TODO: Save to backend API
-    toast.success("Backup settings saved successfully");
+  const handleSaveBackup = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/backup/settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          backupSchedule,
+          backupTime,
+          backupRetention: parseInt(backupRetention),
+          backupLocation,
+          cloudBackupEnabled
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save backup settings');
+      }
+
+      toast.success("Backup settings saved successfully");
+    } catch (error) {
+      toast.error("Failed to save backup settings");
+      console.error('Error saving backup settings:', error);
+    }
   };
-  
+
   const handleRunBackup = async () => {
-    // TODO: Trigger backup via API
+    const token = localStorage.getItem('token');
+
     toast.promise(
-      new Promise((resolve) => setTimeout(resolve, 2000)),
+      fetch('/api/backup/create', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).then(async (response) => {
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Backup failed');
+        }
+
+        const data = await response.json();
+
+        // Refresh backup status
+        const statusRes = await fetch('/api/backup/status', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (statusRes.ok) {
+          const statusData = await statusRes.json();
+          setBackupStatus(statusData.status);
+          if (statusData.status?.lastBackup) {
+            setLastBackupTime(new Date(statusData.status.lastBackup));
+          }
+        }
+
+        return data;
+      }),
       {
         loading: 'Creating backup...',
         success: 'Backup completed successfully',
-        error: 'Backup failed',
+        error: (error) => error.message || 'Backup failed',
       }
     );
   };
-  
+
   const handleRestoreBackup = async () => {
-    // TODO: Implement restore functionality
-    toast.info("Restore functionality will be available soon");
+    // Show file selection dialog (would need a file picker component)
+    // For now, just show info that user needs to select a backup file
+    toast.info("Please contact administrator to restore from a specific backup file");
   };
   
   // Group permissions by category
@@ -720,13 +997,108 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
                     </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
+               </CardContent>
+             </Card>
+             
+             {/* Edit Category Dialog */}
+             <Dialog open={!!editingCategory} onOpenChange={(open: boolean) => !open && setEditingCategory(null)}>
+               <DialogContent>
+                 <DialogHeader>
+                   <DialogTitle>Edit Service Category</DialogTitle>
+                   <DialogDescription>
+                     Update the category details below
+                   </DialogDescription>
+                 </DialogHeader>
+                 <div className="space-y-4 py-4">
+                   <div className="space-y-2">
+                     <Label htmlFor="edit-category-name">Category Name</Label>
+                     <Input
+                       id="edit-category-name"
+                       value={editingCategoryData.name}
+                       onChange={(e) => setEditingCategoryData(prev => ({ ...prev, name: e.target.value }))}
+                       placeholder="e.g., Housekeeping"
+                     />
+                   </div>
+                   <div className="space-y-2">
+                     <Label htmlFor="edit-category-icon">Icon Name</Label>
+                     <Input
+                       id="edit-category-icon"
+                       value={editingCategoryData.icon}
+                       onChange={(e) => setEditingCategoryData(prev => ({ ...prev, icon: e.target.value }))}
+                       placeholder="e.g., Home"
+                     />
+                   </div>
+                   <div className="space-y-2">
+                     <Label htmlFor="edit-category-color">Color</Label>
+                     <Input
+                       id="edit-category-color"
+                       type="color"
+                       value={editingCategoryData.color}
+                       onChange={(e) => setEditingCategoryData(prev => ({ ...prev, color: e.target.value }))}
+                     />
+                   </div>
+                   <div className="space-y-2">
+                     <Label htmlFor="edit-category-description">Description</Label>
+                     <Input
+                       id="edit-category-description"
+                       value={editingCategoryData.description}
+                       onChange={(e) => setEditingCategoryData(prev => ({ ...prev, description: e.target.value }))}
+                       placeholder="Optional description"
+                     />
+                   </div>
+                   <div className="flex items-center justify-between">
+                     <Label htmlFor="edit-category-active">Active</Label>
+                     <Switch
+                       id="edit-category-active"
+                       checked={editingCategoryData.isActive}
+                       onCheckedChange={(checked: boolean) => setEditingCategoryData(prev => ({ ...prev, isActive: checked }))}
+                     />
+                   </div>
+                 </div>
+                 <DialogFooter>
+                   <Button variant="outline" onClick={() => setEditingCategory(null)}>
+                     Cancel
+                   </Button>
+                   <Button
+                     onClick={() => {
+                       if (editingCategory && editingCategoryData.name && editingCategoryData.icon) {
+                         updateCategory.mutate({
+                           id: editingCategory.id,
+                           name: editingCategoryData.name,
+                           icon: editingCategoryData.icon,
+                           color: editingCategoryData.color,
+                           description: editingCategoryData.description || undefined,
+                           isActive: editingCategoryData.isActive
+                         }, {
+                           onSuccess: () => {
+                             setEditingCategory(null);
+                             toast.success("Category updated successfully");
+                           },
+                           onError: () => {
+                             toast.error("Failed to update category");
+                           }
+                         });
+                       }
+                     }}
+                     disabled={!editingCategoryData.name || !editingCategoryData.icon || updateCategory.isPending}
+                   >
+                     Save Changes
+                   </Button>
+                 </DialogFooter>
+               </DialogContent>
+             </Dialog>
+           </div>
+         </TabsContent>
 
         {/* Notifications Tab */}
         <TabsContent value="notifications" className="space-y-6">
+          {isLoadingNotifications ? (
+            <Card>
+              <CardContent className="py-8">
+                <div className="text-center text-muted-foreground">Loading notification settings...</div>
+              </CardContent>
+            </Card>
+          ) : (
           <div className="grid gap-6">
             <Card>
               <CardHeader>
@@ -787,6 +1159,101 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
                     />
                   </div>
                 )}
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Notification Types</CardTitle>
+                <CardDescription>
+                  Choose which types of notifications you want to receive
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-2">
+                      <Bell className="h-4 w-4" />
+                      Service Requests
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Notifications for new service requests
+                    </p>
+                  </div>
+                  <Switch
+                    checked={serviceRequests}
+                    onCheckedChange={setServiceRequests}
+                    disabled={!pushNotifications}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      Emergency Alerts
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Critical emergency notifications (always enabled)
+                    </p>
+                  </div>
+                  <Switch
+                    checked={emergencyAlerts}
+                    onCheckedChange={setEmergencyAlerts}
+                    disabled={true}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-2">
+                      <Info className="h-4 w-4" />
+                      System Messages
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      System updates and maintenance alerts
+                    </p>
+                  </div>
+                  <Switch
+                    checked={systemMessages}
+                    onCheckedChange={setSystemMessages}
+                    disabled={!pushNotifications}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Guest Messages
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Direct messages from guests
+                    </p>
+                  </div>
+                  <Switch
+                    checked={guestMessages}
+                    onCheckedChange={setGuestMessages}
+                    disabled={!pushNotifications}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Crew Messages
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Messages from other crew members
+                    </p>
+                  </div>
+                  <Switch
+                    checked={crewMessages}
+                    onCheckedChange={setCrewMessages}
+                    disabled={!pushNotifications}
+                  />
+                </div>
               </CardContent>
             </Card>
             
@@ -886,12 +1353,13 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
             </Card>
             
             <div className="flex justify-end">
-              <Button onClick={handleSaveNotifications}>
+              <Button onClick={handleSaveNotifications} disabled={isLoadingNotifications}>
                 <Save className="h-4 w-4 mr-2" />
                 Save Notification Settings
               </Button>
             </div>
           </div>
+          )}
         </TabsContent>
 
         {/* Roles & Permissions Tab */}
@@ -1117,40 +1585,75 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Database Connection</span>
                     <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      <span className="text-sm text-success">Connected</span>
+                      {systemStatus?.database?.connected ? (
+                        <>
+                          <CheckCircle className="h-4 w-4 text-success" />
+                          <span className="text-sm text-success">{systemStatus.database.status}</span>
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="h-4 w-4 text-error" />
+                          <span className="text-sm text-error">Disconnected</span>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">WebSocket Server</span>
                     <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      <span className="text-sm text-success">Active</span>
+                      {systemStatus?.webSocket?.active ? (
+                        <>
+                          <CheckCircle className="h-4 w-4 text-success" />
+                          <span className="text-sm text-success">{systemStatus.webSocket.status}</span>
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="h-4 w-4 text-error" />
+                          <span className="text-sm text-error">Inactive</span>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">API Server</span>
                     <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      <span className="text-sm text-success">Running on port {serverPort}</span>
+                      {systemStatus?.apiServer?.running ? (
+                        <>
+                          <CheckCircle className="h-4 w-4 text-success" />
+                          <span className="text-sm text-success">{systemStatus.apiServer.status}</span>
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="h-4 w-4 text-error" />
+                          <span className="text-sm text-error">Stopped</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
-                
+
                 <Separator />
-                
+
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">System Uptime</span>
-                    <span className="text-sm text-muted-foreground">14 days, 3 hours</span>
+                    <span className="text-sm text-muted-foreground">
+                      {systemStatus?.uptime?.formatted || 'Loading...'}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Last Restart</span>
-                    <span className="text-sm text-muted-foreground">Oct 8, 2025 at 02:15 UTC</span>
+                    <span className="text-sm text-muted-foreground">
+                      {systemStatus?.lastRestart
+                        ? new Date(systemStatus.lastRestart).toLocaleString()
+                        : 'Loading...'}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">System Version</span>
-                    <span className="text-sm text-muted-foreground">Obedio v1.0.0</span>
+                    <span className="text-sm text-muted-foreground">
+                      Obedio v{systemStatus?.version || '1.0.0'}
+                    </span>
                   </div>
                 </div>
               </CardContent>
@@ -1293,15 +1796,27 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Total Backup Size</span>
-                    <span className="text-sm text-muted-foreground">2.4 GB</span>
+                    <span className="text-sm text-muted-foreground">
+                      {backupStatus?.totalSize
+                        ? `${(backupStatus.totalSize / (1024 ** 3)).toFixed(2)} GB`
+                        : 'Loading...'}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Number of Backups</span>
-                    <span className="text-sm text-muted-foreground">28 backups stored</span>
+                    <span className="text-sm text-muted-foreground">
+                      {backupStatus?.backupCount !== undefined
+                        ? `${backupStatus.backupCount} backup${backupStatus.backupCount !== 1 ? 's' : ''} stored`
+                        : 'Loading...'}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Available Storage</span>
-                    <span className="text-sm text-muted-foreground">48.6 GB free</span>
+                    <span className="text-sm text-muted-foreground">
+                      {backupStatus?.availableSpace
+                        ? `${(backupStatus.availableSpace / (1024 ** 3)).toFixed(1)} GB free`
+                        : 'Loading...'}
+                    </span>
                   </div>
                 </div>
                 

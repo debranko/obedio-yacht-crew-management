@@ -37,31 +37,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Debug: Log state changes
+  // Handle auth:logout event
   useEffect(() => {
-    console.log('📊 AuthProvider state changed:', { 
-      user: user ? `${user.name} (${user.role})` : 'null', 
-      isLoading,
-      isAuthenticated: !!user
-    });
-  }, [user, isLoading]);
+    const handleAuthLogout = (event: CustomEvent) => {
+      logout();
+    };
+
+    window.addEventListener('auth:logout' as any, handleAuthLogout);
+
+    return () => {
+      window.removeEventListener('auth:logout' as any, handleAuthLogout);
+    };
+  }, []);
 
   // Check for existing session on mount and verify token
   useEffect(() => {
     const checkAuth = async () => {
-      console.log('🔍 Checking for existing session...');
       try {
         const storedUser = localStorage.getItem('obedio-auth-user');
         const storedToken = localStorage.getItem('obedio-auth-token');
 
-        console.log('📦 localStorage check:', {
-          hasUser: !!storedUser,
-          hasToken: !!storedToken
-        });
-
         if (storedUser && storedToken) {
-          console.log('✅ Found stored session, verifying token...');
-          
           // Verify token with backend
           try {
             const response = await fetch(`${API_BASE_URL}/auth/verify`, {
@@ -75,7 +71,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
             if (response.ok) {
               const data = await response.json();
               if (data.success && data.valid && data.user) {
-                console.log('✅ Token valid, updating user data');
                 // Update user data from server (might have changed)
                 const user: User = {
                   id: data.user.id,
@@ -87,9 +82,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                   username: data.user.username,
                 };
                 setUser(user);
-                // Update localStorage with fresh user data
                 localStorage.setItem('obedio-auth-user', JSON.stringify(user));
-                console.log('✅ Session restored and verified successfully!');
               } else {
                 throw new Error('Invalid token');
               }
@@ -97,7 +90,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
               throw new Error('Token verification failed');
             }
           } catch (error) {
-            console.error('❌ Token verification failed:', error);
             // Token is invalid, try to refresh it
             try {
               const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
@@ -112,11 +104,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 const refreshData = await refreshResponse.json();
                 if (refreshData.success && refreshData.data) {
                   const { user: userData, token: newToken } = refreshData.data;
-                  console.log('✅ Token refreshed successfully');
-                  
+
                   // Store new token
                   localStorage.setItem('obedio-auth-token', newToken);
-                  
+
                   // Update user
                   const user: User = {
                     id: userData.id,
@@ -136,25 +127,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 throw new Error('Token refresh failed');
               }
             } catch (refreshError) {
-              console.error('❌ Token refresh failed:', refreshError);
               // Clear invalid session
               localStorage.removeItem('obedio-auth-user');
               localStorage.removeItem('obedio-auth-token');
               setUser(null);
-              console.log('🗑️ Cleared invalid session');
             }
           }
-        } else {
-          console.log('❌ No stored session found');
         }
       } catch (error) {
-        console.error('❌ Auth check failed:', error);
+        console.error('[Auth] Session check failed:', error);
         // Clear invalid session
         localStorage.removeItem('obedio-auth-user');
         localStorage.removeItem('obedio-auth-token');
-        console.log('🗑️ Cleared invalid session');
       } finally {
-        console.log('🏁 Auth check complete, setting isLoading = false');
         setIsLoading(false);
       }
     };
@@ -163,15 +148,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    console.log('🔑 AuthContext.login called');
-    console.log('🔑 Current state before login:', { user, isLoading });
     try {
-      console.log('⏳ Setting isLoading = true');
       setIsLoading(true);
 
-      console.log('📡 Fetching http://localhost:8080/api/auth/login...');
-      
-      // Call backend API for authentication
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
@@ -180,38 +159,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
         body: JSON.stringify({ username: email, password }),
       });
 
-      console.log('📥 Response received:', response.status, response.statusText);
-
       if (!response.ok) {
         let errorMessage = 'Login failed';
         try {
           const error = await response.json();
-          errorMessage = error.message || error.error || errorMessage;
+          if (response.status === 401) {
+            errorMessage = error.message || 'Invalid username or password';
+          } else if (response.status === 404) {
+            errorMessage = 'User not found';
+          } else {
+            errorMessage = error.message || error.error || `Server error: ${response.status}`;
+          }
         } catch {
-          errorMessage = `Server error: ${response.status} ${response.statusText}`;
+          if (response.status === 401) {
+            errorMessage = 'Invalid username or password';
+          } else {
+            errorMessage = `Server error: ${response.status} ${response.statusText}`;
+          }
         }
-        console.error('🔴 Response not OK:', errorMessage);
         throw new Error(errorMessage);
       }
 
       const data = await response.json();
-      console.log('📦 Response data:', data);
 
       if (!data.success) {
-        console.error('🔴 Data.success is false');
         throw new Error(data.message || 'Login failed');
       }
 
       if (!data.data || !data.data.user || !data.data.token) {
-        console.error('🔴 Invalid data structure:', data);
         throw new Error('Invalid login response from server');
       }
 
-      // Extract user and token from response
       const { user: userData, token } = data.data;
-      console.log('👤 User data extracted:', userData);
 
-      // Map backend user data to frontend User type
       const user: User = {
         id: userData.id,
         name: userData.name,
@@ -222,26 +202,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
         username: userData.username,
       };
 
-      console.log('💾 Storing to localStorage...');
       // Store in localStorage
       localStorage.setItem('obedio-auth-user', JSON.stringify(user));
       localStorage.setItem('obedio-auth-token', token);
-      console.log('📦 Stored user:', user);
-      console.log('🔑 Stored token:', token.substring(0, 20) + '...');
 
-      console.log('✅ Setting user state...');
       // Update state
       setUser(user);
-      console.log('👤 User state set:', user);
-      console.log('🎉 Login complete! isAuthenticated should be:', !!user);
     } catch (error) {
-      console.error('Login error:', error);
-      
+      console.error('[Auth] Login failed:', error);
+
       // Re-throw with better message if it's a network error
       if (error instanceof TypeError && error.message.includes('fetch')) {
         throw new Error('Cannot connect to server. Please check if backend is running on http://localhost:8080');
       }
-      
+
       throw error;
     } finally {
       setIsLoading(false);

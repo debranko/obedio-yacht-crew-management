@@ -6,9 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Badge } from "../ui/badge";
 import { useAppData } from "../../contexts/AppDataContext";
 import { useDeviceLogs } from "../../hooks/useDeviceLogs";
-import { useServiceRequestHistory } from "../../hooks/useServiceRequestHistoryApi";
 import { useCrewChangeLogs } from "../../hooks/useCrewChangeLogsApi";
-import { Search, Smartphone, Bell, Users, Circle, User, MapPin, Loader2 } from "lucide-react";
+import { useActivityLogs } from "../../hooks/useActivityLogs";
+import { Search, Smartphone, Bell, Users, Circle, User, MapPin, Loader2, Activity } from "lucide-react";
 
 // Simple date formatting helper
 const formatDateTime = (date: Date) => {
@@ -27,6 +27,7 @@ export function ActivityLogPage() {
   const [itemsPerPage, setItemsPerPage] = useState(50);
   const [deviceLogStatus, setDeviceLogStatus] = useState<string | undefined>();
   const [crewChangeAction, setCrewChangeAction] = useState<string | undefined>();
+  const [activityLogType, setActivityLogType] = useState<string | undefined>();
   
   // Fetch device logs from backend API
   const { data: deviceLogs = [], isLoading: isLoadingDeviceLogs, error: deviceLogsError } = useDeviceLogs({
@@ -35,14 +36,13 @@ export function ActivityLogPage() {
     limit: itemsPerPage,
   });
 
-  // Fetch service request history from backend API
+  // Fetch ALL activity logs (we'll filter for service requests on frontend)
   const {
-    data: serviceRequestHistoryResponse,
-    isLoading: isLoadingServiceRequests,
-    error: serviceRequestsError
-  } = useServiceRequestHistory({
-    search: searchQuery || undefined,
-    limit: itemsPerPage,
+    data: allActivityLogsForFiltering = [],
+    isLoading: isLoadingServiceRequestActivity,
+    error: serviceRequestActivityError
+  } = useActivityLogs({
+    limit: itemsPerPage * 3, // Get more since we're filtering on frontend
     page: 1,
   });
 
@@ -58,7 +58,17 @@ export function ActivityLogPage() {
     page: 1,
   });
 
-  const serviceRequestHistory = serviceRequestHistoryResponse?.data || [];
+  // Fetch comprehensive activity logs from backend API
+  const {
+    data: activityLogs = [],
+    isLoading: isLoadingActivityLogs,
+    error: activityLogsError
+  } = useActivityLogs({
+    type: activityLogType,
+    limit: itemsPerPage,
+    page: 1,
+  });
+
   const crewChangeLogs = crewChangeLogsResponse?.data || [];
 
   // Get unique users for filter
@@ -68,9 +78,9 @@ export function ActivityLogPage() {
       deviceLogs.forEach((log: any) => log.user && users.add(log.user));
     }
     crewChangeLogs.forEach((log: any) => log.performedBy && users.add(log.performedBy));
-    serviceRequestHistory.forEach((log: any) => log.completedBy && users.add(log.completedBy));
+    activityLogs.forEach((log: any) => log.user?.username && users.add(log.user.username));
     return Array.from(users);
-  }, [deviceLogs, crewChangeLogs, serviceRequestHistory]);
+  }, [deviceLogs, crewChangeLogs, activityLogs]);
 
   // Process device logs - already filtered by API
   const filteredDeviceLogs = useMemo(() => {
@@ -83,15 +93,22 @@ export function ActivityLogPage() {
     });
   }, [deviceLogs, filterUser]);
 
-  // Filter service request history by user (search is handled by API)
+  // Filter service request related activity (Button Press, Request Accepted, Request Completed)
   const filteredServiceRequests = useMemo(() => {
-    if (filterUser === "all") return serviceRequestHistory;
-    
-    return serviceRequestHistory.filter((log: any) => {
-      const req = log.originalRequest || log;
-      return req.assignedTo === filterUser || log.completedBy === filterUser;
+    // Filter for service request flow events
+    const serviceRequestEvents = allActivityLogsForFiltering.filter((log: any) => {
+      // Include: Button Press (type=device), Request Accepted, Request Completed (type=service_request)
+      return (log.type === 'device' && log.action === 'Button Press') ||
+             (log.type === 'service_request');
     });
-  }, [serviceRequestHistory, filterUser]);
+
+    // Filter by user if specified
+    if (filterUser === "all") return serviceRequestEvents;
+
+    return serviceRequestEvents.filter((log: any) => {
+      return log.user?.username === filterUser;
+    });
+  }, [allActivityLogsForFiltering, filterUser]);
 
   // Filter crew change logs by user (search is handled by API)
   const filteredCrewChangeLogs = useMemo(() => {
@@ -179,8 +196,13 @@ export function ActivityLogPage() {
       </Card>
 
       {/* Tabs with Logs */}
-      <Tabs defaultValue="devices" className="space-y-4">
+      <Tabs defaultValue="all-activity" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="all-activity" className="gap-2">
+            <Activity className="h-4 w-4" />
+            All Activity
+            <Badge variant="secondary" className="ml-1">{activityLogs.length}</Badge>
+          </TabsTrigger>
           <TabsTrigger value="devices" className="gap-2">
             <Smartphone className="h-4 w-4" />
             Devices
@@ -197,6 +219,90 @@ export function ActivityLogPage() {
             <Badge variant="secondary" className="ml-1">{filteredCrewChangeLogs.length}</Badge>
           </TabsTrigger>
         </TabsList>
+
+        {/* All Activity Logs */}
+        <TabsContent value="all-activity" className="space-y-0">
+          <Card>
+            {/* Type Filter for Activity Logs */}
+            <div className="p-4 border-b border-border">
+              <Select value={activityLogType || "all"} onValueChange={(v: string) => setActivityLogType(v === "all" ? undefined : v)}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="device">Device Events</SelectItem>
+                  <SelectItem value="service_request">Service Requests</SelectItem>
+                  <SelectItem value="crew">Crew Changes</SelectItem>
+                  <SelectItem value="guest">Guest Activity</SelectItem>
+                  <SelectItem value="system">System Events</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="border-b border-border">
+                  <tr className="text-left">
+                    <th className="p-4 font-medium text-muted-foreground">Timestamp</th>
+                    <th className="p-4 font-medium text-muted-foreground">Type</th>
+                    <th className="p-4 font-medium text-muted-foreground">Action</th>
+                    <th className="p-4 font-medium text-muted-foreground">Details</th>
+                    <th className="p-4 font-medium text-muted-foreground">Location</th>
+                    <th className="p-4 font-medium text-muted-foreground">User/Device</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoadingActivityLogs ? (
+                    <tr>
+                      <td colSpan={6} className="p-8">
+                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading activity logs...
+                        </div>
+                      </td>
+                    </tr>
+                  ) : activityLogsError ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-error">
+                        Failed to load activity logs. Please try again.
+                      </td>
+                    </tr>
+                  ) : activityLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                        No activity logs found. Activity will appear here as you use the system.
+                      </td>
+                    </tr>
+                  ) : (
+                    activityLogs.map((log: any) => (
+                      <tr key={log.id} className="border-b border-border hover:bg-accent/50 transition-colors">
+                        <td className="p-4 text-sm">
+                          {formatDateTime(new Date(log.timestamp || log.createdAt))}
+                        </td>
+                        <td className="p-4">
+                          <Badge variant="outline" className="capitalize">
+                            {log.type.replace(/_/g, ' ')}
+                          </Badge>
+                        </td>
+                        <td className="p-4 text-sm font-medium">{log.action}</td>
+                        <td className="p-4 text-sm max-w-md truncate" title={log.details || ''}>
+                          {log.details || '—'}
+                        </td>
+                        <td className="p-4 text-sm text-muted-foreground">
+                          {log.location?.name || '—'}
+                        </td>
+                        <td className="p-4 text-sm text-muted-foreground">
+                          {log.user?.username || log.device?.name || '—'}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </TabsContent>
 
         {/* Device Logs */}
         <TabsContent value="devices" className="space-y-0">
@@ -288,74 +394,61 @@ export function ActivityLogPage() {
               <table className="w-full">
                 <thead className="border-b border-border">
                   <tr className="text-left">
-                    <th className="p-4 font-medium text-muted-foreground">Completed</th>
-                    <th className="p-4 font-medium text-muted-foreground">Guest</th>
+                    <th className="p-4 font-medium text-muted-foreground">Timestamp</th>
+                    <th className="p-4 font-medium text-muted-foreground">Action</th>
+                    <th className="p-4 font-medium text-muted-foreground">Details</th>
                     <th className="p-4 font-medium text-muted-foreground">Location</th>
-                    <th className="p-4 font-medium text-muted-foreground">Request</th>
-                    <th className="p-4 font-medium text-muted-foreground">Priority</th>
-                    <th className="p-4 font-medium text-muted-foreground">Assigned To</th>
-                    <th className="p-4 font-medium text-muted-foreground">Completed By</th>
-                    <th className="p-4 font-medium text-muted-foreground">Duration</th>
+                    <th className="p-4 font-medium text-muted-foreground">Guest</th>
+                    <th className="p-4 font-medium text-muted-foreground">User/Device</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {isLoadingServiceRequests ? (
+                  {isLoadingServiceRequestActivity ? (
                     <tr>
-                      <td colSpan={8} className="p-8">
+                      <td colSpan={6} className="p-8">
                         <div className="flex items-center justify-center gap-2 text-muted-foreground">
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          Loading service request history...
+                          Loading service request activity...
                         </div>
                       </td>
                     </tr>
-                  ) : serviceRequestsError ? (
+                  ) : serviceRequestActivityError ? (
                     <tr>
-                      <td colSpan={8} className="p-8 text-center text-error">
-                        Failed to load service request history. Please try again.
+                      <td colSpan={6} className="p-8 text-center text-error">
+                        Failed to load service request activity. Please try again.
                       </td>
                     </tr>
                   ) : filteredServiceRequests.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="p-8 text-center text-muted-foreground">
-                        No completed service requests found
+                      <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                        No service request activity found
                       </td>
                     </tr>
                   ) : (
-                    filteredServiceRequests.map((log: any) => {
-                      const req = log.originalRequest || log;
-                      return (
-                        <tr key={log.id} className="border-b border-border hover:bg-accent/50 transition-colors">
-                          <td className="p-4 text-sm">
-                            {formatDateTime(new Date(log.completedAt))}
-                          </td>
-                          <td className="p-4">
-                            <div className="flex items-center gap-2">
-                              <User className="h-4 w-4 text-primary" />
-                              <span className="text-sm font-medium">{req.guestName}</span>
-                            </div>
-                          </td>
-                          <td className="p-4">
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-sm text-muted-foreground">{req.guestCabin}</span>
-                            </div>
-                          </td>
-                          <td className="p-4 text-sm max-w-xs truncate" title={req.voiceTranscript || req.notes || 'Service request'}>
-                            {req.voiceTranscript || req.notes || '—'}
-                          </td>
-                          <td className="p-4">
-                            <Badge variant="outline" className={getPriorityColor(req.priority)}>
-                              {req.priority}
-                            </Badge>
-                          </td>
-                          <td className="p-4 text-sm">{req.assignedTo || '—'}</td>
-                          <td className="p-4 text-sm font-medium">{log.completedBy}</td>
-                          <td className="p-4 text-sm">
-                            {formatDuration(log.duration)}
-                          </td>
-                        </tr>
-                      );
-                    })
+                    filteredServiceRequests.map((log: any) => (
+                      <tr key={log.id} className="border-b border-border hover:bg-accent/50 transition-colors">
+                        <td className="p-4 text-sm">
+                          {formatDateTime(new Date(log.timestamp || log.createdAt))}
+                        </td>
+                        <td className="p-4">
+                          <Badge variant="outline" className="capitalize">
+                            {log.action}
+                          </Badge>
+                        </td>
+                        <td className="p-4 text-sm max-w-md truncate" title={log.details || ''}>
+                          {log.details || '—'}
+                        </td>
+                        <td className="p-4 text-sm text-muted-foreground">
+                          {log.location?.name || '—'}
+                        </td>
+                        <td className="p-4 text-sm">
+                          {log.guest ? `${log.guest.firstName} ${log.guest.lastName}` : '—'}
+                        </td>
+                        <td className="p-4 text-sm text-muted-foreground">
+                          {log.user?.username || log.device?.name || '—'}
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
@@ -442,7 +535,11 @@ export function ActivityLogPage() {
 
       {/* Summary Stats */}
       <Card className="p-4">
-        <div className="grid grid-cols-3 gap-4 text-center">
+        <div className="grid grid-cols-4 gap-4 text-center">
+          <div>
+            <p className="text-2xl font-semibold text-primary">{activityLogs.length}</p>
+            <p className="text-sm text-muted-foreground">Total Activity</p>
+          </div>
           <div>
             <p className="text-2xl font-semibold text-primary">{filteredDeviceLogs.length}</p>
             <p className="text-sm text-muted-foreground">Device Events</p>

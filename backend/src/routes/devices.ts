@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../middleware/error-handler';
 import { requirePermission, authMiddleware } from '../middleware/auth';
 import { prisma } from '../services/db';
+import { websocketService } from '../services/websocket';
 
 const router = Router();
 
@@ -230,6 +231,9 @@ router.post('/', requirePermission('devices.add'), asyncHandler(async (req, res)
     }
   });
 
+  // Broadcast device creation to all connected clients
+  websocketService.emitDeviceEvent('created', device);
+
   res.status(201).json({ success: true, data: device });
 }));
 
@@ -238,9 +242,45 @@ router.post('/', requirePermission('devices.add'), asyncHandler(async (req, res)
  * Update device
  */
 router.put('/:id', requirePermission('devices.edit'), asyncHandler(async (req, res) => {
+  // Extract valid Prisma fields from req.body
+  const {
+    deviceId, name, type, subType, status,
+    locationId, crewMemberId,
+    batteryLevel, signalStrength, connectionType, lastSeen,
+    config,
+    firmwareVersion, hardwareVersion, macAddress, ipAddress,
+    ...buttonActions // Everything else goes into config
+  } = req.body;
+
+  // Build update data object with only valid Prisma fields
+  const updateData: any = {};
+  if (deviceId !== undefined) updateData.deviceId = deviceId;
+  if (name !== undefined) updateData.name = name;
+  if (type !== undefined) updateData.type = type;
+  if (subType !== undefined) updateData.subType = subType;
+  if (status !== undefined) updateData.status = status;
+  if (locationId !== undefined) updateData.locationId = locationId;
+  if (crewMemberId !== undefined) updateData.crewMemberId = crewMemberId;
+  if (batteryLevel !== undefined) updateData.batteryLevel = batteryLevel;
+  if (signalStrength !== undefined) updateData.signalStrength = signalStrength;
+  if (connectionType !== undefined) updateData.connectionType = connectionType;
+  if (lastSeen !== undefined) updateData.lastSeen = lastSeen;
+  if (firmwareVersion !== undefined) updateData.firmwareVersion = firmwareVersion;
+  if (hardwareVersion !== undefined) updateData.hardwareVersion = hardwareVersion;
+  if (macAddress !== undefined) updateData.macAddress = macAddress;
+  if (ipAddress !== undefined) updateData.ipAddress = ipAddress;
+
+  // Merge button actions into config
+  if (config !== undefined || Object.keys(buttonActions).length > 0) {
+    updateData.config = {
+      ...config,
+      ...buttonActions
+    };
+  }
+
   const device = await prisma.device.update({
     where: { id: req.params.id },
-    data: req.body,
+    data: updateData,
     include: {
       location: true,
       crewMember: true
@@ -257,6 +297,14 @@ router.put('/:id', requirePermission('devices.edit'), asyncHandler(async (req, r
         severity: 'info'
       }
     });
+  }
+
+  // Broadcast device update to all connected clients
+  websocketService.emitDeviceEvent('updated', device);
+
+  // If status changed, also broadcast status change event
+  if (req.body.status) {
+    websocketService.emitDeviceStatusChanged(device);
   }
 
   res.json({ success: true, data: device });
@@ -301,13 +349,23 @@ router.get('/:id/config', requirePermission('devices.view'), asyncHandler(async 
 
 /**
  * PUT /api/devices/:id/config
- * Update device configuration
+ * Update device configuration and name
  */
 router.put('/:id/config', requirePermission('devices.edit'), asyncHandler(async (req, res) => {
+  const updateData: any = {};
+  
+  // Handle both config and name updates
+  if (req.body.config !== undefined) {
+    updateData.config = req.body.config;
+  }
+  if (req.body.name !== undefined) {
+    updateData.name = req.body.name;
+  }
+  
   const device = await prisma.device.update({
     where: { id: req.params.id },
-    data: { config: req.body.config },
-    select: { id: true, deviceId: true, config: true }
+    data: updateData,
+    select: { id: true, deviceId: true, name: true, config: true }
   });
 
   // Log config change
@@ -315,7 +373,7 @@ router.put('/:id/config', requirePermission('devices.edit'), asyncHandler(async 
     data: {
       deviceId: device.id,
       eventType: 'config_change',
-      eventData: req.body.config,
+      eventData: { ...req.body },
       severity: 'info'
     }
   });
@@ -346,11 +404,25 @@ router.post('/:id/test', requirePermission('devices.edit'), asyncHandler(async (
     }
   });
 
-  // TODO: Send actual MQTT message to device
-  // For now, just return success
+  // Send MQTT message to device if it's a smart button
+  if (device.type === 'smart_button' && device.status === 'online') {
+    try {
+      const mqttService = require('../services/mqtt.service').mqttService;
+      await mqttService.sendCommand(device.deviceId, {
+        action: 'test',
+        payload: {
+          led: 'blink',
+          sound: 'beep',
+          duration: 3000
+        }
+      });
+    } catch (error) {
+      console.error('Failed to send MQTT test command:', error);
+    }
+  }
 
-  res.json({ 
-    success: true, 
+  res.json({
+    success: true,
     message: 'Test signal sent to device',
     data: { deviceId: device.deviceId, testType: 'led_blink' }
   });

@@ -7,6 +7,7 @@ import { useState, useRef } from "react";
 import { useLocations } from "../../hooks/useLocations";
 import { useGuests } from "../../hooks/useGuests";
 import { useGuestMutations } from "../../hooks/useGuestMutations";
+import { useDevices, useDeviceMutations } from "../../hooks/useDevices";
 import { useDND } from "../../hooks/useDND";
 import { useAppData } from "../../contexts/AppDataContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -32,9 +33,13 @@ export function LocationsPage() {
   // Use React Query for guests (real-time updates from database)
   const { data: guestsData } = useGuests({ page: 1, limit: 1000 });
   const guests = (guestsData as any)?.items || [];
-  
+
   // Use React Query mutations for database updates
   const { updateGuest: updateGuestMutation } = useGuestMutations();
+
+  // Fetch smart buttons from Device Manager
+  const { data: smartButtons = [], isLoading: isLoadingButtons } = useDevices({ type: 'smart_button' });
+  const { updateDevice: updateDeviceMutation } = useDeviceMutations();
   
   const { addActivityLog, getGuestByLocationId } = useAppData();
   const { user } = useAuth();
@@ -115,23 +120,17 @@ export function LocationsPage() {
     "Lower Deck"
   ];
 
-  // Mock smart buttons - will be replaced with real data from Device Manager
-  const mockSmartButtons = [
-    { id: "btn-001", name: "Owner's Stateroom Button", location: "Owner's Stateroom" },
-    { id: "btn-002", name: "VIP Cabin Button", location: "VIP Cabin" },
-    { id: "btn-003", name: "Main Salon Button", location: "Main Salon" },
-    { id: "btn-004", name: "Sun Deck Lounge Button", location: "Sun Deck Lounge" },
-    { id: "btn-005", name: "Gym Button", location: "Gym" },
-    { id: "btn-006", name: "Dining Room Button", location: "Dining Room" },
-    { id: "btn-007", name: "Music Salon Button", location: "Music Salon" },
-    { id: "btn-008", name: "VIP Office Button", location: "VIP Office" },
-    { id: "btn-009", name: "Conference Room Button", location: "Conference Room" },
-    { id: "btn-010", name: "Welcome Salon Button", location: "Welcome Salon" },
-    { id: "btn-011", name: "External Salon Button", location: "External Salon" },
-    { id: "btn-012", name: "Cabin 6 Button", location: "Cabin 6" },
-    { id: "unassigned-1", name: "Unassigned Button #1", location: null },
-    { id: "unassigned-2", name: "Unassigned Button #2", location: null },
-  ];
+  // Map smart buttons to format expected by UI
+  const smartButtonOptions = smartButtons.map(device => ({
+    id: device.id, // Use UUID as ID for location.smartButtonId
+    deviceId: device.deviceId, // ESP32 hardware ID (e.g., "T3S3-000000000000")
+    name: device.name,
+    location: device.location?.name || null, // Current location name
+    locationId: device.locationId || null, // Current location ID
+    status: device.status,
+    batteryLevel: device.batteryLevel,
+    firmwareVersion: device.firmwareVersion
+  }));
 
   const handleEdit = (location: Location) => {
     setSelectedLocation(location);
@@ -159,14 +158,39 @@ export function LocationsPage() {
     }
 
     // Find selected button name
-    const selectedButton = mockSmartButtons.find(b => b.id === formData.smartButtonId);
+    const selectedButton = smartButtonOptions.find(b => b.id === formData.smartButtonId);
 
     // Find guest currently assigned to this location
     const currentGuest = getGuestByLocationId(selectedLocation.id);
     const previousGuestId = currentGuest?.id;
     const newGuestId = formData.assignedGuestId;
 
+    // Find smart button assignment changes
+    const previousButtonId = selectedLocation.smartButtonId;
+    const newButtonId = formData.smartButtonId || undefined;
+
     try {
+      // Handle smart button assignment changes
+      if (previousButtonId !== newButtonId) {
+        // Remove previous button from this location
+        if (previousButtonId) {
+          const previousButton = smartButtonOptions.find(b => b.id === previousButtonId);
+          if (previousButton) {
+            await updateDeviceMutation({ id: previousButtonId, data: { locationId: null } });
+            toast.success(`${previousButton.name} unassigned from ${selectedLocation.name}`);
+          }
+        }
+
+        // Assign new button to this location
+        if (newButtonId) {
+          const newButton = smartButtonOptions.find(b => b.id === newButtonId);
+          if (newButton) {
+            await updateDeviceMutation({ id: newButtonId, data: { locationId: selectedLocation.id } });
+            toast.success(`${newButton.name} assigned to ${selectedLocation.name}`);
+          }
+        }
+      }
+
       // Handle guest assignment changes
       if (previousGuestId !== newGuestId) {
         // Remove previous guest from this location
@@ -592,15 +616,18 @@ export function LocationsPage() {
                     })()}
 
                     {/* Smart Button Assignment */}
-                    {location.smartButtonId && (
-                      <div className="bg-primary/5 rounded-md p-2">
-                        <div className="flex items-center gap-1.5 text-xs">
-                          <Smartphone className="h-3.5 w-3.5 text-primary" />
-                          <span className="text-muted-foreground">Smart Button:</span>
-                          <span className="font-medium text-foreground">{location.smartButtonId}</span>
+                    {location.smartButtonId && (() => {
+                      const button = smartButtonOptions.find(b => b.id === location.smartButtonId);
+                      return button ? (
+                        <div className="bg-primary/5 rounded-md p-2">
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <Smartphone className="h-3.5 w-3.5 text-primary" />
+                            <span className="text-muted-foreground">Smart Button:</span>
+                            <span className="font-medium text-foreground">{button.name}</span>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      ) : null;
+                    })()}
 
                     {/* Actions */}
                     <div className="flex gap-2">
@@ -722,7 +749,7 @@ export function LocationsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No button assigned</SelectItem>
-                  {mockSmartButtons.map((button) => (
+                  {smartButtonOptions.map((button) => (
                     <SelectItem key={button.id} value={button.id}>
                       <div className="flex items-center gap-2">
                         <Smartphone className="h-3 w-3" />
@@ -948,7 +975,7 @@ export function LocationsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No button assigned</SelectItem>
-                    {mockSmartButtons.map((button) => (
+                    {smartButtonOptions.map((button) => (
                       <SelectItem key={button.id} value={button.id}>
                         <div className="flex items-center gap-2">
                           <Smartphone className="h-3 w-3" />
@@ -964,7 +991,7 @@ export function LocationsPage() {
                 {formData.smartButtonId && formData.smartButtonId !== "none" && (
                   <p className="text-xs text-success mt-2 flex items-center gap-1">
                     <Smartphone className="h-3 w-3" />
-                    {mockSmartButtons.find(b => b.id === formData.smartButtonId)?.name} assigned
+                    {smartButtonOptions.find(b => b.id === formData.smartButtonId)?.name} assigned
                   </p>
                 )}
                 {(!formData.smartButtonId || formData.smartButtonId === "none") && (

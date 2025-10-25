@@ -1,174 +1,101 @@
-/**
- * Error Handler Middleware
- * Centralized error handling for Express application
+﻿/**
+ * Error Handling Middleware
+ * Standardizes error responses and handles async route errors
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { Logger } from '../utils/logger';
+import { ZodError } from 'zod';
 
-const logger = new Logger();
-
-export interface ApiError extends Error {
-  statusCode?: number;
-  code?: string;
-  details?: any;
-}
+/**
+ * Async handler wrapper - catches errors from async route handlers
+ */
+export const asyncHandler = (fn: Function) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+};
 
 /**
  * Global error handler middleware
  */
-export function errorHandler(
-  error: ApiError,
+export const errorHandler = (
+  err: any,
   req: Request,
   res: Response,
   next: NextFunction
-) {
-  // Default error response
-  let statusCode = error.statusCode || 500;
-  let message = error.message || 'Internal server error';
-  let code = error.code || 'INTERNAL_ERROR';
-
-  // Handle specific error types
-  if (error.name === 'ValidationError') {
-    statusCode = 400;
-    code = 'VALIDATION_ERROR';
-    message = 'Validation failed';
-  }
-
-  if (error.name === 'UnauthorizedError') {
-    statusCode = 401;
-    code = 'UNAUTHORIZED';
-    message = 'Authentication required';
-  }
-
-  if (error.name === 'ForbiddenError') {
-    statusCode = 403;
-    code = 'FORBIDDEN';
-    message = 'Insufficient permissions';
-  }
-
-  // Prisma specific errors
-  if (error.name === 'PrismaClientKnownRequestError') {
-    statusCode = 400;
-    code = 'DATABASE_ERROR';
-    
-    // Handle specific Prisma error codes
-    const prismaError = error as any;
-    switch (prismaError.code) {
-      case 'P2002':
-        message = 'Unique constraint violation';
-        break;
-      case 'P2025':
-        message = 'Record not found';
-        statusCode = 404;
-        break;
-      case 'P2003':
-        message = 'Foreign key constraint violation';
-        break;
-      default:
-        message = 'Database operation failed';
-    }
-  }
-
-  // Log error
-  const errorInfo = {
+) => {
+  console.error('[Error]', {
+    message: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+    path: req.path,
     method: req.method,
-    url: req.url,
-    statusCode,
-    code,
-    userAgent: req.get('User-Agent'),
-    ip: req.ip,
-    userId: req.user?.id,
-    username: req.user?.username
-  };
-
-  if (statusCode >= 500) {
-    logger.error('Server Error', error, errorInfo);
-  } else {
-    logger.warn('Client Error', errorInfo);
-  }
-
-  // Send error response
-  const errorResponse: any = {
-    error: message,
-    code,
-    timestamp: new Date().toISOString()
-  };
-
-  // Include error details in development
-  if (process.env.NODE_ENV === 'development') {
-    errorResponse.details = error.details;
-    errorResponse.stack = error.stack;
-  }
-
-  res.status(statusCode).json(errorResponse);
-}
-
-/**
- * 404 handler for unmatched routes
- */
-export function notFoundHandler(req: Request, res: Response) {
-  const message = `Route ${req.method} ${req.path} not found`;
-  
-  logger.warn('Route Not Found', {
-    method: req.method,
-    url: req.url,
-    ip: req.ip,
-    userAgent: req.get('User-Agent')
   });
 
-  res.status(404).json({
+  // Zod validation errors
+  if (err instanceof ZodError) {
+    return res.status(400).json({
+      success: false,
+      error: 'Validation failed',
+      details: err.errors.map(e => ({
+        field: e.path.join('.'),
+        message: e.message,
+      })),
+    });
+  }
+
+  // Custom validation errors
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({
+      success: false,
+      error: err.message,
+      details: err.errors,
+    });
+  }
+
+  // Prisma errors
+  if (err.code === 'P2002') {
+    return res.status(409).json({
+      success: false,
+      error: 'Record already exists',
+    });
+  }
+
+  if (err.code === 'P2025') {
+    return res.status(404).json({
+      success: false,
+      error: 'Record not found',
+    });
+  }
+
+  // JWT errors
+  if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid or expired token',
+    });
+  }
+
+  // Default error
+  const statusCode = err.statusCode || 500;
+  const message = err.message || 'Internal server error';
+
+  res.status(statusCode).json({
+    success: false,
     error: message,
-    code: 'NOT_FOUND',
-    timestamp: new Date().toISOString()
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
-}
+};
 
 /**
- * Async error wrapper
- * Wraps async route handlers to catch errors automatically
+ * Validation middleware factory
  */
-export function asyncHandler(fn: Function) {
+export const validate = (schema: any) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
+    try {
+      req.body = schema.parse(req.body);
+      next();
+    } catch (error) {
+      next(error);
+    }
   };
-}
-
-/**
- * Create custom API error
- */
-export function createApiError(message: string, statusCode: number = 500, code?: string, details?: any): ApiError {
-  const error = new Error(message) as ApiError;
-  error.statusCode = statusCode;
-  error.code = code;
-  error.details = details;
-  return error;
-}
-
-/**
- * Validation error helper
- */
-export function createValidationError(message: string, details?: any): ApiError {
-  return createApiError(message, 400, 'VALIDATION_ERROR', details);
-}
-
-/**
- * Not found error helper
- */
-export function createNotFoundError(resource: string = 'Resource'): ApiError {
-  return createApiError(`${resource} not found`, 404, 'NOT_FOUND');
-}
-
-/**
- * Unauthorized error helper
- */
-export function createUnauthorizedError(message: string = 'Authentication required'): ApiError {
-  return createApiError(message, 401, 'UNAUTHORIZED');
-}
-
-/**
- * Forbidden error helper
- */
-export function createForbiddenError(message: string = 'Insufficient permissions'): ApiError {
-  return createApiError(message, 403, 'FORBIDDEN');
-}
+};

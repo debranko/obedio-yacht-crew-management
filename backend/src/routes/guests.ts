@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { prisma } from '../services/db';
 import type { Prisma } from '@prisma/client';
+import { asyncHandler, validate } from '../middleware/error-handler';
+import { CreateGuestSchema, UpdateGuestSchema } from '../validators/schemas';
 
 const router = Router();
 
 // GET /api/guests - List guests with filtering, sorting, and pagination
-router.get('/', async (req, res) => {
-  try {
+router.get('/', asyncHandler(async (req, res) => {
     // Parse query parameters
     const {
       q = '',
@@ -142,11 +143,7 @@ router.get('/', async (req, res) => {
         totalPages: Math.ceil(total / limitNum)
       }
     });
-  } catch (error) {
-    console.error('Fetch guests error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch guests' });
-  }
-});
+}));
 
 // GET /api/guests/stats - Get guest statistics
 router.get('/stats', async (req, res) => {
@@ -226,52 +223,13 @@ router.get('/meta', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
-  try {
-    const body = req.body ?? {};
-    const { 
-      firstName, 
-      lastName, 
-      preferredName, 
-      photo,
-      type, 
-      status, 
-      nationality, 
-      languages,
-      passportNumber
-    } = body;
-    
-    if (!firstName || !lastName) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'First name and last name are required' 
-      });
-    }
+router.post('/', validate(CreateGuestSchema), asyncHandler(async (req, res) => {
+  const item = await prisma.guest.create({
+    data: req.body
+  });
 
-    // Create with only fields that exist in Prisma schema
-    const item = await prisma.guest.create({ 
-      data: { 
-        firstName, 
-        lastName, 
-        preferredName: preferredName || null,
-        photo: photo || null,
-        type: type ?? 'guest',
-        status: status ?? 'expected',
-        nationality: nationality || null,
-        languages: Array.isArray(languages) ? languages : [],
-        passportNumber: passportNumber || null
-      } 
-    });
-    
-    res.json({ success: true, data: item });
-  } catch (error: any) {
-    console.error('Create guest error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message || 'Failed to create guest' 
-    });
-  }
-});
+  res.json({ success: true, data: item });
+}));
 
 router.get('/:id', async (req, res) => {
   try {
@@ -293,102 +251,25 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const body = req.body ?? {};
-    const {
-      // Basic Info
-      firstName,
-      lastName,
-      preferredName,
-      photo,
-      type,
-      status,
-      nationality,
-      languages,
-      passportNumber,
-      
-      // Accommodation
-      locationId,
-      checkInDate,
-      checkOutDate,
-      
-      // Dietary & Medical
-      allergies,
-      dietaryRestrictions,
-      medicalConditions,
-      
-      // Preferences & Notes
-      preferences,
-      notes,
-      
-      // Emergency Contact
-      emergencyContactName,
-      emergencyContactPhone,
-      emergencyContactRelation
-    } = body;
-    
-    // Update with only fields that exist in Prisma schema
-    const updateData: any = {};
-    
-    // Basic Info
-    if (firstName !== undefined) updateData.firstName = firstName;
-    if (lastName !== undefined) updateData.lastName = lastName;
-    if (preferredName !== undefined) updateData.preferredName = preferredName || null;
-    if (photo !== undefined) updateData.photo = photo || null;
-    if (type !== undefined) updateData.type = type;
-    if (status !== undefined) updateData.status = status;
-    if (nationality !== undefined) updateData.nationality = nationality || null;
-    if (languages !== undefined) updateData.languages = Array.isArray(languages) ? languages : [];
-    if (passportNumber !== undefined) updateData.passportNumber = passportNumber || null;
-    
-    // Accommodation
-    if (locationId !== undefined) updateData.locationId = locationId || null;
-    if (checkInDate !== undefined) updateData.checkInDate = checkInDate ? new Date(checkInDate) : null;
-    if (checkOutDate !== undefined) updateData.checkOutDate = checkOutDate ? new Date(checkOutDate) : null;
-    
-    // Dietary & Medical
-    if (allergies !== undefined) updateData.allergies = Array.isArray(allergies) ? allergies : [];
-    if (dietaryRestrictions !== undefined) updateData.dietaryRestrictions = Array.isArray(dietaryRestrictions) ? dietaryRestrictions : [];
-    if (medicalConditions !== undefined) updateData.medicalConditions = Array.isArray(medicalConditions) ? medicalConditions : [];
-    
-    // Preferences & Notes
-    if (preferences !== undefined) updateData.preferences = preferences || null;
-    if (notes !== undefined) updateData.notes = notes || null;
-    
-    // Emergency Contact
-    if (emergencyContactName !== undefined) updateData.emergencyContactName = emergencyContactName || null;
-    if (emergencyContactPhone !== undefined) updateData.emergencyContactPhone = emergencyContactPhone || null;
-    if (emergencyContactRelation !== undefined) updateData.emergencyContactRelation = emergencyContactRelation || null;
-    
-    const data = await prisma.guest.update({
-      where: { id },
-      data: updateData
-    });
-    
-    res.json({ success: true, data });
-  } catch (error: any) {
-    console.error('Update guest error:', error);
-    res.json({ 
-      success: false, 
-      error: error.message || 'Failed to update guest' 
-    });
-  }
-});
+router.put('/:id', validate(UpdateGuestSchema), asyncHandler(async (req, res) => {
+  const { id } = req.params;
 
-router.delete('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    await prisma.guest.delete({
-      where: { id }
-    });
-    
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Failed to delete guest' });
-  }
-});
+  const data = await prisma.guest.update({
+    where: { id },
+    data: req.body
+  });
+
+  res.json({ success: true, data });
+}));
+
+router.delete('/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  await prisma.guest.delete({
+    where: { id }
+  });
+
+  res.json({ success: true });
+}));
 
 export default router;

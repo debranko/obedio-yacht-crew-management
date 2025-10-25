@@ -147,6 +147,41 @@ export class WebSocketService {
   }
 
   /**
+   * Emit device status changed
+   */
+  emitDeviceStatusChanged(device: any): void {
+    this.broadcast('device:status-changed', device);
+  }
+
+  /**
+   * Emit device event (created, updated, deleted)
+   */
+  emitDeviceEvent(event: 'created' | 'updated' | 'deleted', device: any): void {
+    this.broadcast(`device:${event}`, device);
+  }
+
+  /**
+   * Emit location DND toggle
+   */
+  emitLocationDndToggled(location: any): void {
+    this.broadcast('location:dnd-toggled', location);
+  }
+
+  /**
+   * Emit location event (created, updated, deleted)
+   */
+  emitLocationEvent(event: 'created' | 'updated' | 'deleted', location: any): void {
+    this.broadcast(`location:${event}`, location);
+  }
+
+  /**
+   * Emit duty roster assignment changed
+   */
+  emitAssignmentChanged(event: 'created' | 'updated' | 'deleted', assignment: any): void {
+    this.broadcast(`assignment:${event}`, assignment);
+  }
+
+  /**
    * Get number of connected clients
    */
   getConnectedClientsCount(): number {
@@ -158,6 +193,13 @@ export class WebSocketService {
    */
   getConnectedClients(): any[] {
     return Array.from(this.connectedClients.values()).map(({ userId }) => ({ userId }));
+  }
+
+  /**
+   * Get Socket.IO server instance
+   */
+  getIO(): SocketIOServer | null {
+    return this.io;
   }
 }
 

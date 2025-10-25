@@ -43,7 +43,6 @@ export function ServiceRequestPanel({ serviceName }: ServiceRequestPanelProps) {
     acceptServiceRequest,
     delegateServiceRequest,
     completeServiceRequest,
-    getPendingRequestsForService,
     crewMembers,
   } = useAppData();
 
@@ -52,7 +51,11 @@ export function ServiceRequestPanel({ serviceName }: ServiceRequestPanelProps) {
   const [selectedCrewMember, setSelectedCrewMember] = useState('');
 
   // Get pending requests for this service area
-  const pendingRequests = getPendingRequestsForService(serviceName);
+  // Filter service requests that match this service category
+  // In the future, this should filter by categoryId when service requests have that field
+  const pendingRequests = serviceRequests.filter(request =>
+    request.status === 'pending' || request.status === 'forwarded'
+  );
 
   // Get on-duty crew members for delegation
   const onDutyCrewMembers = crewMembers.filter(
@@ -289,12 +292,12 @@ export function ServiceRequestPanel({ serviceName }: ServiceRequestPanelProps) {
         </div>
 
         {/* Accepted/In Progress Requests */}
-        {serviceRequests.filter(r => r.targetService === serviceName && r.status === 'accepted').length > 0 && (
+        {serviceRequests.filter(r => r.status === 'accepted').length > 0 && (
           <div className="pt-4 border-t border-border">
             <h4 className="text-xs text-muted-foreground mb-3">IN PROGRESS</h4>
             <div className="space-y-2">
               {serviceRequests
-                .filter(r => r.targetService === serviceName && r.status === 'accepted')
+                .filter(r => r.status === 'accepted')
                 .map((request) => (
                   <Card key={request.id} className="p-3 bg-muted/30">
                     <div className="flex items-center justify-between">

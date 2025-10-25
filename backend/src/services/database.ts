@@ -429,9 +429,9 @@ export class DatabaseService {
         include: {
           guest: true,
           location: true,
-          assignedTo: true
+          category: true
         },
-        orderBy: { timestamp: 'desc' },
+        orderBy: { createdAt: 'desc' },
         skip,
         take: limit
       }),
@@ -459,11 +459,37 @@ export class DatabaseService {
   }
 
   async acceptServiceRequest(requestId: string, crewMemberId: string) {
+    // First get the crew member to get their name
+    const crewMember = await this.prisma.crewMember.findUnique({
+      where: { id: crewMemberId }
+    });
+
+    if (!crewMember) {
+      throw new Error('Crew member not found');
+    }
+
+    // Get the service request to populate guest info
+    const request = await this.prisma.serviceRequest.findUnique({
+      where: { id: requestId },
+      include: {
+        guest: true,
+        location: true
+      }
+    });
+
+    if (!request) {
+      throw new Error('Service request not found');
+    }
+
     return this.prisma.serviceRequest.update({
       where: { id: requestId },
       data: {
-        status: 'in-progress',
-        assignedTo: crewMemberId  // assignedTo is a String field, not a relation
+        status: 'IN_PROGRESS',
+        assignedTo: crewMember.name,  // Store crew member name as string
+        assignedToId: crewMemberId,   // Store crew member ID
+        acceptedAt: new Date(),
+        guestName: request.guest ? `${request.guest.firstName} ${request.guest.lastName}` : null,
+        guestCabin: request.location?.name || null
       },
       include: {
         guest: true,
@@ -483,19 +509,22 @@ export class DatabaseService {
       include: {
         guest: true,
         location: true,
-        assignedTo: true
+        category: true
       }
     });
 
     // Create history record
     if (request.acceptedAt) {
-      const responseTime = Math.floor((request.acceptedAt.getTime() - request.timestamp.getTime()) / 1000);
+      const responseTime = Math.floor((request.acceptedAt.getTime() - request.createdAt.getTime()) / 1000);
       const completionTime = Math.floor((request.completedAt!.getTime() - request.acceptedAt.getTime()) / 1000);
 
       await this.prisma.serviceRequestHistory.create({
         data: {
           originalRequestId: request.id,
-          completedBy: request.assignedTo?.name || 'Unknown',
+          action: 'completed',
+          previousStatus: 'IN_PROGRESS',
+          newStatus: 'COMPLETED',
+          completedBy: request.assignedTo || 'Unknown',
           completedAt: request.completedAt!,
           responseTime,
           completionTime,
@@ -503,6 +532,26 @@ export class DatabaseService {
           location: request.guestCabin,
           requestType: request.requestType,
           priority: request.priority
+        }
+      });
+
+      // Log to activity log
+      await this.prisma.activityLog.create({
+        data: {
+          type: 'service_request',
+          action: 'Request Completed',
+          details: `${request.assignedTo || 'Crew'} completed service request from ${request.guest ? request.guest.firstName + ' ' + request.guest.lastName : request.guestName || 'Guest'} at ${request.location?.name || request.guestCabin || 'Unknown'}`,
+          userId: request.assignedToId,
+          locationId: request.locationId,
+          guestId: request.guestId,
+          metadata: JSON.stringify({
+            requestId: request.id,
+            requestType: request.requestType,
+            priority: request.priority,
+            responseTimeSec: responseTime,
+            completionTimeSec: completionTime,
+            totalTimeSec: responseTime + completionTime
+          })
         }
       });
     }
@@ -518,17 +567,17 @@ export class DatabaseService {
     isLongPress?: boolean;
     voiceDuration?: number;
   }) {
-    // Find smart button and its location
-    const smartButton = await this.prisma.smartButton.findUnique({
+    // Find device and its location
+    const device = await this.prisma.device.findUnique({
       where: { deviceId: data.deviceId }
     });
 
-    if (!smartButton) {
-      throw new Error('Smart button not found');
+    if (!device || device.type !== 'smart_button') {
+      throw new Error('Smart button device not found');
     }
 
     const location = await this.prisma.location.findFirst({
-      where: { smartButtonId: smartButton.deviceId },
+      where: { smartButtonId: device.deviceId },
       include: { guests: { where: { status: 'ONBOARD' } } }
     });
 
@@ -538,7 +587,9 @@ export class DatabaseService {
 
     const result: any = {};
 
-    // Handle different button functions
+    // Handle different button functions based on device config
+    const config = device.config as any || {};
+    
     switch (data.buttonType) {
       case 'main':
         // Main button - create service request
@@ -553,7 +604,7 @@ export class DatabaseService {
             guestId: guest?.id,
             requestType: 'CALL',
             priority: 'NORMAL',
-            voiceTranscript: data.isLongPress 
+            voiceTranscript: data.isLongPress
               ? `Voice message (${data.voiceDuration?.toFixed(1)}s): Service request`
               : undefined,
             notes: `Smart button press - ${data.isLongPress ? 'Long press (voice)' : 'Quick tap'}`
@@ -569,7 +620,7 @@ export class DatabaseService {
 
       case 'aux1':
         // DND Toggle (based on button configuration)
-        if (smartButton.auxButton1Function === 'dnd_toggle') {
+        if (config.auxButton1Function === 'dnd_toggle') {
           const newDNDState = !location.doNotDisturb;
           result.dndToggle = await this.toggleDND(location.id, newDNDState, location.guests[0]?.id);
         }
@@ -578,9 +629,9 @@ export class DatabaseService {
       default:
         // Other aux buttons - create specific service requests
         const functionMap: Record<string, string> = {
-          aux2: smartButton.auxButton2Function,
-          aux3: smartButton.auxButton3Function,
-          aux4: smartButton.auxButton4Function
+          aux2: config.auxButton2Function,
+          aux3: config.auxButton3Function,
+          aux4: config.auxButton4Function
         };
 
         const requestFunction = functionMap[data.buttonType];
@@ -591,9 +642,9 @@ export class DatabaseService {
         break;
     }
 
-    // Update smart button last seen
-    await this.prisma.smartButton.update({
-      where: { id: smartButton.id },
+    // Update device last seen
+    await this.prisma.device.update({
+      where: { id: device.id },
       data: { lastSeen: new Date() }
     });
 
@@ -610,15 +661,15 @@ export class DatabaseService {
     limit?: number;
   }) {
     const where: any = {};
-    
+
     if (filters?.type) {
-      where.type = filters.type.toUpperCase();
+      where.type = filters.type; // Keep lowercase - logs are stored in lowercase
     }
-    
+
     if (filters?.userId) {
       where.userId = filters.userId;
     }
-    
+
     if (filters?.locationId) {
       where.locationId = filters.locationId;
     }
@@ -674,8 +725,7 @@ export class DatabaseService {
         location: true,
         assignments: {
           include: {
-            crewMember: true,
-            user: true
+            crewMember: true
           }
         }
       },
@@ -715,7 +765,7 @@ export class DatabaseService {
         serviceRequests: {
           where: { status: 'PENDING' },
           take: 10,
-          orderBy: { timestamp: 'desc' }
+          orderBy: { createdAt: 'desc' }
         }
       }
     });

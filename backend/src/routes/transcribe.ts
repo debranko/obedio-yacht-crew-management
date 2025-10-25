@@ -76,11 +76,11 @@ router.post('/', upload.single('audio'), async (req, res) => {
     // Create a readable stream from the uploaded file
     const audioFile = fs.createReadStream(req.file.path);
 
-    // Call OpenAI Whisper API
-    const transcription = await openai.audio.transcriptions.create({
+    // Call OpenAI Whisper API - Using TRANSLATIONS endpoint
+    // This will auto-detect any language and translate to English
+    const transcription = await openai.audio.translations.create({
       file: audioFile,
       model: 'whisper-1',
-      language: 'en', // You can change this or make it dynamic
       response_format: 'json'
     });
 

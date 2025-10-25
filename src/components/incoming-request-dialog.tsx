@@ -29,6 +29,7 @@ import {
 import { motion } from "motion/react";
 import { ServiceRequest, InteriorTeam } from "../contexts/AppDataContext";
 import { useAppData } from "../contexts/AppDataContext";
+import { useWebSocket } from "../hooks/useWebSocket";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "./ui/dialog";
 import { toast } from "sonner";
@@ -502,6 +503,33 @@ export function useIncomingRequests() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [lastClosedTime, setLastClosedTime] = useState<number>(0);
   const [initializationTime, setInitializationTime] = useState<number>(0);
+
+  // Import WebSocket hook
+  const { on, off } = useWebSocket();
+
+  // Listen for service request updates via WebSocket
+  useEffect(() => {
+    if (!on || !off) return;
+
+    const handleRequestUpdate = (updatedRequest: any) => {
+      console.log('📞 Dialog: Service request updated via WebSocket:', updatedRequest);
+
+      // If the currently displayed request was updated to non-pending status, close the dialog
+      if (currentRequest && updatedRequest.id === currentRequest.id) {
+        if (updatedRequest.status !== 'pending') {
+          console.log('✅ Request accepted/updated - closing dialog');
+          setShowDialog(false);
+          setLastClosedTime(Date.now());
+        }
+      }
+    };
+
+    const unsubscribe = on('service-request:updated', handleRequestUpdate);
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [on, off, currentRequest]);
 
   // Mark as initialized after 2 seconds to ignore initial mock data
   useEffect(() => {

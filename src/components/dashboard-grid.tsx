@@ -28,6 +28,7 @@ import { ClockWidget } from "./clock-widget";
 import { ClockWidget2 } from "./clock-widget-2";
 import { WeatherWindyWidget } from "./weather-windy-widget";
 import { DutyTimerCard } from "./duty-timer-card";
+import { ButtonSimulatorWidget } from "./button-simulator-widget";
 import { useAppData } from "../contexts/AppDataContext";
 import { useDND } from "../hooks/useDND";
 import { Activity, Clock, BatteryLow, Users, BellOff, GripVertical, Bell, Save } from "lucide-react";
@@ -46,19 +47,21 @@ interface WidgetLayout {
 }
 
 const defaultLayout: WidgetLayout[] = [
-  // Priority widgets - Always on top
-  { i: "serving-now", x: 0, y: 0, w: 4, h: 4, minW: 2, minH: 3 },
-  { i: "dnd-auto", x: 4, y: 0, w: 4, h: 3, minW: 3, minH: 3 },
-  // Main widgets - Second row
-  { i: "guest-status", x: 0, y: 4, w: 3, h: 3, minW: 2, minH: 2 },
-  { i: "duty-timer", x: 3, y: 4, w: 5, h: 3, minW: 4, minH: 3 },
-  // Utility widgets
-  { i: "clock", x: 0, y: 7, w: 2, h: 2, minW: 2, minH: 2 },
-  { i: "clock2", x: 5, y: 7, w: 2, h: 2, minW: 2, minH: 2 },
-  { i: "weather", x: 2, y: 7, w: 3, h: 3, minW: 2, minH: 3 },
-  // Optional widgets (if enabled via Manage Widgets)
-  { i: "weather-windy", x: 0, y: 10, w: 4, h: 5, minW: 3, minH: 4 },
-  { i: "windy", x: 4, y: 10, w: 4, h: 4, minW: 3, minH: 3 },
+  // Top row - Service and Duty Timer
+  { i: "serving-now", x: 0, y: 0, w: 4, h: 3, minW: 2, minH: 3 },
+  { i: "duty-timer", x: 4, y: 0, w: 4, h: 3, minW: 3, minH: 3 },
+
+  // Second row - DND, Guests, and Button Simulator
+  { i: "dnd-auto", x: 0, y: 3, w: 3, h: 3, minW: 3, minH: 3 },
+  { i: "guest-status", x: 3, y: 3, w: 2, h: 3, minW: 2, minH: 2 },
+  { i: "button-simulator", x: 5, y: 3, w: 3, h: 4, minW: 3, minH: 4 },
+
+  // Third row - Clock and Weather
+  { i: "clock", x: 0, y: 6, w: 2, h: 2, minW: 2, minH: 2 },
+  { i: "weather", x: 2, y: 6, w: 6, h: 3, minW: 2, minH: 3 },
+
+  // Bottom row - Wind & Weather map
+  { i: "weather-windy", x: 0, y: 9, w: 8, h: 5, minW: 3, minH: 4 },
 ];
 
 interface DashboardGridProps {
@@ -76,11 +79,12 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
   const { hasDND } = useDND();
   
   // Use backend-synced preferences
-  const { preferences, updateDashboard } = useUserPreferences();
+  const { preferences, updateDashboard, isLoading } = useUserPreferences();
   
   const [layout, setLayout] = useState<WidgetLayout[]>(() => {
     // Load from backend preferences only (no localStorage fallback)
     console.log('🎨 Initializing dashboard layout...');
+    console.log('Initial preferences state:', { preferences, isLoading });
     if (preferences?.dashboardLayout) {
       console.log('✅ Loading saved layout from preferences:', preferences.dashboardLayout);
       return preferences.dashboardLayout;
@@ -91,12 +95,17 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
 
   // Update layout when preferences are loaded from backend
   useEffect(() => {
-    console.log('🔄 Preferences changed:', preferences);
-    if (preferences?.dashboardLayout) {
+    console.log('🔄 Preferences changed:', {
+      preferences,
+      isLoading,
+      hasLayout: !!preferences?.dashboardLayout,
+      layoutLength: preferences?.dashboardLayout?.length
+    });
+    if (!isLoading && preferences?.dashboardLayout) {
       console.log('✅ Updating layout from preferences:', preferences.dashboardLayout);
       setLayout(preferences.dashboardLayout);
     }
-  }, [preferences]);
+  }, [preferences, isLoading]);
 
   // Save layout to backend only
   const handleLayoutChange = (newLayout: any[]) => {
@@ -167,17 +176,24 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
   // Expose functions to parent via ref
   useImperativeHandle(ref, () => ({
     resetLayout: () => {
-      // Reset to default layout but only for active widgets
-      const filteredDefault = defaultLayout.filter(l => activeWidgets.includes(l.i));
-      setLayout(filteredDefault);
-      
-      // Update backend
+      // Reset to complete default layout with all widgets properly positioned
+      const resetWidgets = ["serving-now", "duty-timer", "guest-status", "clock", "weather", "weather-windy", "button-simulator"];
+      const resetLayout = defaultLayout.filter(l => resetWidgets.includes(l.i) || l.i === "dnd-auto");
+
+      setLayout(resetLayout);
+
+      // Update active widgets too
+      if (onActiveWidgetsChange) {
+        onActiveWidgetsChange(resetWidgets);
+      }
+
+      // Update backend with both layout and widgets
       updateDashboard({
-        dashboardLayout: filteredDefault,
-        activeWidgets: activeWidgets,
+        dashboardLayout: resetLayout,
+        activeWidgets: resetWidgets,
       });
-      
-      toast.success("Dashboard layout reset to default");
+
+      toast.success("Dashboard reset to default layout");
     },
     openManageWidgets: () => {
       if (onOpenManageWidgets) {
@@ -278,10 +294,10 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
           </div>
         )}
 
-        {/* DND Widget - Auto-managed (always active, auto-show/hide based on DND status) */}
-        {hasDND && (
-          <div key="dnd-auto" className="dashboard-widget">
-            <WidgetWrapper id="dnd-auto">
+        {/* DND Widget - Shows when included in activeWidgets AND when DND is active */}
+        {activeWidgets.includes("dnd-guests") && (
+          <div key="dnd-guests" className="dashboard-widget">
+            <WidgetWrapper id="dnd-guests">
               <DNDGuestsWidget />
             </WidgetWrapper>
           </div>
@@ -308,6 +324,7 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
           </div>
         )}
 
+
         {/* Clock Widget */}
         {activeWidgets.includes("clock") && (
           <div key="clock" className="dashboard-widget">
@@ -322,6 +339,17 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
           <div key="clock2" className="dashboard-widget">
             <WidgetWrapper id="clock2">
               <ClockWidget2 timezone="auto" />
+            </WidgetWrapper>
+          </div>
+        )}
+
+        {/* ESP32 Button Simulator Widget */}
+        {activeWidgets.includes("button-simulator") && (
+          <div key="button-simulator" className="dashboard-widget">
+            <WidgetWrapper id="button-simulator">
+              <Card className="h-full overflow-auto">
+                <ButtonSimulatorWidget />
+              </Card>
             </WidgetWrapper>
           </div>
         )}
