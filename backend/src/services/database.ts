@@ -10,14 +10,21 @@ import { Logger } from '../utils/logger';
 
 const logger = new Logger();
 
+// Singleton PrismaClient instance to prevent multiple connections
+let prismaInstance: PrismaClient | null = null;
+
 export class DatabaseService {
   public prisma: PrismaClient; // Make public for route access
   public isConnected: boolean = false;
 
   constructor() {
-    this.prisma = new PrismaClient({
-      log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
-    });
+    // Use singleton pattern - reuse existing instance
+    if (!prismaInstance) {
+      prismaInstance = new PrismaClient({
+        log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
+      });
+    }
+    this.prisma = prismaInstance;
   }
 
   /**
@@ -65,7 +72,7 @@ export class DatabaseService {
       this.prisma.crewMember.count(),
       this.prisma.guest.count(),
       this.prisma.location.count(),
-      this.prisma.serviceRequest.count({ where: { status: 'PENDING' } }),
+      this.prisma.serviceRequest.count({ where: { status: 'pending' } }),
       this.prisma.device.count()
     ]);
 
@@ -256,13 +263,13 @@ export class DatabaseService {
     limit?: number;
   }) {
     const where: any = {};
-    
+
     if (filters?.status && filters.status !== 'All') {
-      where.status = filters.status.toUpperCase();
+      where.status = filters.status;
     }
-    
+
     if (filters?.type && filters.type !== 'All') {
-      where.type = filters.type.toUpperCase();
+      where.type = filters.type;
     }
     
     if (filters?.search) {
@@ -283,7 +290,7 @@ export class DatabaseService {
         include: {
           location: true,
           serviceRequests: {
-            where: { status: 'PENDING' },
+            where: { status: 'pending' },
             take: 5
           }
         },
@@ -330,13 +337,13 @@ export class DatabaseService {
     return this.prisma.location.findMany({
       include: {
         guests: {
-          where: { status: 'ONBOARD' }
+          where: { status: 'onboard' }
         },
         devices: true,
         _count: {
           select: {
             serviceRequests: {
-              where: { status: 'PENDING' }
+              where: { status: 'pending' }
             }
           }
         }
@@ -410,13 +417,13 @@ export class DatabaseService {
     limit?: number;
   }) {
     const where: any = {};
-    
+
     if (filters?.status && filters.status !== 'All') {
-      where.status = filters.status.toUpperCase();
+      where.status = filters.status;
     }
     
     if (filters?.priority && filters.priority !== 'All') {
-      where.priority = filters.priority.toUpperCase();
+      where.priority = filters.priority;
     }
 
     const page = filters?.page || 1;
@@ -468,7 +475,7 @@ export class DatabaseService {
       throw new Error('Crew member not found');
     }
 
-    // Get the service request to populate guest info
+    // Get the service request to validate status and populate guest info
     const request = await this.prisma.serviceRequest.findUnique({
       where: { id: requestId },
       include: {
@@ -481,10 +488,15 @@ export class DatabaseService {
       throw new Error('Service request not found');
     }
 
+    // Validate status transition: can only accept pending requests
+    if (request.status !== 'pending') {
+      throw new Error(`Cannot accept service request with status '${request.status}'. Only 'pending' requests can be accepted.`);
+    }
+
     return this.prisma.serviceRequest.update({
       where: { id: requestId },
       data: {
-        status: 'IN_PROGRESS',
+        status: 'accepted',
         assignedTo: crewMember.name,  // Store crew member name as string
         assignedToId: crewMemberId,   // Store crew member ID
         acceptedAt: new Date(),
@@ -499,11 +511,88 @@ export class DatabaseService {
     });
   }
 
+  async delegateServiceRequest(requestId: string, newCrewMemberId: string) {
+    // First get the new crew member
+    const newCrewMember = await this.prisma.crewMember.findUnique({
+      where: { id: newCrewMemberId }
+    });
+
+    if (!newCrewMember) {
+      throw new Error('New crew member not found');
+    }
+
+    // Get the service request to validate it exists and can be delegated
+    const request = await this.prisma.serviceRequest.findUnique({
+      where: { id: requestId },
+      include: {
+        guest: true,
+        location: true
+      }
+    });
+
+    if (!request) {
+      throw new Error('Service request not found');
+    }
+
+    // Only accepted or in-progress requests can be delegated
+    if (request.status !== 'accepted' && request.status !== 'in-progress') {
+      throw new Error(`Cannot delegate service request with status '${request.status}'. Only 'accepted' or 'in-progress' requests can be delegated.`);
+    }
+
+    // Update the service request with new assignment
+    return this.prisma.serviceRequest.update({
+      where: { id: requestId },
+      data: {
+        assignedTo: newCrewMember.name,
+        assignedToId: newCrewMemberId,
+        // Keep the same status - delegation doesn't change status
+        guestName: request.guest ? `${request.guest.firstName} ${request.guest.lastName}` : null,
+        guestCabin: request.location?.name || null
+      },
+      include: {
+        guest: true,
+        location: true,
+        category: true
+      }
+    });
+  }
+
   async completeServiceRequest(requestId: string) {
+    console.log('📝 Database: completeServiceRequest called', { requestId });
+
+    // First fetch the request to validate status transition
+    const existingRequest = await this.prisma.serviceRequest.findUnique({
+      where: { id: requestId }
+    });
+
+    if (!existingRequest) {
+      console.error('❌ Database: Service request not found', { requestId });
+      throw new Error('Service request not found');
+    }
+
+    console.log('📋 Database: Existing request found', {
+      id: existingRequest.id,
+      status: existingRequest.status,
+      assignedTo: existingRequest.assignedTo,
+      guestName: existingRequest.guestName
+    });
+
+    // Validate status transition: can only complete accepted requests
+    if (existingRequest.status !== 'accepted') {
+      console.error('❌ Database: Invalid status transition', {
+        requestId,
+        currentStatus: existingRequest.status,
+        expectedStatus: 'accepted'
+      });
+      throw new Error(`Cannot complete service request with status '${existingRequest.status}'. Only 'accepted' requests can be completed.`);
+    }
+
+    console.log('✅ Database: Status validation passed, completing request...');
+
     const request = await this.prisma.serviceRequest.update({
       where: { id: requestId },
       data: {
-        status: 'COMPLETED',
+        status: 'completed',
         completedAt: new Date()
       },
       include: {
@@ -522,8 +611,8 @@ export class DatabaseService {
         data: {
           originalRequestId: request.id,
           action: 'completed',
-          previousStatus: 'IN_PROGRESS',
-          newStatus: 'COMPLETED',
+          previousStatus: 'accepted',
+          newStatus: 'completed',
           completedBy: request.assignedTo || 'Unknown',
           completedAt: request.completedAt!,
           responseTime,
@@ -535,13 +624,23 @@ export class DatabaseService {
         }
       });
 
+      // Get User ID from CrewMember for Activity Log (userId must be User ID, not CrewMember ID)
+      let activityLogUserId: string | undefined;
+      if (request.assignedToId) {
+        const crewMember = await this.prisma.crewMember.findUnique({
+          where: { id: request.assignedToId },
+          select: { userId: true }
+        });
+        activityLogUserId = crewMember?.userId || undefined;
+      }
+
       // Log to activity log
       await this.prisma.activityLog.create({
         data: {
-          type: 'service_request',
+          type: 'SERVICE_REQUEST',
           action: 'Request Completed',
           details: `${request.assignedTo || 'Crew'} completed service request from ${request.guest ? request.guest.firstName + ' ' + request.guest.lastName : request.guestName || 'Guest'} at ${request.location?.name || request.guestCabin || 'Unknown'}`,
-          userId: request.assignedToId,
+          userId: activityLogUserId,
           locationId: request.locationId,
           guestId: request.guestId,
           metadata: JSON.stringify({
@@ -555,6 +654,127 @@ export class DatabaseService {
         }
       });
     }
+
+    return request;
+  }
+
+  /**
+   * Get service request by ID
+   */
+  async getServiceRequestById(requestId: string) {
+    const request = await this.prisma.serviceRequest.findUnique({
+      where: { id: requestId },
+      include: {
+        guest: true,
+        location: true,
+        category: true
+      }
+    });
+
+    if (!request) {
+      throw new Error('Service request not found');
+    }
+
+    return request;
+  }
+
+  /**
+   * Update service request (general update for any field)
+   */
+  async updateServiceRequest(requestId: string, data: any) {
+    // First check if request exists
+    const existing = await this.prisma.serviceRequest.findUnique({
+      where: { id: requestId }
+    });
+
+    if (!existing) {
+      throw new Error('Service request not found');
+    }
+
+    // Update the request
+    const request = await this.prisma.serviceRequest.update({
+      where: { id: requestId },
+      data,
+      include: {
+        guest: true,
+        location: true,
+        category: true
+      }
+    });
+
+    return request;
+  }
+
+  /**
+   * Cancel service request
+   */
+  async cancelServiceRequest(requestId: string, cancelledBy?: string) {
+    // First fetch the request to validate
+    const existingRequest = await this.prisma.serviceRequest.findUnique({
+      where: { id: requestId }
+    });
+
+    if (!existingRequest) {
+      throw new Error('Service request not found');
+    }
+
+    // Can only cancel pending or accepted requests
+    if (!['pending', 'accepted'].includes(existingRequest.status)) {
+      throw new Error(`Cannot cancel service request with status '${existingRequest.status}'. Only 'pending' or 'accepted' requests can be cancelled.`);
+    }
+
+    const request = await this.prisma.serviceRequest.update({
+      where: { id: requestId },
+      data: {
+        status: 'cancelled'
+      },
+      include: {
+        guest: true,
+        location: true,
+        category: true
+      }
+    });
+
+    // Create history record
+    await this.prisma.serviceRequestHistory.create({
+      data: {
+        originalRequestId: request.id,
+        action: 'cancelled',
+        previousStatus: existingRequest.status,
+        newStatus: 'cancelled',
+        completedBy: cancelledBy || 'System',
+        completedAt: new Date(),
+        guestName: request.guestName,
+        location: request.guestCabin,
+        requestType: request.requestType,
+        priority: request.priority
+      }
+    });
+
+    // Get User ID for Activity Log (cancelledBy might be User ID or null)
+    // Only set userId if cancelledBy is provided and looks like a valid ID
+    let activityLogUserId: string | undefined;
+    if (cancelledBy && cancelledBy.startsWith('cm') || cancelledBy?.startsWith('user_')) {
+      // Assume it's a User ID if it starts with 'cm' (cuid) or 'user_'
+      activityLogUserId = cancelledBy;
+    }
+
+    // Log to activity log
+    await this.prisma.activityLog.create({
+      data: {
+        type: 'SERVICE_REQUEST',
+        action: 'Request Cancelled',
+        details: `Service request from ${request.guest ? request.guest.firstName + ' ' + request.guest.lastName : request.guestName || 'Guest'} at ${request.location?.name || request.guestCabin || 'Unknown'} was cancelled`,
+        userId: activityLogUserId,
+        locationId: request.locationId,
+        guestId: request.guestId,
+        metadata: JSON.stringify({
+          requestId: request.id,
+          requestType: request.requestType,
+          priority: request.priority
+        })
+      }
+    });
 
     return request;
   }
@@ -578,7 +798,7 @@ export class DatabaseService {
 
     const location = await this.prisma.location.findFirst({
       where: { smartButtonId: device.deviceId },
-      include: { guests: { where: { status: 'ONBOARD' } } }
+      include: { guests: { where: { status: 'onboard' } } }
     });
 
     if (!location) {
@@ -602,8 +822,8 @@ export class DatabaseService {
             cabinId: location.id,
             locationId: location.id,
             guestId: guest?.id,
-            requestType: 'CALL',
-            priority: 'NORMAL',
+            requestType: 'call',
+            priority: 'normal',
             voiceTranscript: data.isLongPress
               ? `Voice message (${data.voiceDuration?.toFixed(1)}s): Service request`
               : undefined,
@@ -760,10 +980,10 @@ export class DatabaseService {
     return this.prisma.location.findUnique({
       where: { id },
       include: {
-        guests: { where: { status: 'ONBOARD' } },
+        guests: { where: { status: 'onboard' } },
         devices: true,
         serviceRequests: {
-          where: { status: 'PENDING' },
+          where: { status: 'pending' },
           take: 10,
           orderBy: { createdAt: 'desc' }
         }
@@ -775,7 +995,7 @@ export class DatabaseService {
     return this.prisma.location.findMany({
       where: { doNotDisturb: true },
       include: {
-        guests: { where: { status: 'ONBOARD' } }
+        guests: { where: { status: 'onboard' } }
       },
       orderBy: { name: 'asc' }
     });

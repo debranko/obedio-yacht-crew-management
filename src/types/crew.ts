@@ -2,14 +2,34 @@
 export interface CrewMemberExtended {
   id: string;
   name: string;
+  nickname?: string;
   position: string;
   department: string;
-  status?: 'on-duty' | 'off-duty' | 'on-leave';
+  status?: 'active' | 'on-duty' | 'off-duty' | 'on-leave';
   shift?: string;
   contact?: string;
   email?: string;
+  phone?: string;
+  onBoardContact?: string; // On-board contact (radio, intercom, etc.)
   joinDate?: string;
   role?: string;
+
+  // Visual identification
+  avatar?: string;  // Avatar image URL
+  color?: string;   // Color for visual identification in UI (default: #C8A96B)
+
+  // Leave tracking
+  leaveStart?: string; // YYYY-MM-DD format
+  leaveEnd?: string;   // YYYY-MM-DD format
+
+  // Additional info
+  languages?: string[];
+  skills?: string[];
+  notes?: string;
+
+  // Metadata
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // Role & Permission Types

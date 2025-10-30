@@ -13,8 +13,17 @@ echo.
 echo Checking system status...
 echo.
 
-REM Kill any Node.js processes that might be running
-taskkill /F /IM node.exe >nul 2>&1
+REM Kill only OBEDIO processes by port (safer than killing all Node.js)
+echo Stopping any running OBEDIO services...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8080" ^| findstr "LISTENING"') do (
+    taskkill /F /PID %%a >nul 2>&1
+)
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":5173" ^| findstr "LISTENING"') do (
+    taskkill /F /PID %%a >nul 2>&1
+)
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8888" ^| findstr "LISTENING"') do (
+    taskkill /F /PID %%a >nul 2>&1
+)
 timeout /t 2 /nobreak >nul
 
 echo Starting services...
@@ -94,6 +103,17 @@ if %errorlevel%==0 (
     echo      ⚠ Frontend startup incomplete (check frontend window)
 )
 
+REM Verify MQTT Monitor started
+echo.
+echo Verifying MQTT Monitor...
+timeout /t 3 /nobreak >nul
+netstat -ano | findstr ":8888" | findstr "LISTENING" >nul
+if %errorlevel%==0 (
+    echo      ✓ MQTT Monitor available
+) else (
+    echo      ⚠ MQTT Monitor not started (launches with backend)
+)
+
 echo.
 echo ========================================
 echo    STARTUP COMPLETE!
@@ -116,7 +136,8 @@ echo ========================================
 echo   SYSTEM READY!
 echo ========================================
 echo.
-echo Login: admin / admin123
+echo Default Login: admin / admin123
+echo (Change password after first login!)
 echo.
 echo IMPORTANT:
 echo - Do NOT close the command windows

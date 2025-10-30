@@ -1,0 +1,20 @@
+4fc9862 Implement real-time Activity Logs with database integration
+b2c3a6b Add OBEDIO project documentation and fix virtual button simulator
+ca9dfda Add OBEDIO Strict Development Rules - NO HARDCODING, NO MOCK DATA
+570ca0e bmad initial commit
+442b553 Add image upload functionality for locations
+852879b Complete mock data removal and location image database update
+4fc8450 Fix critical bugs and remove mock data dependencies
+9032740 Add comprehensive task list for next developer - 115 tasks with instructions
+8f3a71a Major update: Security fixes, service categories, device manager, dashboard persistence
+ba8f662 Add detailed task lists: SIMPLE (completed by cheap AI) + COMPLEX (for expensive AI) - Hybrid strategy documentation complete
+8125387 QUICK WIN: Register 3 missing routes (activity-logs, settings, smart-buttons) - Backend now 92% complete, 20/20 routes active! (+2% demo readiness in 5 min)
+e1f1790 COMPREHENSIVE UPDATE COMPARISON: Detailed analysis - 80% demo-ready, 5 new APIs added, identified 3 critical priorities (token persistence, activity logs registration, yacht settings DB)
+43fbcf7 Add Yacht Settings route + System improvements: Activity logs, Device logs, Shifts hooks, Settings page enhancements, Comprehensive code review complete (85% backend ready for METSTRADE)
+2fb4d7f COMPREHENSIVE CODE REVIEW: 85% backend complete, identified 3 critical priorities for METSTRADE demo
+f38afe1 Backend-first strategy: Meeting feedback - Voice-to-text and duty assignment impressed! Focus on backend stability and testing
+0364822 Update METSTRADE roadmap: Mobile/Watch apps ARE doable, Voice-to-text already works, LoRa deprioritized
+518fe14 Add METSTRADE 2025 roadmap - 24 days sprint plan
+605fb62 MAJOR UPDATE: Database-first migration, Device Manager, Scripts automation, Remove hardcoded data - METSTRADE prep (24 days to go)
+587e9af feat: Make voice transcript text larger and more prominent - Changed from text-sm to text-xl (20px) - Added font-semibold for bold emphasis - Increased padding (p-4 to p-5) for breathing room - Enhanced Message label styling (uppercase, tracking-wide) - Transcript is now THE focal point of the dialog - This is the most important information crew needs to see!
+ea13162 fix: Enable audio playback in incoming request dialog - Uncommented audio playback code - Added proper event handlers (onended, onerror) - Audio stops icon pulsing when playback ends - Error handling with toast notifications - Proper cleanup on playback errors - Now users can actually listen to voice messages!

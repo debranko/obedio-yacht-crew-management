@@ -7,7 +7,7 @@ import { Router } from 'express';
 import { prisma } from '../services/db';
 import { asyncHandler, validate } from '../middleware/error-handler';
 import { CreateAssignmentSchema, UpdateAssignmentSchema } from '../validators/schemas';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, requirePermission } from '../middleware/auth';
 
 const router = Router();
 
@@ -19,7 +19,7 @@ router.use(authMiddleware);
  * Get all assignments with optional filtering
  * Query params: date, shiftId, crewMemberId, type, startDate, endDate
  */
-router.get('/', asyncHandler(async (req, res) => {
+router.get('/', requirePermission('duty.view'), asyncHandler(async (req, res) => {
   const { date, shiftId, crewMemberId, type, startDate, endDate } = req.query;
 
   const where: any = {};
@@ -58,7 +58,7 @@ router.get('/', asyncHandler(async (req, res) => {
  * GET /api/assignments/by-date/:date
  * Get all assignments for a specific date
  */
-router.get('/by-date/:date', asyncHandler(async (req, res) => {
+router.get('/by-date/:date', requirePermission('duty.view'), asyncHandler(async (req, res) => {
   const { date } = req.params;
 
   const assignments = await prisma.assignment.findMany({
@@ -81,7 +81,7 @@ router.get('/by-date/:date', asyncHandler(async (req, res) => {
  * GET /api/assignments/by-week/:startDate
  * Get all assignments for a week starting from startDate
  */
-router.get('/by-week/:startDate', asyncHandler(async (req, res) => {
+router.get('/by-week/:startDate', requirePermission('duty.view'), asyncHandler(async (req, res) => {
   const startDate = req.params.startDate;
 
   // Calculate end date (7 days later)
@@ -119,7 +119,7 @@ router.get('/by-week/:startDate', asyncHandler(async (req, res) => {
  * GET /api/assignments/crew/:crewMemberId
  * Get all assignments for a specific crew member
  */
-router.get('/crew/:crewMemberId', asyncHandler(async (req, res) => {
+router.get('/crew/:crewMemberId', requirePermission('duty.view'), asyncHandler(async (req, res) => {
   const { crewMemberId } = req.params;
   const { startDate, endDate } = req.query;
 
@@ -151,7 +151,7 @@ router.get('/crew/:crewMemberId', asyncHandler(async (req, res) => {
  * GET /api/assignments/:id
  * Get a single assignment by ID
  */
-router.get('/:id', asyncHandler(async (req, res) => {
+router.get('/:id', requirePermission('duty.view'), asyncHandler(async (req, res) => {
   const assignment = await prisma.assignment.findUnique({
     where: { id: req.params.id },
     include: {
@@ -173,7 +173,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
  * POST /api/assignments
  * Create a new assignment
  */
-router.post('/', validate(CreateAssignmentSchema), asyncHandler(async (req, res) => {
+router.post('/', requirePermission('duty.manage'), validate(CreateAssignmentSchema), asyncHandler(async (req, res) => {
   // Check if assignment already exists (unique constraint)
   const existing = await prisma.assignment.findFirst({
     where: {
@@ -207,9 +207,11 @@ router.post('/', validate(CreateAssignmentSchema), asyncHandler(async (req, res)
 
 /**
  * POST /api/assignments/bulk
- * Create multiple assignments at once
+ * Create multiple assignments at once (REPLACES all existing assignments)
+ * CRITICAL: This endpoint deletes ALL existing assignments before creating new ones
+ * This ensures duty roster is always in sync with database after save
  */
-router.post('/bulk', asyncHandler(async (req, res) => {
+router.post('/bulk', requirePermission('duty.manage'), asyncHandler(async (req, res) => {
   const { assignments } = req.body;
 
   if (!Array.isArray(assignments)) {
@@ -224,21 +226,51 @@ router.post('/bulk', asyncHandler(async (req, res) => {
     CreateAssignmentSchema.parse(a)
   );
 
-  // Create all assignments in a transaction
-  const created = await prisma.$transaction(
-    validatedAssignments.map(data =>
-      prisma.assignment.create({
-        data,
-        include: { shift: true }
-      })
-    )
-  );
+  console.log(`🔄 Bulk save: Received ${validatedAssignments.length} assignments`);
+
+  // Calculate date range for deletion
+  const dates = [...new Set(validatedAssignments.map(a => a.date))];
+  const minDate = dates.sort()[0];
+  const maxDate = dates.sort()[dates.length - 1];
+
+  console.log(`🗑️  Deleting existing assignments from ${minDate} to ${maxDate}`);
+
+  // CRITICAL: Delete ALL existing assignments in the date range, then create new ones
+  // This ensures database matches exactly what user sees in the UI
+  const result = await prisma.$transaction(async (tx) => {
+    // Step 1: Delete all existing assignments in the date range
+    const deleted = await tx.assignment.deleteMany({
+      where: {
+        date: {
+          gte: minDate,
+          lte: maxDate
+        }
+      }
+    });
+
+    console.log(`✅ Deleted ${deleted.count} existing assignments`);
+
+    // Step 2: Create all new assignments
+    const created = await Promise.all(
+      validatedAssignments.map(data =>
+        tx.assignment.create({
+          data,
+          include: { shift: true }
+        })
+      )
+    );
+
+    console.log(`✅ Created ${created.length} new assignments`);
+
+    return { deleted: deleted.count, created };
+  });
 
   res.status(201).json({
     success: true,
-    data: created,
-    count: created.length,
-    message: `${created.length} assignment(s) created successfully`
+    data: result.created,
+    count: result.created.length,
+    deletedCount: result.deleted,
+    message: `Duty roster saved: ${result.deleted} old assignment(s) removed, ${result.created.length} new assignment(s) created`
   });
 }));
 
@@ -246,7 +278,7 @@ router.post('/bulk', asyncHandler(async (req, res) => {
  * PUT /api/assignments/:id
  * Update an existing assignment
  */
-router.put('/:id', validate(UpdateAssignmentSchema), asyncHandler(async (req, res) => {
+router.put('/:id', requirePermission('duty.manage'), validate(UpdateAssignmentSchema), asyncHandler(async (req, res) => {
   const assignment = await prisma.assignment.update({
     where: { id: req.params.id },
     data: req.body,
@@ -266,7 +298,7 @@ router.put('/:id', validate(UpdateAssignmentSchema), asyncHandler(async (req, re
  * DELETE /api/assignments/:id
  * Delete a single assignment
  */
-router.delete('/:id', asyncHandler(async (req, res) => {
+router.delete('/:id', requirePermission('duty.manage'), asyncHandler(async (req, res) => {
   await prisma.assignment.delete({
     where: { id: req.params.id }
   });
@@ -281,7 +313,7 @@ router.delete('/:id', asyncHandler(async (req, res) => {
  * DELETE /api/assignments/by-date/:date
  * Delete all assignments for a specific date
  */
-router.delete('/by-date/:date', asyncHandler(async (req, res) => {
+router.delete('/by-date/:date', requirePermission('assignments.delete'), asyncHandler(async (req, res) => {
   const { date } = req.params;
 
   const result = await prisma.assignment.deleteMany({
@@ -299,7 +331,7 @@ router.delete('/by-date/:date', asyncHandler(async (req, res) => {
  * DELETE /api/assignments/crew/:crewMemberId
  * Delete all assignments for a specific crew member
  */
-router.delete('/crew/:crewMemberId', asyncHandler(async (req, res) => {
+router.delete('/crew/:crewMemberId', requirePermission('duty.manage'), asyncHandler(async (req, res) => {
   const { crewMemberId } = req.params;
   const { startDate, endDate } = req.query;
 

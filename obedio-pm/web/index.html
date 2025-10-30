@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OBEDIO Project Manager</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="controls">
+            <div class="filter-buttons">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="pending">Pending</button>
+                <button class="filter-btn" data-filter="done">Completed</button>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-secondary" id="manageCategoriesBtn">📁 Categories</button>
+                <button class="btn-primary" id="addTaskBtn">+ Add Task</button>
+            </div>
+        </div>
+
+        <!-- Kanban Board -->
+        <div class="kanban-board" id="kanbanBoard">
+            <!-- Columns will be rendered here by JavaScript -->
+        </div>
+
+        <!-- Add Task Modal -->
+        <div id="addTaskModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Add New Task</h2>
+                    <span class="close">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Task Description</label>
+                        <input type="text" id="taskDescription" placeholder="What needs to be done?" autofocus>
+                    </div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="taskCategory">
+                            <option value="webapp">🌐 WebApp</option>
+                            <option value="case">📦 Case Design</option>
+                            <option value="pcb">⚡ PCB</option>
+                            <option value="metstrade">⚓ METSTRADE</option>
+                            <option value="marketing">🎨 Marketing</option>
+                            <option value="website">🌍 Website</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Priority</label>
+                        <select id="taskPriority">
+                            <option value="urgent">🔴 Urgent - HITNO!</option>
+                            <option value="high">🟠 High</option>
+                            <option value="medium" selected>🟡 Medium</option>
+                            <option value="low">🟢 Low</option>
+                        </select>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn-secondary" id="cancelBtn">Cancel</button>
+                        <button class="btn-primary" id="saveTaskBtn">Add Task</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Task Modal -->
+        <div id="editTaskModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Edit Task</h2>
+                    <span class="close">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Task Description</label>
+                        <input type="text" id="editTaskDescription">
+                    </div>
+                    <div class="form-group">
+                        <label>Priority</label>
+                        <select id="editTaskPriority">
+                            <option value="urgent">🔴 Urgent</option>
+                            <option value="high">🟠 High</option>
+                            <option value="medium">🟡 Medium</option>
+                            <option value="low">🟢 Low</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Add Subtask</label>
+                        <div class="subtask-input">
+                            <input type="text" id="newSubtaskDescription" placeholder="Subtask description">
+                            <button class="btn-small" id="addSubtaskBtn">+ Add</button>
+                        </div>
+                    </div>
+                    <div class="subtasks-list" id="subtasksList">
+                        <!-- Subtasks will be rendered here -->
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn-danger" id="deleteTaskBtn">Delete Task</button>
+                        <button class="btn-secondary" id="cancelEditBtn">Cancel</button>
+                        <button class="btn-primary" id="saveEditBtn">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Manage Categories Modal -->
+        <div id="categoriesModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Manage Categories</h2>
+                    <span class="close">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="categories-list" id="categoriesList">
+                        <!-- Categories will be rendered here -->
+                    </div>
+                    <div class="form-group" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border-color);">
+                        <label>Add New Category</label>
+                        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                            <input type="text" id="newCategoryKey" placeholder="Key (e.g. hardware)" style="flex: 1;">
+                            <input type="text" id="newCategoryIcon" placeholder="Icon" style="width: 80px;" maxlength="2">
+                        </div>
+                        <input type="text" id="newCategoryName" placeholder="Display name (e.g. Hardware Design)">
+                        <button class="btn-primary" id="addCategoryBtn" style="margin-top: 12px; width: 100%;">+ Add Category</button>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn-secondary" id="closeCategoriesBtn">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating AI Assistant -->
+    <div class="floating-ai" id="floatingAI">
+        <div class="floating-ai-trigger" id="aiTrigger">
+            <span>🤖 AI Assistant</span>
+            <span id="aiToggleIcon">▲</span>
+        </div>
+        <div class="floating-ai-panel" id="aiPanel">
+            <div class="chat-input-container">
+                <input type="text" id="chatInputCompact" placeholder="Reci mi šta ti treba..." style="flex: 1; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-size: 0.9rem;">
+                <label for="fileUpload" class="btn-file-upload" title="Upload dokument">
+                    📎
+                    <input type="file" id="fileUpload" accept="image/*,.pdf,.stl,.obj,.step,.dwg" style="display: none;">
+                </label>
+                <button class="btn-primary btn-small" id="sendChatCompactBtn">Send</button>
+            </div>
+            <div id="chatMessagesCompact" class="chat-messages-compact">
+                <!-- Messages will appear here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

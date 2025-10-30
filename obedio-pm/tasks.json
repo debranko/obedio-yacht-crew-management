@@ -1,0 +1,195 @@
+{
+  "tasks": [
+    {
+      "id": 8,
+      "description": "Poručivanje test tastera za glavno dugme",
+      "category": "pcb",
+      "status": "pending",
+      "priority": "urgent",
+      "order": 1,
+      "createdAt": "2025-10-26T20:33:09.911Z",
+      "subtasks": []
+    },
+    {
+      "id": 10,
+      "description": "Pokazuje mi webapp nekoliko service request odjednom. kao da otvara vise starih prozora koji su vec prihvaceni",
+      "category": "webapp",
+      "status": "pending",
+      "priority": "medium",
+      "order": 1,
+      "createdAt": "2025-10-26T20:41:28.061Z",
+      "subtasks": []
+    },
+    {
+      "id": 11,
+      "description": "Poručiti C&K PTS645SL50SMTR92 LFS taster sa Digikey",
+      "category": "order",
+      "status": "pending",
+      "priority": "medium",
+      "order": 2,
+      "createdAt": "2025-10-26T20:45:19.083Z",
+      "subtasks": []
+    },
+    {
+      "id": 12,
+      "description": "Naručiti LILYGO T-Watch S3 pametni sat za razvoj",
+      "category": "order",
+      "status": "pending",
+      "priority": "medium",
+      "order": 3,
+      "createdAt": "2025-10-26T21:06:12.582Z",
+      "subtasks": []
+    },
+    {
+      "id": 13,
+      "description": "Istražiti i dokumentovati hall-effect magnetni switch za patentnu dokumentaciju",
+      "category": "patents",
+      "status": "pending",
+      "priority": "medium",
+      "order": 4,
+      "createdAt": "2025-10-27T09:45:37.550Z",
+      "subtasks": []
+    },
+    {
+      "id": 14,
+      "description": "Napraviti detaljan spisak svih budućih projekata sa procenom resursa i vremena",
+      "category": "website",
+      "status": "pending",
+      "priority": "high",
+      "order": 5,
+      "createdAt": "2025-10-27T09:53:58.281Z",
+      "subtasks": []
+    },
+    {
+      "id": 15,
+      "description": "Proceniti tehničku i finansijsku izvodljivost predloženih projekata",
+      "category": "website",
+      "status": "pending",
+      "priority": "high",
+      "order": 6,
+      "createdAt": "2025-10-27T09:53:58.286Z",
+      "subtasks": []
+    },
+    {
+      "id": 16,
+      "description": "Rangirati projekte po važnosti i hitnosti, odrediti redosled implementacije",
+      "category": "website",
+      "status": "pending",
+      "priority": "medium",
+      "order": 7,
+      "createdAt": "2025-10-27T09:53:58.290Z",
+      "subtasks": []
+    },
+    {
+      "id": 17,
+      "description": "Napisati detaljan tehnički opis za Hall-Effect pametni taster uključujući: magnetni opružni sistem, eddy-current damping, Hall senzor za detekciju, integrisanu elektroniku",
+      "category": "patents",
+      "status": "pending",
+      "priority": "high",
+      "order": 8,
+      "createdAt": "2025-10-27T09:54:38.661Z",
+      "subtasks": []
+    },
+    {
+      "id": 18,
+      "description": "Kreirati tehničke dijagrame za: magnetni sistem, bakarnu ploču za damping, poziciju Hall senzora, LED ring i integrisanu elektroniku",
+      "category": "patents",
+      "status": "pending",
+      "priority": "high",
+      "order": 9,
+      "createdAt": "2025-10-27T09:54:38.665Z",
+      "subtasks": []
+    },
+    {
+      "id": 19,
+      "description": "Definisati patent claims za: 1) Magnetni opružni sistem, 2) Eddy-current damping, 3) Hall-effect pozicioniranje, 4) Integrisanu elektroniku, 5) Multi-senzorski interfejs, 6) Auto-kalibraciju",
+      "category": "patents",
+      "status": "pending",
+      "priority": "high",
+      "order": 10,
+      "createdAt": "2025-10-27T09:54:38.671Z",
+      "subtasks": []
+    },
+    {
+      "id": 20,
+      "description": "Pripremiti kompletnu patentnu dokumentaciju za 'Magnetically-Actuated, Contactless Tactile Button with Hall-Effect Position Sensing and Eddy-Current Damping'",
+      "category": "patents",
+      "status": "pending",
+      "priority": "high",
+      "order": 11,
+      "createdAt": "2025-10-27T09:54:38.674Z",
+      "subtasks": []
+    },
+    {
+      "id": 21,
+      "description": "Pripremiti dokumentaciju za patentiranje check to call sistema za hitne pozive",
+      "category": "patents",
+      "status": "pending",
+      "priority": "high",
+      "order": 12,
+      "createdAt": "2025-10-27T10:36:38.718Z",
+      "subtasks": []
+    },
+    {
+      "id": 22,
+      "description": "Provera i update CrewMember-Device relationship u Prisma schema, kreiranje migracije ako je potrebno",
+      "category": "webapp",
+      "status": "pending",
+      "priority": "urgent",
+      "order": 13,
+      "createdAt": "2025-10-27T10:42:37.052Z",
+      "subtasks": []
+    },
+    {
+      "id": 23,
+      "description": "Implementacija publishWatchNotification() metode za slanje notifikacija na watch",
+      "category": "webapp",
+      "status": "pending",
+      "priority": "urgent",
+      "order": 14,
+      "createdAt": "2025-10-27T10:42:37.057Z",
+      "subtasks": []
+    },
+    {
+      "id": 24,
+      "description": "Integracija MQTT notifikacija sa service request creation flow-om",
+      "category": "webapp",
+      "status": "pending",
+      "priority": "urgent",
+      "order": 15,
+      "createdAt": "2025-10-27T10:42:37.062Z",
+      "subtasks": []
+    },
+    {
+      "id": 25,
+      "description": "Implementacija handleWatchAcknowledgement() za procesiranje potvrda sa watch-a",
+      "category": "webapp",
+      "status": "pending",
+      "priority": "urgent",
+      "order": 16,
+      "createdAt": "2025-10-27T10:42:37.066Z",
+      "subtasks": []
+    },
+    {
+      "id": 26,
+      "description": "Export MQTT service kao singleton i provera implementacije",
+      "category": "webapp",
+      "status": "pending",
+      "priority": "high",
+      "order": 17,
+      "createdAt": "2025-10-27T10:42:37.070Z",
+      "subtasks": []
+    },
+    {
+      "id": 27,
+      "description": "Implementacija auto-assignment logike za service requests na osnovu lokacije i dostupnosti crew member-a",
+      "category": "webapp",
+      "status": "pending",
+      "priority": "high",
+      "order": 18,
+      "createdAt": "2025-10-27T10:42:37.076Z",
+      "subtasks": []
+    }
+  ],
+  "nextId": 28
+}

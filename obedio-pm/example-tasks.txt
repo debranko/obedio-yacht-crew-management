@@ -1,0 +1,22 @@
+# Primer fajla sa taskovima za OBEDIO
+
+[WebApp]
+- Implement real-time notifications
+- Add export to PDF functionality
+- Fix mobile responsive issues
+  - Test on iPhone
+  - Test on Android
+  - Fix navigation menu
+
+[Website]
+- Create landing page design
+- Write product description copy
+- Add testimonials section
+
+[METSTRADE]
+- Book booth space
+- Prepare demo devices
+  - Test device #1
+  - Test device #2
+  - Prepare backup device
+- Print marketing materials

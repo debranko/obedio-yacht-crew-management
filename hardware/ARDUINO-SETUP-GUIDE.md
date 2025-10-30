@@ -109,8 +109,8 @@ Open **Tools → Manage Libraries** and install:
 1. Open: `hardware/heltec-minimal/heltec-minimal.ino`
 2. Verify WiFi credentials are correct:
    ```cpp
-   const char* WIFI_SSID = "NOVA_1300";
-   const char* WIFI_PASSWORD = "need9963";
+   const char* WIFI_SSID = "Blagojevic";
+   const char* WIFI_PASSWORD = "Lozinka12!";
    const char* MQTT_BROKER = "192.168.5.152";
    ```
 
@@ -137,7 +137,7 @@ Open **Tools → Manage Libraries** and install:
    Firmware: v0.1-minimal
 
    🔌 Connecting to WiFi...
-   SSID: NOVA_1300
+   SSID: Blagojevic
    ✅ WiFi connected!
    IP Address: 192.168.5.XXX
    RSSI: -XX dBm
@@ -290,8 +290,8 @@ You should see both devices listed:
 ### Device Won't Connect to WiFi
 
 **Check WiFi Credentials**:
-- Verify SSID is exactly: `NOVA_1300`
-- Verify password is exactly: `need9963`
+- Verify SSID is exactly: `Blagojevic`
+- Verify password is exactly: `Lozinka12!`
 - Make sure WiFi is 2.4GHz (ESP32 doesn't support 5GHz)
 
 **Check Signal Strength**:

@@ -190,27 +190,40 @@ class MQTTService {
         include: { location: true }
       });
 
+      // Validate locationId from message before using it
+      // This prevents foreign key constraint errors from old firmware with hardcoded IDs
+      let validatedLocationIdForDevice = message.locationId || null;
+      if (validatedLocationIdForDevice) {
+        const locationExists = await prisma.location.findUnique({
+          where: { id: validatedLocationIdForDevice }
+        });
+        if (!locationExists) {
+          console.warn(`⚠️ Invalid locationId '${validatedLocationIdForDevice}' from device ${deviceId} - ignoring assignment`);
+          validatedLocationIdForDevice = null;
+        }
+      }
+
       // If device exists but has no locationId, update it from message
-      if (device && !device.locationId && message.locationId) {
-        console.log(`📍 Updating device location: ${message.locationId}`);
+      if (device && !device.locationId && validatedLocationIdForDevice) {
+        console.log(`📍 Updating device location: ${validatedLocationIdForDevice}`);
         device = await prisma.device.update({
           where: { deviceId },
-          data: { locationId: message.locationId },
+          data: { locationId: validatedLocationIdForDevice },
           include: { location: true }
         });
       }
 
       if (!device) {
         console.log(`📱 Auto-creating virtual device: ${deviceId}`);
-        
-        // Auto-create virtual device for button simulator
+
+        // Auto-create virtual device for button simulator (use validated locationId)
         device = await prisma.device.create({
           data: {
             deviceId,
             name: `Virtual Button ${deviceId.slice(-4)}`,
             type: 'smart_button',
             status: 'online',
-            locationId: message.locationId || null,
+            locationId: validatedLocationIdForDevice,
             batteryLevel: message.battery || 100,
             signalStrength: message.rssi || -50,
             config: {
@@ -323,11 +336,38 @@ class MQTTService {
       notes += `\n- Signal: ${message.rssi || 'unknown'} dBm`;
       notes += `\n- Firmware: ${message.firmwareVersion || 'unknown'}`;
 
-      // Create service request using DERIVED values (with or without guest)
+      // Validate locationId exists in database before using it
+      // This prevents foreign key constraint errors from old firmware with hardcoded IDs
+      let validatedLocationId = device.locationId || message.locationId || null;
+      if (validatedLocationId) {
+        const locationExists = await prisma.location.findUnique({
+          where: { id: validatedLocationId }
+        });
+        if (!locationExists) {
+          console.warn(`⚠️ Invalid locationId '${validatedLocationId}' from device ${deviceId} - creating anonymous request`);
+          validatedLocationId = null;
+        }
+      }
+
+      // Validate guestId exists in database before using it
+      let validatedGuestId = guest?.id || null;
+      if (validatedGuestId) {
+        const guestExists = await prisma.guest.findUnique({
+          where: { id: validatedGuestId }
+        });
+        if (!guestExists) {
+          console.warn(`⚠️ Invalid guestId '${validatedGuestId}' from device ${deviceId} - creating anonymous request`);
+          validatedGuestId = null;
+          guest = null; // Clear guest object too
+        }
+      }
+
+      // Create service request using VALIDATED values (with or without guest/location)
+      // This ensures service requests are created even when device has invalid foreign keys
       const serviceRequest = await prisma.serviceRequest.create({
         data: {
-          guestId: guest?.id || null,
-          locationId: device.locationId || message.locationId || null,
+          guestId: validatedGuestId,
+          locationId: validatedLocationId,
           status: 'pending',
           priority,
           requestType,
@@ -372,7 +412,7 @@ class MQTTService {
       // Log activity: Button press and service request created
       await prisma.activityLog.create({
         data: {
-          type: 'device',
+          type: 'DEVICE',
           action: 'Button Press',
           details: `${guest ? guest.firstName + ' ' + guest.lastName : 'Guest'} requested service from ${device.location?.name || 'Unknown'}`,
           locationId: device.locationId,
@@ -836,7 +876,7 @@ class MQTTService {
       const responseTime = Date.now() - serviceRequest.createdAt.getTime();
       await prisma.activityLog.create({
         data: {
-          type: 'service_request',
+          type: 'SERVICE_REQUEST',
           action: 'Request Accepted',
           details: `${watch.crewMember.name} accepted service request from ${serviceRequest.guest ? serviceRequest.guest.firstName + ' ' + serviceRequest.guest.lastName : serviceRequest.guestName || 'Guest'} at ${serviceRequest.location?.name || serviceRequest.guestCabin || 'Unknown'}`,
           userId: watch.crewMember.userId,

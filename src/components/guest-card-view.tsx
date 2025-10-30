@@ -55,7 +55,17 @@ export function GuestCardView({ guests, onView, onEdit, onDelete }: GuestCardVie
   };
 
   const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName[0]}${lastName[0]}`.toUpperCase();
+    try {
+      if (!firstName || !lastName) {
+        return '?';
+      }
+      const first = firstName.trim()[0] || '?';
+      const last = lastName.trim()[0] || '?';
+      return `${first}${last}`.toUpperCase();
+    } catch (error) {
+      console.error('Error generating initials:', error);
+      return '?';
+    }
   };
 
   if (guests.length === 0) {

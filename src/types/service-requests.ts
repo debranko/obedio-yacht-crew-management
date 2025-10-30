@@ -14,12 +14,12 @@ export interface ServiceRequest {
   guestCabin: string;
   cabinId: string;
   requestType: 'call' | 'service' | 'emergency';
-  priority: 'normal' | 'urgent' | 'emergency';
+  priority: 'low' | 'normal' | 'urgent' | 'emergency';
   timestamp: Date;
   voiceTranscript?: string; // Voice-to-text transcript
   voiceAudioUrl?: string; // Original audio message URL
   cabinImage?: string; // Cabin rendering/photo URL
-  status: 'pending' | 'accepted' | 'completed' | 'delegated' | 'forwarded';
+  status: 'pending' | 'accepted' | 'completed' | 'cancelled';
   assignedTo?: string; // Crew member name
   forwardedToTeam?: InteriorTeam; // Team this was forwarded to
   acceptedAt?: Date;

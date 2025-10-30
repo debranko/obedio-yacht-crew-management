@@ -1,0 +1,434 @@
+src/__tests__/setup.ts(6,39): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+src/__tests__/setup.ts(7,25): error TS2307: Cannot find module '@testing-library/react' or its corresponding type declarations.
+src/__tests__/setup.ts(8,27): error TS2307: Cannot find module '@testing-library/jest-dom/matchers' or its corresponding type declarations.
+src/__tests__/setup.ts(21,37): error TS7006: Parameter 'query' implicitly has an 'any' type.
+src/__tests__/utils/test-utils.tsx(7,39): error TS2307: Cannot find module '@testing-library/react' or its corresponding type declarations.
+src/__tests__/utils/test-utils.tsx(9,31): error TS2307: Cannot find module 'react-router-dom' or its corresponding type declarations.
+src/__tests__/utils/test-utils.tsx(17,9): error TS2353: Object literal may only specify known properties, and 'cacheTime' does not exist in type 'OmitKeyof<QueryObserverOptions<unknown, Error, unknown, unknown, readonly unknown[], never>, "suspense" | "queryKey", "strictly">'.
+src/__tests__/utils/test-utils.tsx(56,15): error TS2307: Cannot find module '@testing-library/react' or its corresponding type declarations.
+src/components/__tests__/dashboard-grid.test.tsx(5,54): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+src/components/__tests__/dashboard-grid.test.tsx(6,44): error TS2307: Cannot find module '@testing-library/react' or its corresponding type declarations.
+src/components/__tests__/service-request-panel.test.tsx(5,54): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+src/components/__tests__/service-request-panel.test.tsx(6,44): error TS2307: Cannot find module '@testing-library/react' or its corresponding type declarations.
+src/components/__tests__/service-request-panel.test.tsx(29,9): error TS2322: Type '{ request: { id: string; guestName: string; guestCabin: string; cabinId: string; requestType: "call"; priority: "normal"; timestamp: Date; status: "pending"; }; onAccept: any; onDelegate: any; onComplete: any; }' is not assignable to type 'IntrinsicAttributes & ServiceRequestPanelProps'.
+  Property 'request' does not exist on type 'IntrinsicAttributes & ServiceRequestPanelProps'.
+src/components/__tests__/service-request-panel.test.tsx(44,9): error TS2322: Type '{ request: { id: string; guestName: string; guestCabin: string; cabinId: string; requestType: "call"; priority: "normal"; timestamp: Date; status: "pending"; }; onAccept: any; onDelegate: any; onComplete: any; }' is not assignable to type 'IntrinsicAttributes & ServiceRequestPanelProps'.
+  Property 'request' does not exist on type 'IntrinsicAttributes & ServiceRequestPanelProps'.
+src/components/__tests__/service-request-panel.test.tsx(58,9): error TS2322: Type '{ request: { id: string; guestName: string; guestCabin: string; cabinId: string; requestType: "call"; priority: "normal"; timestamp: Date; status: "pending"; }; onAccept: any; onDelegate: any; onComplete: any; }' is not assignable to type 'IntrinsicAttributes & ServiceRequestPanelProps'.
+  Property 'request' does not exist on type 'IntrinsicAttributes & ServiceRequestPanelProps'.
+src/components/__tests__/service-request-panel.test.tsx(83,9): error TS2322: Type '{ request: { status: "accepted"; assignedTo: string; acceptedAt: Date; id: string; guestName: string; guestCabin: string; cabinId: string; requestType: "call"; priority: "normal"; timestamp: Date; }; onAccept: any; onDelegate: any; onComplete: any; }' is not assignable to type 'IntrinsicAttributes & ServiceRequestPanelProps'.
+  Property 'request' does not exist on type 'IntrinsicAttributes & ServiceRequestPanelProps'.
+src/components/__tests__/service-request-panel.test.tsx(104,9): error TS2322: Type '{ request: { status: "completed"; assignedTo: string; acceptedAt: Date; completedAt: Date; id: string; guestName: string; guestCabin: string; cabinId: string; requestType: "call"; priority: "normal"; timestamp: Date; }; onAccept: any; onDelegate: any; onComplete: any; }' is not assignable to type 'IntrinsicAttributes & ServiceRequestPanelProps'.
+  Property 'request' does not exist on type 'IntrinsicAttributes & ServiceRequestPanelProps'.
+src/components/__tests__/service-request-panel.test.tsx(124,9): error TS2322: Type '{ request: { status: "accepted"; assignedTo: string; acceptedAt: Date; id: string; guestName: string; guestCabin: string; cabinId: string; requestType: "call"; priority: "normal"; timestamp: Date; }; onAccept: any; onDelegate: any; onComplete: any; }' is not assignable to type 'IntrinsicAttributes & ServiceRequestPanelProps'.
+  Property 'request' does not exist on type 'IntrinsicAttributes & ServiceRequestPanelProps'.
+src/components/__tests__/service-request-panel.test.tsx(142,9): error TS2322: Type '{ request: { priority: "emergency"; id: string; guestName: string; guestCabin: string; cabinId: string; requestType: "call"; timestamp: Date; status: "pending"; }; onAccept: any; onDelegate: any; onComplete: any; }' is not assignable to type 'IntrinsicAttributes & ServiceRequestPanelProps'.
+  Property 'request' does not exist on type 'IntrinsicAttributes & ServiceRequestPanelProps'.
+src/components/__tests__/service-request-panel.test.tsx(162,9): error TS2322: Type '{ request: { voiceTranscript: string; id: string; guestName: string; guestCabin: string; cabinId: string; requestType: "call"; priority: "normal"; timestamp: Date; status: "pending"; }; onAccept: any; onDelegate: any; onComplete: any; }' is not assignable to type 'IntrinsicAttributes & ServiceRequestPanelProps'.
+  Property 'request' does not exist on type 'IntrinsicAttributes & ServiceRequestPanelProps'.
+src/components/__tests__/service-request-panel.test.tsx(187,9): error TS2322: Type '{ request: { status: "accepted"; assignedTo: string; id: string; guestName: string; guestCabin: string; cabinId: string; requestType: "call"; priority: "normal"; timestamp: Date; }; onAccept: any; onDelegate: any; onComplete: any; }' is not assignable to type 'IntrinsicAttributes & ServiceRequestPanelProps'.
+  Property 'request' does not exist on type 'IntrinsicAttributes & ServiceRequestPanelProps'.
+src/components/app-sidebar.tsx(12,3): error TS6133: 'Radio' is declared but its value is never read.
+src/components/button-simulator-dialog.tsx(8,1): error TS6133: 'Button' is declared but its value is never read.
+src/components/button-simulator-dialog.tsx(18,15): error TS6133: 'SettingsIcon' is declared but its value is never read.
+src/components/button-simulator-dialog.tsx(102,22): error TS2339: Property 'cabin' does not exist on type 'string'.
+src/components/button-simulator-dialog.tsx(125,83): error TS2339: Property 'name' does not exist on type 'Guest'.
+src/components/button-simulator-dialog.tsx(140,80): error TS2339: Property 'name' does not exist on type 'Guest'.
+src/components/button-simulator-dialog.tsx(265,52): error TS2339: Property 'cabin' does not exist on type 'string'.
+src/components/button-simulator-dialog.tsx(265,127): error TS2339: Property 'name' does not exist on type 'Guest'.
+src/components/button-simulator-widget.tsx(15,3): error TS6133: 'Coffee' is declared but its value is never read.
+src/components/button-simulator-widget.tsx(23,3): error TS6133: 'AlertTriangle' is declared but its value is never read.
+src/components/button-simulator-widget.tsx(126,10): error TS6133: 'isTranscribing' is declared but its value is never read.
+src/components/call-backup-dialog.tsx(141,48): error TS2339: Property 'avatar' does not exist on type 'BackupCrewMember'.
+src/components/camera-dialog.tsx(11,32): error TS6133: 'AlertTriangle' is declared but its value is never read.
+src/components/camera-dialog.tsx(12,1): error TS6133: 'toast' is declared but its value is never read.
+src/components/crew-card-view.tsx(3,1): error TS6133: 'Badge' is declared but its value is never read.
+src/components/crew-card-view.tsx(152,31): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/crew-card-view.tsx(171,31): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/crew-card-view.tsx(190,31): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/crew-member-details-dialog.tsx(48,52): error TS6133: 'getDayName' is declared but its value is never read.
+src/components/crew-member-details-dialog.tsx(88,45): error TS6133: 'devicesLoading' is declared but its value is never read.
+src/components/crew-member-details-dialog.tsx(252,14): error TS2345: Argument of type '{ status: string; id: string; name: string; nickname?: string; position: string; department: string; avatar?: string; color: string; email?: string; phone?: string; onBoardContact?: string; leaveStart?: string; leaveEnd?: string; languages?: string[]; skills?: string[]; notes?: string; }' is not assignable to parameter of type 'CrewMember'.
+  Types of property 'status' are incompatible.
+    Type 'string' is not assignable to type '"on-duty" | "off-duty" | "on-leave" | undefined'.
+src/components/crew-member-details-dialog.tsx(260,9): error TS6133: 'handleSetOnLeave' is declared but its value is never read.
+src/components/crew-member-details-dialog.tsx(730,36): error TS7006: Parameter 'range' implicitly has an 'any' type.
+src/components/dashboard-grid.tsx(7,43): error TS7016: Could not find a declaration file for module 'react-grid-layout'. 'C:/Users/debra/OneDrive/Desktop/Luxury Minimal Web App Design/node_modules/react-grid-layout/index.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/react-grid-layout` if it exists or add a new declaration (.d.ts) file containing `declare module 'react-grid-layout';`
+src/components/dashboard-grid.tsx(21,1): error TS6133: 'WidgetCard' is declared but its value is never read.
+src/components/dashboard-grid.tsx(31,1): error TS6133: 'useAppData' is declared but its value is never read.
+src/components/dashboard-grid.tsx(33,10): error TS6133: 'Activity' is declared but its value is never read.
+src/components/dashboard-grid.tsx(33,20): error TS6133: 'Clock' is declared but its value is never read.
+src/components/dashboard-grid.tsx(33,27): error TS6133: 'BatteryLow' is declared but its value is never read.
+src/components/dashboard-grid.tsx(33,39): error TS6133: 'Users' is declared but its value is never read.
+src/components/dashboard-grid.tsx(33,46): error TS6133: 'BellOff' is declared but its value is never read.
+src/components/dashboard-grid.tsx(33,69): error TS6133: 'Bell' is declared but its value is never read.
+src/components/dashboard-grid.tsx(75,26): error TS6133: 'onEditModeChange' is declared but its value is never read.
+src/components/dashboard-grid.tsx(77,9): error TS6133: 'hasDND' is declared but its value is never read.
+src/components/dashboard-grid.tsx(204,38): error TS6133: 'id' is declared but its value is never read.
+src/components/dnd-guests-kpi-card.tsx(6,19): error TS6133: 'User' is declared but its value is never read.
+src/components/dnd-guests-kpi-card.tsx(15,11): error TS6133: 'guests' is declared but its value is never read.
+src/components/dnd-guests-widget.tsx(18,11): error TS6133: 'guests' is declared but its value is never read.
+src/components/duty-roster/calendar-day-cell.tsx(200,9): error TS6133: 'getCrewById' is declared but its value is never read.
+src/components/duty-roster/calendar-day-cell.tsx(483,28): error TS7006: Parameter 'open' implicitly has an 'any' type.
+src/components/duty-roster/day-detail-dialog.tsx(61,9): error TS6133: 'formattedDate' is declared but its value is never read.
+src/components/duty-roster/day-detail-dialog.tsx(198,44): error TS7006: Parameter 'open' implicitly has an 'any' type.
+src/components/duty-timer-card.tsx(2,1): error TS6133: 'Card' is declared but its value is never read.
+src/components/duty-timer-card.tsx(224,49): error TS6133: 'urgency' is declared but its value is never read.
+src/components/duty-timer-card.tsx(224,66): error TS6133: 'reason' is declared but its value is never read.
+src/components/duty-timer-card.tsx(249,32): error TS6133: 'shiftEnd' is declared but its value is never read.
+src/components/ErrorBoundary.tsx(6,8): error TS6133: 'React' is declared but its value is never read.
+src/components/guest-card-view.tsx(40,12): error TS2678: Type '"primary"' is not comparable to type '"owner" | "vip" | "guest" | "partner" | "family"'.
+src/components/guest-card-view.tsx(46,12): error TS2678: Type '"child"' is not comparable to type '"owner" | "vip" | "guest" | "partner" | "family"'.
+src/components/guest-card-view.tsx(52,12): error TS2678: Type '"charter"' is not comparable to type '"owner" | "vip" | "guest" | "partner" | "family"'.
+src/components/guest-card-view.tsx(137,22): error TS2339: Property 'email' does not exist on type 'Guest'.
+src/components/guest-card-view.tsx(140,53): error TS2339: Property 'email' does not exist on type 'Guest'.
+src/components/guest-card-view.tsx(144,22): error TS2339: Property 'phone' does not exist on type 'Guest'.
+src/components/guest-card-view.tsx(147,32): error TS2339: Property 'phone' does not exist on type 'Guest'.
+src/components/guest-card-view.tsx(208,27): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/guest-card-view.tsx(219,27): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/guest-details-dialog.tsx(5,1): error TS6133: 'Separator' is declared but its value is never read.
+src/components/guest-details-dialog.tsx(7,3): error TS6133: 'Calendar' is declared but its value is never read.
+src/components/guest-details-dialog.tsx(10,3): error TS6133: 'Languages' is declared but its value is never read.
+src/components/guest-details-dialog.tsx(59,12): error TS2678: Type '"primary"' is not comparable to type '"owner" | "vip" | "guest" | "partner" | "family"'.
+src/components/guest-details-dialog.tsx(65,12): error TS2678: Type '"child"' is not comparable to type '"owner" | "vip" | "guest" | "partner" | "family"'.
+src/components/guest-details-dialog.tsx(71,12): error TS2678: Type '"charter"' is not comparable to type '"owner" | "vip" | "guest" | "partner" | "family"'.
+src/components/guests/GuestsToolbar.tsx(6,8): error TS6133: 'React' is declared but its value is never read.
+src/components/guests/GuestsToolbar.tsx(340,36): error TS7006: Parameter 'date' implicitly has an 'any' type.
+src/components/guests/GuestsToolbar.tsx(356,36): error TS7006: Parameter 'date' implicitly has an 'any' type.
+src/components/guests/GuestsToolbar.tsx(416,56): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/components/incoming-request-dialog.tsx(48,57): error TS2339: Property 'forwardServiceRequest' does not exist on type 'AppDataContextType'.
+src/components/incoming-request-dialog.tsx(208,18): error TS7053: Element implicitly has an 'any' type because expression of type '"normal" | "low" | "emergency" | "urgent"' can't be used to index type '{ emergency: { bg: string; border: string; text: string; icon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; label: string; }; urgent: { ...; }; normal: { ...; }; }'.
+  Property 'low' does not exist on type '{ emergency: { bg: string; border: string; text: string; icon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; label: string; }; urgent: { ...; }; normal: { ...; }; }'.
+src/components/manage-widgets-dialog.tsx(23,3): error TS6133: 'Radio' is declared but its value is never read.
+src/components/notification-settings-dialog.tsx(103,33): error TS7006: Parameter 'checked' implicitly has an 'any' type.
+src/components/notification-settings-dialog.tsx(118,35): error TS7006: Parameter 'checked' implicitly has an 'any' type.
+src/components/notification-settings-dialog.tsx(128,33): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/components/notification-settings-dialog.tsx(156,35): error TS7006: Parameter 'checked' implicitly has an 'any' type.
+src/components/notification-settings-dialog.tsx(166,33): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/components/notify-crew-dialog.tsx(3,16): error TS6133: 'Calendar' is declared but its value is never read.
+src/components/notify-crew-dialog.tsx(3,26): error TS6133: 'Clock' is declared but its value is never read.
+src/components/notify-crew-dialog.tsx(6,1): error TS6133: 'Avatar' is declared but its value is never read.
+src/components/notify-crew-dialog.tsx(7,1): error TS6133: 'getCrewAvatarUrl' is declared but its value is never read.
+src/components/pages/activity-log.tsx(11,51): error TS6133: 'User' is declared but its value is never read.
+src/components/pages/activity-log.tsx(11,57): error TS6133: 'MapPin' is declared but its value is never read.
+src/components/pages/activity-log.tsx(26,7): error TS6133: 'formatDate' is declared but its value is never read.
+src/components/pages/activity-log.tsx(39,9): error TS6133: 'crewMembers' is declared but its value is never read.
+src/components/pages/activity-log.tsx(146,9): error TS6133: 'getPriorityColor' is declared but its value is never read.
+src/components/pages/activity-log.tsx(165,9): error TS6133: 'formatDuration' is declared but its value is never read.
+src/components/pages/button-simulator.tsx(21,3): error TS6133: 'Wind' is declared but its value is never read.
+src/components/pages/button-simulator.tsx(23,3): error TS6133: 'CheckCircle2' is declared but its value is never read.
+src/components/pages/button-simulator.tsx(451,36): error TS2339: Property 'cabin' does not exist on type 'string'.
+src/components/pages/button-simulator.tsx(452,22): error TS2339: Property 'name' does not exist on type 'Guest'.
+src/components/pages/button-simulator.tsx(720,35): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/components/pages/crew-list.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/pages/crew-list.tsx(18,1): error TS6133: 'StatusChip' is declared but its value is never read.
+src/components/pages/crew-list.tsx(61,38): error TS6133: 'NotificationSettings' is declared but its value is never read.
+src/components/pages/crew-list.tsx(80,32): error TS6133: 'onNavigate' is declared but its value is never read.
+src/components/pages/crew-list.tsx(103,10): error TS6133: 'cameraDialogMode' is declared but its value is never read.
+src/components/pages/crew-list.tsx(113,9): error TS6133: 'can' is declared but its value is never read.
+src/components/pages/crew-list.tsx(155,13): error TS2339: Property 'phone' does not exist on type 'CrewMemberExtended'.
+src/components/pages/crew-list.tsx(155,27): error TS2339: Property 'phone' does not exist on type 'CrewMemberExtended'.
+src/components/pages/crew-list.tsx(156,13): error TS2339: Property 'onBoardContact' does not exist on type 'CrewMemberExtended'.
+src/components/pages/crew-list.tsx(156,36): error TS2339: Property 'onBoardContact' does not exist on type 'CrewMemberExtended'.
+src/components/pages/crew-list.tsx(184,20): error TS7053: Element implicitly has an 'any' type because expression of type '"color" | "email" | "name" | "id" | "avatar" | "phone" | "department" | "notes" | "languages" | "position" | "nickname" | "onBoardContact" | "leaveStart" | "leaveEnd" | "skills"' can't be used to index type 'CrewMemberExtended'.
+  Property 'color' does not exist on type 'CrewMemberExtended'.
+src/components/pages/crew-list.tsx(185,20): error TS7053: Element implicitly has an 'any' type because expression of type '"color" | "email" | "name" | "id" | "avatar" | "phone" | "department" | "notes" | "languages" | "position" | "nickname" | "onBoardContact" | "leaveStart" | "leaveEnd" | "skills"' can't be used to index type 'CrewMemberExtended'.
+  Property 'color' does not exist on type 'CrewMemberExtended'.
+src/components/pages/crew-list.tsx(381,27): error TS2345: Argument of type '(CrewMemberExtended | { status: string; id: string; name: string; position: string; department: string; shift?: string | undefined; contact?: string | undefined; email?: string | undefined; joinDate?: string | undefined; role?: string | undefined; })[]' is not assignable to parameter of type 'CrewMemberExtended[]'.
+  Type 'CrewMemberExtended | { status: string; id: string; name: string; position: string; department: string; shift?: string | undefined; contact?: string | undefined; email?: string | undefined; joinDate?: string | undefined; role?: string | undefined; }' is not assignable to type 'CrewMemberExtended'.
+    Type '{ status: string; id: string; name: string; position: string; department: string; shift?: string; contact?: string; email?: string; joinDate?: string; role?: string; }' is not assignable to type 'CrewMemberExtended'.
+      Types of property 'status' are incompatible.
+        Type 'string' is not assignable to type '"active" | "on-duty" | "off-duty" | "on-leave" | undefined'.
+src/components/pages/crew-list.tsx(448,27): error TS2345: Argument of type '(CrewMemberExtended | { status: string; id: string; name: string; position: string; department: string; shift?: string | undefined; contact?: string | undefined; email?: string | undefined; joinDate?: string | undefined; role?: string | undefined; })[]' is not assignable to parameter of type 'CrewMemberExtended[]'.
+  Type 'CrewMemberExtended | { status: string; id: string; name: string; position: string; department: string; shift?: string | undefined; contact?: string | undefined; email?: string | undefined; joinDate?: string | undefined; role?: string | undefined; }' is not assignable to type 'CrewMemberExtended'.
+    Type '{ status: string; id: string; name: string; position: string; department: string; shift?: string; contact?: string; email?: string; joinDate?: string; role?: string; }' is not assignable to type 'CrewMemberExtended'.
+      Types of property 'status' are incompatible.
+        Type 'string' is not assignable to type '"active" | "on-duty" | "off-duty" | "on-leave" | undefined'.
+src/components/pages/crew-list.tsx(471,14): error TS2339: Property 'phone' does not exist on type 'CrewMemberExtended'.
+src/components/pages/crew-list.tsx(472,14): error TS2339: Property 'onBoardContact' does not exist on type 'CrewMemberExtended'.
+src/components/pages/crew-list.tsx(487,17): error TS2345: Argument of type '{ name: string; nickname: string; position: string; department: string; status: "off-duty"; contact: string; phone: string; onBoardContact: string; email: string; avatar: string; color: string; languages: never[]; skills: never[]; notes: string; leaveStart: string; leaveEnd: string; }' is not assignable to parameter of type 'SetStateAction<{ name: string; nickname: string; position: string; department: string; role: Role; status: "on-duty" | "off-duty" | "on-leave"; contact: string; phone: string; onBoardContact: string; ... 7 more ...; leaveEnd: string; }>'.
+  Property 'role' is missing in type '{ name: string; nickname: string; position: string; department: string; status: "off-duty"; contact: string; phone: string; onBoardContact: string; email: string; avatar: string; color: string; languages: never[]; skills: never[]; notes: string; leaveStart: string; leaveEnd: string; }' but required in type '{ name: string; nickname: string; position: string; department: string; role: Role; status: "on-duty" | "off-duty" | "on-leave"; contact: string; phone: string; onBoardContact: string; email: string; ... 6 more ...; leaveEnd: string; }'.
+src/components/pages/crew-list.tsx(533,17): error TS2345: Argument of type '{ name: string; nickname: string; position: string; department: string; status: "on-duty" | "off-duty" | "on-leave"; contact: string; phone: string; onBoardContact: string; email: string; avatar: string; ... 5 more ...; leaveEnd: string; }' is not assignable to parameter of type 'SetStateAction<{ name: string; nickname: string; position: string; department: string; role: Role; status: "on-duty" | "off-duty" | "on-leave"; contact: string; phone: string; onBoardContact: string; ... 7 more ...; leaveEnd: string; }>'.
+  Property 'role' is missing in type '{ name: string; nickname: string; position: string; department: string; status: "on-duty" | "off-duty" | "on-leave"; contact: string; phone: string; onBoardContact: string; email: string; avatar: string; ... 5 more ...; leaveEnd: string; }' but required in type '{ name: string; nickname: string; position: string; department: string; role: Role; status: "on-duty" | "off-duty" | "on-leave"; contact: string; phone: string; onBoardContact: string; email: string; ... 6 more ...; leaveEnd: string; }'.
+src/components/pages/crew-list.tsx(558,33): error TS2345: Argument of type 'CrewMemberExtended' is not assignable to parameter of type 'SetStateAction<CrewMember | null>'.
+  Property 'color' is missing in type 'CrewMemberExtended' but required in type 'CrewMember'.
+src/components/pages/crew-list.tsx(665,19): error TS2741: Property 'color' is missing in type 'CrewMemberExtended' but required in type 'CrewMember'.
+src/components/pages/crew-list.tsx(667,19): error TS2322: Type 'CrewMemberExtended | undefined' is not assignable to type '{ shift: string; } | undefined'.
+  Type 'CrewMemberExtended' is not assignable to type '{ shift: string; }'.
+    Types of property 'shift' are incompatible.
+      Type 'string | undefined' is not assignable to type 'string'.
+        Type 'undefined' is not assignable to type 'string'.
+src/components/pages/crew-list.tsx(672,47): error TS2741: Property 'date' is missing in type 'CrewMemberExtended' but required in type 'DutyInfo'.
+src/components/pages/crew-list.tsx(754,48): error TS2345: Argument of type 'CrewMemberExtended' is not assignable to parameter of type 'CrewMember'.
+  Property 'color' is missing in type 'CrewMemberExtended' but required in type 'CrewMember'.
+src/components/pages/crew-list.tsx(763,47): error TS2741: Property 'color' is missing in type 'CrewMemberExtended' but required in type 'CrewMember'.
+src/components/pages/crew-list.tsx(763,53): error TS2741: Property 'date' is missing in type 'CrewMemberExtended' but required in type 'DutyInfo'.
+src/components/pages/crew-list.tsx(769,45): error TS2345: Argument of type 'CrewMemberExtended' is not assignable to parameter of type 'SetStateAction<CrewMember | null>'.
+  Property 'color' is missing in type 'CrewMemberExtended' but required in type 'CrewMember'.
+src/components/pages/crew-list.tsx(801,50): error TS2339: Property 'avatar' does not exist on type 'CrewMemberExtended'.
+src/components/pages/crew-list.tsx(845,43): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/pages/crew-list.tsx(868,43): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/pages/crew-list.tsx(870,44): error TS2345: Argument of type 'CrewMemberExtended' is not assignable to parameter of type 'CrewMember'.
+  Property 'color' is missing in type 'CrewMemberExtended' but required in type 'CrewMember'.
+src/components/pages/crew-list.tsx(887,43): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/pages/crew-list.tsx(889,52): error TS2345: Argument of type 'CrewMemberExtended' is not assignable to parameter of type 'CrewMember'.
+  Property 'color' is missing in type 'CrewMemberExtended' but required in type 'CrewMember'.
+src/components/pages/crew-list.tsx(1004,35): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/components/pages/crew-list.tsx(1346,39): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/components/pages/crew-list.tsx(1622,33): error TS7006: Parameter 'checked' implicitly has an 'any' type.
+src/components/pages/crew-list.tsx(1740,33): error TS7006: Parameter 'checked' implicitly has an 'any' type.
+src/components/pages/crew-management.tsx(18,49): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/components/pages/device-manager-full.tsx(49,10): error TS6133: 'isAddDialogOpen' is declared but its value is never read.
+src/components/pages/duty-roster-tab.tsx(35,3): error TS6133: 'Download' is declared but its value is never read.
+src/components/pages/duty-roster-tab.tsx(39,45): error TS6133: 'CrewMember' is declared but its value is never read.
+src/components/pages/duty-roster-tab.tsx(122,16): error TS2339: Property 'nickname' does not exist on type 'CrewMemberExtended'.
+src/components/pages/duty-roster-tab.tsx(176,45): error TS2339: Property 'leaveStart' does not exist on type 'CrewMemberExtended'.
+src/components/pages/duty-roster-tab.tsx(176,64): error TS2339: Property 'leaveEnd' does not exist on type 'CrewMemberExtended'.
+src/components/pages/duty-roster-tab.tsx(177,24): error TS2339: Property 'leaveStart' does not exist on type 'CrewMemberExtended'.
+src/components/pages/duty-roster-tab.tsx(177,51): error TS2339: Property 'leaveEnd' does not exist on type 'CrewMemberExtended'.
+src/components/pages/duty-roster-tab.tsx(240,63): error TS2345: Argument of type 'CrewMemberExtended[]' is not assignable to parameter of type 'CrewMember[]'.
+  Property 'color' is missing in type 'CrewMemberExtended' but required in type 'CrewMember'.
+src/components/pages/duty-roster-tab.tsx(271,9): error TS2345: Argument of type 'CrewMemberExtended[]' is not assignable to parameter of type 'CrewMember[]'.
+  Property 'color' is missing in type 'CrewMemberExtended' but required in type 'CrewMember'.
+src/components/pages/duty-roster-tab.tsx(703,49): error TS2741: Property 'color' is missing in type 'CrewMemberExtended' but required in type 'CrewMember'.
+src/components/pages/duty-roster-tab.tsx(723,49): error TS2741: Property 'color' is missing in type 'CrewMemberExtended' but required in type 'CrewMember'.
+src/components/pages/duty-roster-tab.tsx(753,60): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/components/pages/duty-roster-tab.tsx(795,25): error TS2322: Type 'CrewMemberExtended[]' is not assignable to type 'CrewMember[]'.
+  Property 'color' is missing in type 'CrewMemberExtended' but required in type 'CrewMember'.
+src/components/pages/duty-roster-tab.tsx(815,60): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/components/pages/duty-roster-tab.tsx(862,23): error TS2322: Type 'CrewMemberExtended[]' is not assignable to type 'CrewMember[]'.
+  Property 'color' is missing in type 'CrewMemberExtended' but required in type 'CrewMember'.
+src/components/pages/duty-roster-tab.tsx(879,60): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/components/pages/duty-roster-tab.tsx(913,21): error TS2322: Type 'CrewMemberExtended[]' is not assignable to type 'CrewMember[]'.
+  Property 'color' is missing in type 'CrewMemberExtended' but required in type 'CrewMember'.
+src/components/pages/duty-roster-tab.tsx(954,11): error TS2322: Type 'CrewMemberExtended[]' is not assignable to type 'CrewMember[]'.
+  Property 'color' is missing in type 'CrewMemberExtended' but required in type 'CrewMember'.
+src/components/pages/guests-list.tsx(1,29): error TS6133: 'useEffect' is declared but its value is never read.
+src/components/pages/guests-list.tsx(10,31): error TS6133: 'Calendar' is declared but its value is never read.
+src/components/pages/guests-list.tsx(10,62): error TS6133: 'Loader2' is declared but its value is never read.
+src/components/pages/guests-list.tsx(10,111): error TS6133: 'UserCheck' is declared but its value is never read.
+src/components/pages/guests-list.tsx(13,1): error TS6133: 'DNDGuestsKpiCard' is declared but its value is never read.
+src/components/pages/guests-list.tsx(59,9): error TS6133: 'queryClient' is declared but its value is never read.
+src/components/pages/guests-list.tsx(77,9): error TS6133: 'meta' is declared but its value is never read.
+src/components/pages/guests-list.tsx(114,42): error TS6133: 'filters' is declared but its value is never read.
+src/components/pages/guests-list.tsx(488,47): error TS6133: 'index' is declared but its value is never read.
+src/components/pages/locations.tsx(14,36): error TS6133: 'LOCATION_STATUS_LABELS' is declared but its value is never read.
+src/components/pages/locations.tsx(18,99): error TS6133: 'Bell' is declared but its value is never read.
+src/components/pages/locations.tsx(19,1): error TS6133: 'Switch' is declared but its value is never read.
+src/components/pages/locations.tsx(41,47): error TS6133: 'isLoadingButtons' is declared but its value is never read.
+src/components/pages/locations.tsx(161,11): error TS6133: 'selectedButton' is declared but its value is never read.
+src/components/pages/locations.tsx(179,72): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+src/components/pages/locations.tsx(198,62): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+src/components/pages/locations.tsx(208,40): error TS7006: Parameter 'g' implicitly has an 'any' type.
+src/components/pages/locations.tsx(209,45): error TS7006: Parameter 'g' implicitly has an 'any' type.
+src/components/pages/locations.tsx(253,54): error TS7006: Parameter 'g' implicitly has an 'any' type.
+src/components/pages/locations.tsx(520,35): error TS6133: 'floorIndex' is declared but its value is never read.
+src/components/pages/locations.tsx(571,62): error TS7006: Parameter 'g' implicitly has an 'any' type.
+src/components/pages/locations.tsx(577,48): error TS7006: Parameter 'a' implicitly has an 'any' type.
+src/components/pages/locations.tsx(577,51): error TS7006: Parameter 'b' implicitly has an 'any' type.
+src/components/pages/locations.tsx(676,24): error TS7006: Parameter 'open' implicitly has an 'any' type.
+src/components/pages/locations.tsx(815,24): error TS7006: Parameter 'open' implicitly has an 'any' type.
+src/components/pages/locations.tsx(928,31): error TS7006: Parameter 'g' implicitly has an 'any' type.
+src/components/pages/locations.tsx(929,29): error TS7006: Parameter 'guest' implicitly has an 'any' type.
+src/components/pages/locations.tsx(955,53): error TS7006: Parameter 'g' implicitly has an 'any' type.
+src/components/pages/locations.tsx(1081,24): error TS7006: Parameter 'open' implicitly has an 'any' type.
+src/components/pages/service-requests.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/pages/service-requests.tsx(9,3): error TS6133: 'CheckCircle2' is declared but its value is never read.
+src/components/pages/service-requests.tsx(15,3): error TS6133: 'Volume2' is declared but its value is never read.
+src/components/pages/service-requests.tsx(19,3): error TS6133: 'UtensilsCrossed' is declared but its value is never read.
+src/components/pages/service-requests.tsx(20,3): error TS6133: 'Package' is declared but its value is never read.
+src/components/pages/service-requests.tsx(21,3): error TS6133: 'Home' is declared but its value is never read.
+src/components/pages/service-requests.tsx(22,3): error TS6133: 'Shirt' is declared but its value is never read.
+src/components/pages/service-requests.tsx(23,3): error TS6133: 'Wine' is declared but its value is never read.
+src/components/pages/service-requests.tsx(24,3): error TS6133: 'Waves' is declared but its value is never read.
+src/components/pages/service-requests.tsx(28,31): error TS6196: 'InteriorTeam' is declared but never used.
+src/components/pages/service-requests.tsx(50,1): error TS6133: 'authService' is declared but its value is never read.
+src/components/pages/service-requests.tsx(64,5): error TS6133: 'acceptServiceRequest' is declared but its value is never read.
+src/components/pages/service-requests.tsx(65,5): error TS6133: 'delegateServiceRequest' is declared but its value is never read.
+src/components/pages/service-requests.tsx(68,5): error TS6133: 'serviceRequestHistory' is declared but its value is never read.
+src/components/pages/service-requests.tsx(69,5): error TS6133: 'clearServiceRequestHistory' is declared but its value is never read.
+src/components/pages/service-requests.tsx(84,10): error TS6133: 'showHistory' is declared but its value is never read.
+src/components/pages/service-requests.tsx(84,23): error TS6133: 'setShowHistory' is declared but its value is never read.
+src/components/pages/service-requests.tsx(99,10): error TS6133: 'selectedCrewMember' is declared but its value is never read.
+src/components/pages/service-requests.tsx(102,10): error TS6133: 'playingAudio' is declared but its value is never read.
+src/components/pages/service-requests.tsx(308,9): error TS6133: 'handlePlayAudio' is declared but its value is never read.
+src/components/pages/service-requests.tsx(767,33): error TS7006: Parameter 'crewId' implicitly has an 'any' type.
+src/components/pages/service-requests.tsx(853,33): error TS7006: Parameter 'crewId' implicitly has an 'any' type.
+src/components/pages/settings.tsx(9,1): error TS6133: 'Textarea' is declared but its value is never read.
+src/components/pages/settings.tsx(32,3): error TS6133: 'Lock' is declared but its value is never read.
+src/components/pages/settings.tsx(39,3): error TS6133: 'Calendar' is declared but its value is never read.
+src/components/pages/settings.tsx(43,3): error TS6133: 'FileText' is declared but its value is never read.
+src/components/pages/settings.tsx(45,3): error TS6133: 'RefreshCw' is declared but its value is never read.
+src/components/pages/settings.tsx(46,3): error TS6133: 'ExternalLink' is declared but its value is never read.
+src/components/pages/settings.tsx(73,1): error TS6133: 'Progress' is declared but its value is never read.
+src/components/pages/settings.tsx(194,10): error TS6133: 'notifications' is declared but its value is never read.
+src/components/pages/settings.tsx(194,25): error TS6133: 'setNotifications' is declared but its value is never read.
+src/components/pages/settings.tsx(195,10): error TS6133: 'autoBackup' is declared but its value is never read.
+src/components/pages/settings.tsx(195,22): error TS6133: 'setAutoBackup' is declared but its value is never read.
+src/components/pages/settings.tsx(272,9): error TS6133: 'reorderCategories' is declared but its value is never read.
+src/components/send-message-dialog.tsx(20,1): error TS6133: 'Badge' is declared but its value is never read.
+src/components/send-message-dialog.tsx(21,31): error TS6133: 'Battery' is declared but its value is never read.
+src/components/send-message-dialog.tsx(175,31): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/components/service-requests-settings-dialog.tsx(17,3): error TS6133: 'Clock' is declared but its value is never read.
+src/components/service-requests-settings-dialog.tsx(244,33): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/components/service-requests-settings-dialog.tsx(306,33): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/components/service-requests-settings-dialog.tsx(371,33): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/components/serving-now-widget.tsx(10,1): error TS6133: 'toast' is declared but its value is never read.
+src/components/ui/accordion.tsx(4,37): error TS2307: Cannot find module '@radix-ui/react-accordion@1.2.3' or its corresponding type declarations.
+src/components/ui/accordion.tsx(5,33): error TS2307: Cannot find module 'lucide-react@0.487.0' or its corresponding type declarations.
+src/components/ui/alert-dialog.tsx(4,39): error TS2307: Cannot find module '@radix-ui/react-alert-dialog@1.1.6' or its corresponding type declarations.
+src/components/ui/alert.tsx(2,40): error TS2307: Cannot find module 'class-variance-authority@0.7.1' or its corresponding type declarations.
+src/components/ui/aspect-ratio.tsx(3,39): error TS2307: Cannot find module '@radix-ui/react-aspect-ratio@1.1.2' or its corresponding type declarations.
+src/components/ui/avatar.tsx(4,34): error TS2307: Cannot find module '@radix-ui/react-avatar@1.1.3' or its corresponding type declarations.
+src/components/ui/badge.tsx(2,22): error TS2307: Cannot find module '@radix-ui/react-slot@1.1.2' or its corresponding type declarations.
+src/components/ui/badge.tsx(3,40): error TS2307: Cannot find module 'class-variance-authority@0.7.1' or its corresponding type declarations.
+src/components/ui/breadcrumb.tsx(2,22): error TS2307: Cannot find module '@radix-ui/react-slot@1.1.2' or its corresponding type declarations.
+src/components/ui/breadcrumb.tsx(3,46): error TS2307: Cannot find module 'lucide-react@0.487.0' or its corresponding type declarations.
+src/components/ui/button.tsx(2,22): error TS2307: Cannot find module '@radix-ui/react-slot@1.1.2' or its corresponding type declarations.
+src/components/ui/button.tsx(3,40): error TS2307: Cannot find module 'class-variance-authority@0.7.1' or its corresponding type declarations.
+src/components/ui/calendar.tsx(4,43): error TS2307: Cannot find module 'lucide-react@0.487.0' or its corresponding type declarations.
+src/components/ui/calendar.tsx(5,27): error TS2307: Cannot find module 'react-day-picker@8.10.1' or its corresponding type declarations.
+src/components/ui/calendar.tsx(63,22): error TS7031: Binding element 'className' implicitly has an 'any' type.
+src/components/ui/calendar.tsx(66,23): error TS7031: Binding element 'className' implicitly has an 'any' type.
+src/components/ui/carousel.tsx(6,8): error TS2307: Cannot find module 'embla-carousel-react@8.6.0' or its corresponding type declarations.
+src/components/ui/carousel.tsx(7,39): error TS2307: Cannot find module 'lucide-react@0.487.0' or its corresponding type declarations.
+src/components/ui/chart.tsx(4,36): error TS2307: Cannot find module 'recharts@2.15.2' or its corresponding type declarations.
+src/components/ui/chart.tsx(182,23): error TS7006: Parameter 'item' implicitly has an 'any' type.
+src/components/ui/chart.tsx(182,29): error TS7006: Parameter 'index' implicitly has an 'any' type.
+src/components/ui/chart.tsx(278,21): error TS7006: Parameter 'item' implicitly has an 'any' type.
+src/components/ui/checkbox.tsx(4,36): error TS2307: Cannot find module '@radix-ui/react-checkbox@1.1.4' or its corresponding type declarations.
+src/components/ui/checkbox.tsx(5,27): error TS2307: Cannot find module 'lucide-react@0.487.0' or its corresponding type declarations.
+src/components/ui/collapsible.tsx(3,39): error TS2307: Cannot find module '@radix-ui/react-collapsible@1.1.3' or its corresponding type declarations.
+src/components/ui/command.tsx(4,45): error TS2307: Cannot find module 'cmdk@1.1.1' or its corresponding type declarations.
+src/components/ui/command.tsx(5,28): error TS2307: Cannot find module 'lucide-react@0.487.0' or its corresponding type declarations.
+src/components/ui/context-menu.tsx(4,39): error TS2307: Cannot find module '@radix-ui/react-context-menu@2.2.6' or its corresponding type declarations.
+src/components/ui/context-menu.tsx(5,57): error TS2307: Cannot find module 'lucide-react@0.487.0' or its corresponding type declarations.
+src/components/ui/dialog.tsx(4,34): error TS2307: Cannot find module '@radix-ui/react-dialog@1.1.6' or its corresponding type declarations.
+src/components/ui/dialog.tsx(5,23): error TS2307: Cannot find module 'lucide-react@0.487.0' or its corresponding type declarations.
+src/components/ui/drawer.tsx(4,43): error TS2307: Cannot find module 'vaul@1.1.2' or its corresponding type declarations.
+src/components/ui/dropdown-menu.tsx(4,40): error TS2307: Cannot find module '@radix-ui/react-dropdown-menu@2.1.6' or its corresponding type declarations.
+src/components/ui/dropdown-menu.tsx(5,57): error TS2307: Cannot find module 'lucide-react@0.487.0' or its corresponding type declarations.
+src/components/ui/form.tsx(4,33): error TS2307: Cannot find module '@radix-ui/react-label@2.1.2' or its corresponding type declarations.
+src/components/ui/form.tsx(5,22): error TS2307: Cannot find module '@radix-ui/react-slot@1.1.2' or its corresponding type declarations.
+src/components/ui/form.tsx(14,8): error TS2307: Cannot find module 'react-hook-form@7.55.0' or its corresponding type declarations.
+src/components/ui/hover-card.tsx(4,37): error TS2307: Cannot find module '@radix-ui/react-hover-card@1.1.6' or its corresponding type declarations.
+src/components/ui/input-otp.tsx(4,43): error TS2307: Cannot find module 'input-otp@1.4.2' or its corresponding type declarations.
+src/components/ui/input-otp.tsx(5,27): error TS2307: Cannot find module 'lucide-react@0.487.0' or its corresponding type declarations.
+src/components/ui/input-otp.tsx(47,61): error TS2339: Property 'slots' does not exist on type '{}'.
+src/components/ui/label.tsx(4,33): error TS2307: Cannot find module '@radix-ui/react-label@2.1.2' or its corresponding type declarations.
+src/components/ui/menubar.tsx(4,35): error TS2307: Cannot find module '@radix-ui/react-menubar@1.1.6' or its corresponding type declarations.
+src/components/ui/menubar.tsx(5,57): error TS2307: Cannot find module 'lucide-react@0.487.0' or its corresponding type declarations.
+src/components/ui/navigation-menu.tsx(2,42): error TS2307: Cannot find module '@radix-ui/react-navigation-menu@1.2.5' or its corresponding type declarations.
+src/components/ui/navigation-menu.tsx(3,21): error TS2307: Cannot find module 'class-variance-authority@0.7.1' or its corresponding type declarations.
+src/components/ui/navigation-menu.tsx(4,33): error TS2307: Cannot find module 'lucide-react@0.487.0' or its corresponding type declarations.
+src/components/ui/pagination.tsx(6,8): error TS2307: Cannot find module 'lucide-react@0.487.0' or its corresponding type declarations.
+src/components/ui/pagination.tsx(75,7): error TS2783: 'size' is specified more than once, so this usage will be overwritten.
+src/components/ui/pagination.tsx(92,7): error TS2783: 'size' is specified more than once, so this usage will be overwritten.
+src/components/ui/popover.tsx(4,35): error TS2307: Cannot find module '@radix-ui/react-popover@1.1.6' or its corresponding type declarations.
+src/components/ui/progress.tsx(4,36): error TS2307: Cannot find module '@radix-ui/react-progress@1.1.2' or its corresponding type declarations.
+src/components/ui/radio-group.tsx(4,38): error TS2307: Cannot find module '@radix-ui/react-radio-group@1.2.3' or its corresponding type declarations.
+src/components/ui/radio-group.tsx(5,28): error TS2307: Cannot find module 'lucide-react@0.487.0' or its corresponding type declarations.
+src/components/ui/resizable.tsx(4,34): error TS2307: Cannot find module 'lucide-react@0.487.0' or its corresponding type declarations.
+src/components/ui/resizable.tsx(5,37): error TS2307: Cannot find module 'react-resizable-panels@2.1.7' or its corresponding type declarations.
+src/components/ui/scroll-area.tsx(4,38): error TS2307: Cannot find module '@radix-ui/react-scroll-area@1.2.3' or its corresponding type declarations.
+src/components/ui/select.tsx(4,34): error TS2307: Cannot find module '@radix-ui/react-select@2.1.6' or its corresponding type declarations.
+src/components/ui/select.tsx(9,8): error TS2307: Cannot find module 'lucide-react@0.487.0' or its corresponding type declarations.
+src/components/ui/separator.tsx(4,37): error TS2307: Cannot find module '@radix-ui/react-separator@1.1.2' or its corresponding type declarations.
+src/components/ui/sheet.tsx(4,33): error TS2307: Cannot find module '@radix-ui/react-dialog@1.1.6' or its corresponding type declarations.
+src/components/ui/sheet.tsx(5,23): error TS2307: Cannot find module 'lucide-react@0.487.0' or its corresponding type declarations.
+src/components/ui/sidebar.tsx(4,22): error TS2307: Cannot find module '@radix-ui/react-slot@1.1.2' or its corresponding type declarations.
+src/components/ui/sidebar.tsx(5,35): error TS2307: Cannot find module 'class-variance-authority@0.7.1' or its corresponding type declarations.
+src/components/ui/sidebar.tsx(6,31): error TS2307: Cannot find module 'lucide-react@0.487.0' or its corresponding type declarations.
+src/components/ui/sidebar.tsx(270,17): error TS7006: Parameter 'event' implicitly has an 'any' type.
+src/components/ui/slider.tsx(4,34): error TS2307: Cannot find module '@radix-ui/react-slider@1.2.3' or its corresponding type declarations.
+src/components/ui/switch.tsx(4,34): error TS2307: Cannot find module '@radix-ui/react-switch@1.1.3' or its corresponding type declarations.
+src/components/ui/tabs.tsx(4,32): error TS2307: Cannot find module '@radix-ui/react-tabs@1.1.3' or its corresponding type declarations.
+src/components/ui/toggle-group.tsx(4,39): error TS2307: Cannot find module '@radix-ui/react-toggle-group@1.1.2' or its corresponding type declarations.
+src/components/ui/toggle-group.tsx(5,35): error TS2307: Cannot find module 'class-variance-authority@0.7.1' or its corresponding type declarations.
+src/components/ui/toggle.tsx(4,34): error TS2307: Cannot find module '@radix-ui/react-toggle@1.1.2' or its corresponding type declarations.
+src/components/ui/toggle.tsx(5,40): error TS2307: Cannot find module 'class-variance-authority@0.7.1' or its corresponding type declarations.
+src/components/ui/tooltip.tsx(4,35): error TS2307: Cannot find module '@radix-ui/react-tooltip@1.1.8' or its corresponding type declarations.
+src/contexts/AppDataContext.tsx(4,22): error TS6133: 'CrewMember' is declared but its value is never read.
+src/contexts/AppDataContext.tsx(13,1): error TS6192: All imports in import declaration are unused.
+src/contexts/AppDataContext.tsx(14,20): error TS6133: 'LocationType' is declared but its value is never read.
+src/contexts/AppDataContext.tsx(29,3): error TS6133: 'InteriorTeam' is declared but its value is never read.
+src/contexts/AppDataContext.tsx(174,10): error TS6133: 'generateDefaultAssignments' is declared but its value is never read.
+src/contexts/AppDataContext.tsx(298,9): error TS6133: 'wsConnected' is declared but its value is never read.
+src/contexts/AppDataContext.tsx(301,51): error TS6133: 'isLoadingCrew' is declared but its value is never read.
+src/contexts/AppDataContext.tsx(304,41): error TS6133: 'isLoadingGuests' is declared but its value is never read.
+src/contexts/AppDataContext.tsx(307,59): error TS6133: 'isLoadingServiceRequests' is declared but its value is never read.
+src/contexts/AppDataContext.tsx(310,44): error TS6133: 'isLoadingShifts' is declared but its value is never read.
+src/contexts/AppDataContext.tsx(314,49): error TS6133: 'isLoadingAssignments' is declared but its value is never read.
+src/contexts/AppDataContext.tsx(322,47): error TS6133: 'isLoadingLocations' is declared but its value is never read.
+src/contexts/AppDataContext.tsx(404,26): error TS6133: 'setRecentActivity' is declared but its value is never read.
+src/contexts/AuthContext.tsx(42,31): error TS6133: 'event' is declared but its value is never read.
+src/hooks/useAssignments.ts(15,5): error TS2353: Object literal may only specify known properties, and 'notes' does not exist in type 'Assignment'.
+src/hooks/useAssignments.ts(28,23): error TS2339: Property 'notes' does not exist on type 'Partial<Assignment>'.
+src/hooks/useAssignments.ts(141,37): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/hooks/useDeviceLogs.ts(13,11): error TS6196: 'DeviceLogsResponse' is declared but never used.
+src/hooks/useGuestsQueryParams.ts(1,20): error TS6133: 'useEffect' is declared but its value is never read.
+src/hooks/useOptimizedQuery.ts(60,24): error TS2339: Property 'staleTime' does not exist on type '{ meta?: Record<string, unknown> | undefined; select?: ((data: TData) => TData) | undefined; queryFn?: unique symbol | QueryFunction<TData, readonly unknown[], never> | undefined; ... 27 more ...; maxPages?: number | undefined; } | {}'.
+  Property 'staleTime' does not exist on type '{}'.
+src/hooks/useOptimizedQuery.ts(61,36): error TS2339: Property 'staleTime' does not exist on type '{ meta?: Record<string, unknown> | undefined; select?: ((data: TData) => TData) | undefined; queryFn?: unique symbol | QueryFunction<TData, readonly unknown[], never> | undefined; ... 27 more ...; maxPages?: number | undefined; } | {}'.
+  Property 'staleTime' does not exist on type '{}'.
+src/hooks/useOptimizedQuery.ts(63,10): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(options: DefinedInitialDataOptions<TData, TError, TData, readonly unknown[]>, queryClient?: QueryClient | undefined): DefinedUseQueryResult<...>', gave the following error.
+    Type 'unique symbol | QueryFunction<TData, readonly unknown[], never>' is not assignable to type 'QueryFunction<TData, readonly unknown[]> | undefined'.
+      Type 'typeof skipToken' is not assignable to type 'QueryFunction<TData, readonly unknown[]>'.
+  Overload 2 of 3, '(options: UndefinedInitialDataOptions<TData, TError, TData, readonly unknown[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'cacheTime' does not exist in type 'UndefinedInitialDataOptions<TData, TError, TData, readonly unknown[]>'.
+  Overload 3 of 3, '(options: UseQueryOptions<TData, TError, TData, readonly unknown[]>, queryClient?: QueryClient | undefined): UseQueryResult<NoInfer<TData>, TError>', gave the following error.
+    Object literal may only specify known properties, and 'cacheTime' does not exist in type 'UseQueryOptions<TData, TError, TData, readonly unknown[]>'.
+src/hooks/useOptimizedQuery.ts(86,10): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(options: DefinedInitialDataOptions<TData, TError, TData, readonly unknown[]>, queryClient?: QueryClient | undefined): DefinedUseQueryResult<...>', gave the following error.
+    Type 'unique symbol | QueryFunction<TData, readonly unknown[], never>' is not assignable to type 'QueryFunction<TData, readonly unknown[]> | undefined'.
+      Type 'typeof skipToken' is not assignable to type 'QueryFunction<TData, readonly unknown[]>'.
+  Overload 2 of 3, '(options: UndefinedInitialDataOptions<TData, TError, TData, readonly unknown[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'cacheTime' does not exist in type 'UndefinedInitialDataOptions<TData, TError, TData, readonly unknown[]>'.
+  Overload 3 of 3, '(options: UseQueryOptions<TData, TError, TData, readonly unknown[]>, queryClient?: QueryClient | undefined): UseQueryResult<NoInfer<TData>, TError>', gave the following error.
+    Object literal may only specify known properties, and 'cacheTime' does not exist in type 'UseQueryOptions<TData, TError, TData, readonly unknown[]>'.
+src/hooks/useOptimizedQuery.ts(108,10): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(options: DefinedInitialDataOptions<TData, TError, TData, readonly unknown[]>, queryClient?: QueryClient | undefined): DefinedUseQueryResult<...>', gave the following error.
+    Type 'unique symbol | QueryFunction<TData, readonly unknown[], never>' is not assignable to type 'QueryFunction<TData, readonly unknown[]> | undefined'.
+      Type 'typeof skipToken' is not assignable to type 'QueryFunction<TData, readonly unknown[]>'.
+  Overload 2 of 3, '(options: UndefinedInitialDataOptions<TData, TError, TData, readonly unknown[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'cacheTime' does not exist in type 'UndefinedInitialDataOptions<TData, TError, TData, readonly unknown[]>'.
+  Overload 3 of 3, '(options: UseQueryOptions<TData, TError, TData, readonly unknown[]>, queryClient?: QueryClient | undefined): UseQueryResult<NoInfer<TData>, TError>', gave the following error.
+    Object literal may only specify known properties, and 'cacheTime' does not exist in type 'UseQueryOptions<TData, TError, TData, readonly unknown[]>'.
+src/hooks/useOptimizedQuery.ts(157,10): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(options: DefinedInitialDataOptions<TData, TError, TData, readonly unknown[]>, queryClient?: QueryClient | undefined): DefinedUseQueryResult<...>', gave the following error.
+    Type 'unique symbol | QueryFunction<TData, readonly unknown[], never>' is not assignable to type 'QueryFunction<TData, readonly unknown[]> | undefined'.
+      Type 'typeof skipToken' is not assignable to type 'QueryFunction<TData, readonly unknown[]>'.
+  Overload 2 of 3, '(options: UndefinedInitialDataOptions<TData, TError, TData, readonly unknown[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'cacheTime' does not exist in type 'UndefinedInitialDataOptions<TData, TError, TData, readonly unknown[]>'.
+  Overload 3 of 3, '(options: UseQueryOptions<TData, TError, TData, readonly unknown[]>, queryClient?: QueryClient | undefined): UseQueryResult<NoInfer<TData>, TError>', gave the following error.
+    Object literal may only specify known properties, and 'cacheTime' does not exist in type 'UseQueryOptions<TData, TError, TData, readonly unknown[]>'.
+src/hooks/useOptimizedQuery.ts(172,3): error TS6133: 'queryKey' is declared but its value is never read.
+src/hooks/useOptimizedQuery.ts(179,9): error TS6198: All destructured elements are unused.
+src/hooks/useWebSocket.ts(273,35): error TS2345: Argument of type 'WebSocketEvents[K]' is not assignable to parameter of type 'FallbackToUntypedListener<K extends "connect" | "connect_error" | "disconnect" ? SocketReservedEvents[K] : K extends string ? (...args: any[]) => void : never>'.
+  Type '((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ... 9 more ... | ((data: any) => void)' is not assignable to type 'FallbackToUntypedListener<K extends "connect" | "connect_error" | "disconnect" ? SocketReservedEvents[K] : K extends string ? (...args: any[]) => void : never>'.
+    Type '(data: any) => void' is not assignable to type 'FallbackToUntypedListener<K extends "connect" | "connect_error" | "disconnect" ? SocketReservedEvents[K] : K extends string ? (...args: any[]) => void : never>'.
+src/hooks/useWebSocket.ts(277,39): error TS2345: Argument of type 'WebSocketEvents[K]' is not assignable to parameter of type 'FallbackToUntypedListener<K extends "connect" | "connect_error" | "disconnect" ? SocketReservedEvents[K] : K extends string ? (...args: any[]) => void : never> | undefined'.
+  Type '((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ... 9 more ... | ((data: any) => void)' is not assignable to type 'FallbackToUntypedListener<K extends "connect" | "connect_error" | "disconnect" ? SocketReservedEvents[K] : K extends string ? (...args: any[]) => void : never> | undefined'.
+    Type '(data: any) => void' is not assignable to type 'FallbackToUntypedListener<K extends "connect" | "connect_error" | "disconnect" ? SocketReservedEvents[K] : K extends string ? (...args: any[]) => void : never>'.
+      Type 'WebSocketEvents[K]' is not assignable to type 'FallbackToUntypedListener<K extends "connect" | "connect_error" | "disconnect" ? SocketReservedEvents[K] : K extends string ? (...args: any[]) => void : never>'.
+        Type '((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ... 9 more ... | ((data: any) => void)' is not assignable to type 'FallbackToUntypedListener<K extends "connect" | "connect_error" | "disconnect" ? SocketReservedEvents[K] : K extends string ? (...args: any[]) => void : never>'.
+          Type '(data: any) => void' is not assignable to type 'FallbackToUntypedListener<K extends "connect" | "connect_error" | "disconnect" ? SocketReservedEvents[K] : K extends string ? (...args: any[]) => void : never>'.
+src/hooks/useWebSocket.ts(288,36): error TS2345: Argument of type 'WebSocketEvents[K] | undefined' is not assignable to parameter of type 'FallbackToUntypedListener<K extends "connect" | "connect_error" | "disconnect" ? SocketReservedEvents[K] : K extends string ? (...args: any[]) => void : never> | undefined'.
+  Type 'WebSocketEvents[K]' is not assignable to type 'FallbackToUntypedListener<K extends "connect" | "connect_error" | "disconnect" ? SocketReservedEvents[K] : K extends string ? (...args: any[]) => void : never> | undefined'.
+    Type '((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ... 9 more ... | ((data: any) => void)' is not assignable to type 'FallbackToUntypedListener<K extends "connect" | "connect_error" | "disconnect" ? SocketReservedEvents[K] : K extends string ? (...args: any[]) => void : never> | undefined'.
+      Type '(data: any) => void' is not assignable to type 'FallbackToUntypedListener<K extends "connect" | "connect_error" | "disconnect" ? SocketReservedEvents[K] : K extends string ? (...args: any[]) => void : never>'.
+        Type 'WebSocketEvents[K]' is not assignable to type 'FallbackToUntypedListener<K extends "connect" | "connect_error" | "disconnect" ? SocketReservedEvents[K] : K extends string ? (...args: any[]) => void : never>'.
+          Type '((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ((data: any) => void) | ... 9 more ... | ((data: any) => void)' is not assignable to type 'FallbackToUntypedListener<K extends "connect" | "connect_error" | "disconnect" ? SocketReservedEvents[K] : K extends string ? (...args: any[]) => void : never>'.
+            Type '(data: any) => void' is not assignable to type 'FallbackToUntypedListener<K extends "connect" | "connect_error" | "disconnect" ? SocketReservedEvents[K] : K extends string ? (...args: any[]) => void : never>'.
+src/services/websocket.ts(79,11): error TS6133: 'maxReconnectAttempts' is declared but its value is never read.
+src/services/websocket.ts(194,38): error TS6133: 'error' is declared but its value is never read.
+src/utils/registerServiceWorker.ts(161,7): error TS2322: Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'string | BufferSource | null | undefined'.
+  Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'ArrayBufferView<ArrayBuffer>'.
+    Types of property 'buffer' are incompatible.
+      Type 'ArrayBufferLike' is not assignable to type 'ArrayBuffer'.
+        Type 'SharedArrayBuffer' is not assignable to type 'ArrayBuffer'.
+          Types of property '[Symbol.toStringTag]' are incompatible.
+            Type '"SharedArrayBuffer"' is not assignable to type '"ArrayBuffer"'.

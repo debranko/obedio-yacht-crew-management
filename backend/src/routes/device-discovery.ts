@@ -147,8 +147,9 @@ export function handleDeviceAnnouncement(deviceId: string, data: any) {
 
 /**
  * Test endpoint to simulate device announcement
+ * Protected endpoint - requires admin authentication
  */
-router.post('/simulate-announce', asyncHandler(async (req, res) => {
+router.post('/simulate-announce', authMiddleware, asyncHandler(async (req, res) => {
   const deviceId = `BTN-TEST-${Math.floor(Math.random() * 1000)}`;
   
   handleDeviceAnnouncement(deviceId, {

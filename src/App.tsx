@@ -255,8 +255,9 @@ function AppContent() {
       />
       
       {/* Global Incoming Request Dialog (for normal/urgent requests) */}
+      {/* Don't show popup on Service Requests page - user already sees the full list */}
       <IncomingRequestDialog
-        isOpen={showDialog && !showEmergencyDialog}
+        isOpen={showDialog && !showEmergencyDialog && currentPage !== 'service-requests'}
         onClose={closeDialog}
         request={currentRequest}
       />

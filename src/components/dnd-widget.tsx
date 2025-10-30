@@ -13,6 +13,8 @@ import { useDND } from "../hooks/useDND";
 import { useSizeMode } from "../hooks/useSizeMode";
 import { useAppData } from "../contexts/AppDataContext";
 import { useLocations } from "../hooks/useLocations";
+import { useGuests } from "../hooks/useGuests";
+import { useGuestMutations } from "../hooks/useGuestMutations";
 import { toast } from "sonner";
 import { Location } from "../domain/locations";
 
@@ -23,15 +25,21 @@ interface DNDWidgetProps {
 export function DNDWidget({ dndList }: DNDWidgetProps) {
   const { dndLocations: internalDndList, count } = useDND();
   const { updateLocation: updateLocationService } = useLocations();
-  const { guests, updateGuest, addActivityLog, getGuestByLocationId } = useAppData();
+  const { addActivityLog } = useAppData();
+
+  // ✅ Use React Query for guests data
+  const { data: guestsData } = useGuests({ page: 1, limit: 1000 });
+  const guests = (guestsData as any)?.items || [];
+  const { updateGuest: updateGuestMutation } = useGuestMutations();
+
   const { ref, mode } = useSizeMode();
 
   // Use provided list or fallback to internal hook
   const data = dndList || internalDndList;
 
   const handleRemoveDND = async (locationId: string, locationName: string) => {
-    // Find guest in this location using proper foreign key relationship
-    const guest = getGuestByLocationId(locationId);
+    // ✅ Find guest in this location using React Query data
+    const guest = guests.find(g => g.locationId === locationId);
 
     try {
       // Remove DND from location
@@ -40,9 +48,9 @@ export function DNDWidget({ dndList }: DNDWidgetProps) {
         doNotDisturb: false
       });
 
-      // Remove DND from guest
+      // ✅ Remove DND from guest using mutation
       if (guest) {
-        updateGuest(guest.id, { doNotDisturb: false });
+        updateGuestMutation({ id: guest.id, data: { doNotDisturb: false } });
       }
 
       // Log activity
@@ -117,9 +125,8 @@ export function DNDWidget({ dndList }: DNDWidgetProps) {
         <ScrollArea className="h-[220px]">
           <div className="space-y-1.5 pr-2">
             {data.map(loc => {
-              const guest = guests.find(g => 
-                g.cabin?.toLowerCase().includes(loc.name.toLowerCase())
-              );
+              // ✅ Find guest by locationId for accurate matching
+              const guest = guests.find(g => g.locationId === loc.id);
 
               return (
                 <div

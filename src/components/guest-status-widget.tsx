@@ -22,12 +22,16 @@ export function GuestStatusWidget({
   // Get guests with their cabin information
   const guestsWithCabins = useMemo(() => {
     return guests
-      .filter(g => g.status === 'onboard' && g.locationId)
+      .filter(g => g.status === 'onboard' && (g.locationId || g.cabin))
       .map(guest => {
-        const location = locations.find(l => l.id === guest.locationId);
+        // Try to get location name from locationId first, fallback to cabin field
+        const location = guest.locationId
+          ? locations.find(l => l.id === guest.locationId)
+          : null;
+
         return {
           name: `${guest.firstName} ${guest.lastName}`,
-          cabin: location?.name || 'Unknown',
+          cabin: location?.name || guest.cabin || 'Unknown',
           photo: guest.photo,
           id: guest.id
         };

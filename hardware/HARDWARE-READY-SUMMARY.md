@@ -12,7 +12,7 @@
 **File**: `hardware/heltec-minimal/heltec-minimal.ino`
 
 **What it does**:
-- Connects to WiFi (NOVA_1300)
+- Connects to WiFi (Blagojevic)
 - Connects to MQTT broker (192.168.5.152:1883)
 - Generates device ID from MAC address (e.g., HELTEC-A1B2C3D4E5F6)
 - Registers with backend via MQTT
@@ -46,7 +46,7 @@ WiFi: -45dBm
 **File**: `hardware/twatch-minimal/twatch-minimal.ino`
 
 **What it does**:
-- Connects to WiFi (NOVA_1300)
+- Connects to WiFi (Blagojevic)
 - Connects to MQTT broker (192.168.5.152:1883)
 - Generates device ID from MAC address (e.g., TWATCH-F6E5D4C3B2A1)
 - Registers with backend via MQTT (type: "wearable")
@@ -160,7 +160,7 @@ Uptime: 120s
 
 1. **Upload firmware via Arduino IDE** (USB cable)
    ↓
-2. **Device boots and connects to WiFi** (NOVA_1300)
+2. **Device boots and connects to WiFi** (Blagojevic)
    ↓
 3. **Device connects to MQTT broker** (192.168.5.152:1883)
    ↓
@@ -237,7 +237,7 @@ Device Type: smart_button
 Firmware: v0.1-minimal
 
 🔌 Connecting to WiFi...
-SSID: NOVA_1300
+SSID: Blagojevic
 ✅ WiFi connected!
 IP Address: 192.168.5.XXX
 
@@ -397,8 +397,8 @@ docker restart obedio-backend-1
 
 ### WiFi Connection Fails
 
-- Check SSID is exactly: `NOVA_1300`
-- Check password is exactly: `need9963`
+- Check SSID is exactly: `Blagojevic`
+- Check password is exactly: `Lozinka12!`
 - Make sure WiFi is 2.4GHz (not 5GHz)
 - Move device closer to router
 
@@ -420,7 +420,7 @@ Before uploading firmware, verify:
 - [ ] Backend container running
 - [ ] Backend MQTT connected (check logs)
 - [ ] Frontend running (http://localhost:5173)
-- [ ] WiFi SSID "NOVA_1300" is active
+- [ ] WiFi SSID "Blagojevic" is active
 - [ ] Server IP 192.168.5.152 is accessible
 
 ---

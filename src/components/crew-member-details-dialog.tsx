@@ -50,6 +50,7 @@ import { toast } from 'sonner';
 import { useAppData } from '../contexts/AppDataContext';
 import { CameraDialog } from './camera-dialog';
 import { useDevices } from '../hooks/useDevices';
+import { api } from '../services/api';
 
 interface CrewMemberDetailsDialogProps {
   open: boolean;
@@ -85,11 +86,14 @@ export function CrewMemberDetailsDialog({
   const currentDevice = getCrewDevice(crewMember.id);
 
   // Fetch real devices from database (only unassigned devices)
-  const { data: allDevices = [], isLoading: devicesLoading } = useDevices();
+  const { data: allDevices = [], isLoading: devicesLoading, refetch: refetchDevices } = useDevices();
 
-  // Filter to show only unassigned devices (no crewMemberId)
+  // Filter to show only unassigned WATCHES (wearable devices for crew members)
   const availableDevices = allDevices
-    .filter(device => !device.crewMemberId)
+    .filter(device =>
+      !device.crewMemberId && // Not assigned to anyone
+      (device.type === 'watch' || device.type === 'wearable') // Only watches, not smart_buttons
+    )
     .map(device => ({
       id: device.id,
       deviceId: device.deviceId,
@@ -97,7 +101,7 @@ export function CrewMemberDetailsDialog({
       type: device.type
     }));
   
-  const handleAssignDevice = () => {
+  const handleAssignDevice = async () => {
     if (!selectedDeviceId) {
       toast.error('Please select a device');
       return;
@@ -106,33 +110,66 @@ export function CrewMemberDetailsDialog({
     const device = availableDevices.find(d => d.id === selectedDeviceId);
     if (!device) return;
 
-    // Map device type to AppDataContext expected types
-    const mapDeviceType = (type: string): 'watch' | 'tablet' | 'phone' | 'other' => {
-      if (type === 'watch') return 'watch';
-      if (type === 'mobile_app') return 'phone';
-      if (type === 'smart_button') return 'other';
-      if (type === 'repeater') return 'other';
-      return 'other';
-    };
+    try {
+      // ✅ UPDATE DATABASE via API - assign device to crew member
+      await api.devices.update(device.id, {
+        crewMemberId: crewMember.id
+      });
 
-    assignDeviceToCrew({
-      crewMemberId: crewMember.id,
-      crewMemberName: crewMember.name,
-      deviceId: device.deviceId,
-      deviceName: device.name,
-      deviceType: mapDeviceType(device.type),
-      status: 'connected',
-    });
+      // Map device type to AppDataContext expected types
+      const mapDeviceType = (type: string): 'watch' | 'tablet' | 'phone' | 'other' => {
+        if (type === 'watch') return 'watch';
+        if (type === 'mobile_app') return 'phone';
+        if (type === 'smart_button') return 'other';
+        if (type === 'repeater') return 'other';
+        return 'other';
+      };
 
-    toast.success(`${device.name} assigned to ${crewMember.name.split(' ')[0]}`);
-    setSelectedDeviceId('');
+      // Update local state
+      assignDeviceToCrew({
+        crewMemberId: crewMember.id,
+        crewMemberName: crewMember.name,
+        deviceId: device.deviceId,
+        deviceName: device.name,
+        deviceType: mapDeviceType(device.type),
+        status: 'connected',
+      });
+
+      toast.success(`${device.name} assigned to ${crewMember.name.split(' ')[0]}`);
+      setSelectedDeviceId('');
+
+      // Refetch devices to update the available devices list
+      refetchDevices();
+    } catch (error: any) {
+      console.error('Failed to assign device:', error);
+      toast.error(error.message || 'Failed to assign device');
+    }
   };
   
-  const handleRemoveDevice = () => {
+  const handleRemoveDevice = async () => {
     if (!currentDevice) return;
-    
-    removeDeviceFromCrew(crewMember.id);
-    toast.success(`${currentDevice.deviceName} removed from ${crewMember.name.split(' ')[0]}`);
+
+    try {
+      // Find device in allDevices by deviceId (not the assignment id)
+      const device = allDevices.find(d => d.deviceId === currentDevice.deviceId);
+
+      if (device) {
+        // ✅ UPDATE DATABASE via API - remove device assignment (set crewMemberId to null)
+        await api.devices.update(device.id, {
+          crewMemberId: null
+        });
+      }
+
+      // Update local state
+      removeDeviceFromCrew(crewMember.id);
+      toast.success(`${currentDevice.deviceName} removed from ${crewMember.name.split(' ')[0]}`);
+
+      // Refetch devices to update the available devices list
+      refetchDevices();
+    } catch (error: any) {
+      console.error('Failed to remove device:', error);
+      toast.error(error.message || 'Failed to remove device');
+    }
   };
   
   const getDeviceIcon = (type: string) => {
@@ -225,7 +262,7 @@ export function CrewMemberDetailsDialog({
     };
   }, [assignments, crewMember.id]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     // Update leave dates from calendar selection
     if (leaveRange.from) {
       editedCrew.leaveStart = formatDate(leaveRange.from);
@@ -238,23 +275,86 @@ export function CrewMemberDetailsDialog({
         editedCrew.status = 'off-duty';
       }
     }
-    
-    onUpdate(editedCrew);
-    setIsEditing(false);
-    toast.success('Crew member details updated');
+
+    try {
+      // Send PUT request to backend to persist changes
+      const response = await fetch(`http://localhost:3001/api/crew/${editedCrew.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: editedCrew.name,
+          nickname: editedCrew.nickname || null,
+          position: editedCrew.position,
+          department: editedCrew.department,
+          status: editedCrew.status,
+          email: editedCrew.email || null,
+          phone: editedCrew.phone || null,
+          onBoardContact: editedCrew.onBoardContact || null,
+          avatar: editedCrew.avatar || null,
+          color: editedCrew.color,
+          leaveStart: editedCrew.leaveStart || null,
+          leaveEnd: editedCrew.leaveEnd || null,
+          languages: editedCrew.languages || [],
+          skills: editedCrew.skills || [],
+          notes: editedCrew.notes || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update crew member');
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        // Update local state with data from backend
+        onUpdate(data.data);
+        setIsEditing(false);
+        toast.success('Crew member details updated');
+      }
+    } catch (error: any) {
+      console.error('Error updating crew member:', error);
+      toast.error(error.message || 'Failed to update crew member');
+    }
   };
 
-  const handleMarkUnavailable = () => {
-    const updated = {
-      ...crewMember,
-      status: crewMember.status === 'off-duty' ? 'on-duty' : 'off-duty' as const,
-    };
-    onUpdate(updated);
-    toast.success(
-      updated.status === 'off-duty'
-        ? `${crewMember.name.split(' ')[0]} removed from duty`
-        : `${crewMember.name.split(' ')[0]} activated for duty`
-    );
+  const handleMarkUnavailable = async () => {
+    const newStatus = crewMember.status === 'off-duty' ? 'on-duty' : 'off-duty';
+
+    try {
+      // Send PUT request to backend to update status
+      const response = await fetch(`http://localhost:3001/api/crew/${crewMember.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: newStatus,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update crew status');
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        onUpdate(data.data);
+        toast.success(
+          newStatus === 'off-duty'
+            ? `${crewMember.name.split(' ')[0]} removed from duty`
+            : `${crewMember.name.split(' ')[0]} activated for duty`
+        );
+      }
+    } catch (error: any) {
+      console.error('Error updating crew status:', error);
+      toast.error(error.message || 'Failed to update crew status');
+    }
   };
 
   const handleSetOnLeave = () => {
@@ -378,15 +478,72 @@ export function CrewMemberDetailsDialog({
 
             <div className="flex-1">
               <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="mb-1">{crewMember.name}</h3>
-                  {crewMember.nickname && (
-                    <p className="text-sm text-muted-foreground mb-2">"{crewMember.nickname}"</p>
-                  )}
-                  <p className="text-sm text-muted-foreground">
-                    {crewMember.position} • {crewMember.department}
-                  </p>
-                </div>
+                {isEditing ? (
+                  <div className="space-y-3 flex-1 mr-4">
+                    <div className="space-y-2">
+                      <Label>Full Name</Label>
+                      <Input
+                        value={editedCrew.name}
+                        onChange={(e) =>
+                          setEditedCrew({ ...editedCrew, name: e.target.value })
+                        }
+                        placeholder="Full Name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Nickname (Optional)</Label>
+                      <Input
+                        value={editedCrew.nickname || ''}
+                        onChange={(e) =>
+                          setEditedCrew({ ...editedCrew, nickname: e.target.value })
+                        }
+                        placeholder="Nickname"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>Position</Label>
+                        <Input
+                          value={editedCrew.position}
+                          onChange={(e) =>
+                            setEditedCrew({ ...editedCrew, position: e.target.value })
+                          }
+                          placeholder="Position"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Department</Label>
+                        <Select
+                          value={editedCrew.department}
+                          onValueChange={(value) =>
+                            setEditedCrew({ ...editedCrew, department: value })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Interior">Interior</SelectItem>
+                            <SelectItem value="Deck">Deck</SelectItem>
+                            <SelectItem value="Engineering">Engineering</SelectItem>
+                            <SelectItem value="Galley">Galley</SelectItem>
+                            <SelectItem value="Management">Management</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <h3 className="mb-1">{crewMember.name}</h3>
+                    {crewMember.nickname && (
+                      <p className="text-sm text-muted-foreground mb-2">"{crewMember.nickname}"</p>
+                    )}
+                    <p className="text-sm text-muted-foreground">
+                      {crewMember.position} • {crewMember.department}
+                    </p>
+                  </div>
+                )}
                 <div className="flex flex-col gap-2 items-end">
                   {getStatusBadge(crewMember.status)}
                   {crewMember.leaveStart && crewMember.leaveEnd && (

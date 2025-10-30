@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/error-handler';
 import { requirePermission } from '../middleware/auth';
+import { strictRateLimiter } from '../middleware/rate-limiter';
 import { prisma } from '../services/db';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -145,9 +146,9 @@ router.get('/status', asyncHandler(async (_, res) => {
 
 /**
  * POST /api/backup/create
- * Create a new backup
+ * Create a new backup - with strict rate limiting (resource-intensive)
  */
-router.post('/create', asyncHandler(async (req, res) => {
+router.post('/create', strictRateLimiter, asyncHandler(async (req, res) => {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const filename = `obedio-backup-${timestamp}.sql`;
   const filePath = path.join(BACKUP_DIR, filename);
@@ -200,9 +201,9 @@ router.post('/create', asyncHandler(async (req, res) => {
 
 /**
  * POST /api/backup/restore/:filename
- * Restore from a backup file
+ * Restore from a backup file - with strict rate limiting (critical operation)
  */
-router.post('/restore/:filename', asyncHandler(async (req, res) => {
+router.post('/restore/:filename', strictRateLimiter, asyncHandler(async (req, res) => {
   const { filename } = req.params;
   const filePath = path.join(BACKUP_DIR, filename);
 

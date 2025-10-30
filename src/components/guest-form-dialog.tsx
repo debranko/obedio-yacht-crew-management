@@ -27,10 +27,15 @@ interface GuestFormDialogProps {
   guest?: Guest | null;
 }
 
-// Cabin Select Component
-function CabinSelect({ value, onValueChange }: { value?: string; onValueChange: (value: string) => void }) {
+// Cabin Select Component - Now returns locationId for bidirectional assignment
+function CabinSelect({ value, onValueChange, locationId, onLocationChange }: {
+  value?: string;
+  onValueChange: (value: string) => void;
+  locationId?: string;
+  onLocationChange?: (locationId: string, cabinName: string) => void;
+}) {
   const { locations } = useLocations();
-  
+
   // Get only cabin-type locations
   const cabins = useMemo(() => {
     return locations
@@ -45,8 +50,19 @@ function CabinSelect({ value, onValueChange }: { value?: string; onValueChange: 
       });
   }, [locations]);
 
+  // ✅ Find current cabin by locationId or cabin name
+  const currentCabinId = locationId || cabins.find(c => c.name === value)?.id || '';
+
+  const handleChange = (newLocationId: string) => {
+    const selectedCabin = cabins.find(c => c.id === newLocationId);
+    if (selectedCabin) {
+      onValueChange(selectedCabin.name); // Update cabin name for backward compatibility
+      onLocationChange?.(newLocationId, selectedCabin.name); // ✅ Update locationId for bidirectional assignment
+    }
+  };
+
   return (
-    <Select value={value} onValueChange={onValueChange}>
+    <Select value={currentCabinId} onValueChange={handleChange}>
       <SelectTrigger id="cabin">
         <SelectValue placeholder="Select cabin..." />
       </SelectTrigger>
@@ -57,7 +73,7 @@ function CabinSelect({ value, onValueChange }: { value?: string; onValueChange: 
           </SelectItem>
         ) : (
           cabins.map((cabin) => (
-            <SelectItem key={cabin.id} value={cabin.name}>
+            <SelectItem key={cabin.id} value={cabin.id}>
               {cabin.name} {cabin.floor && `(${cabin.floor})`}
             </SelectItem>
           ))
@@ -69,6 +85,7 @@ function CabinSelect({ value, onValueChange }: { value?: string; onValueChange: 
 
 export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogProps) {
   const { createGuest, updateGuest, isCreating, isUpdating } = useGuestMutations();
+  const { updateLocation } = useLocations();
   const [isCameraOpen, setIsCameraOpen] = useState(false);
 
   // Form state
@@ -77,12 +94,13 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
     lastName: '',
     preferredName: '',
     photo: undefined,
-    type: 'charter',
+    type: 'guest',
     status: 'expected',
     nationality: '',
     languages: [],
     passportNumber: '',
     cabin: '',
+    locationId: undefined, // ✅ Added for bidirectional assignment
     checkInDate: new Date().toISOString().split('T')[0],
     checkInTime: '14:00',
     checkOutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -125,12 +143,13 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
         lastName: '',
         preferredName: '',
         photo: undefined,
-        type: 'charter',
+        type: 'guest',
         status: 'expected',
         nationality: '',
         languages: [],
         passportNumber: '',
         cabin: '',
+        locationId: undefined,
         checkInDate: new Date().toISOString().split('T')[0],
         checkInTime: '14:00',
         checkOutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -210,10 +229,25 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
 
     if (guest) {
       // Update existing guest via backend API
+      const previousLocationId = guest.locationId;
+      const newLocationId = formData.locationId;
+
       updateGuest(
         { id: guest.id, data: formData },
         {
-          onSuccess: () => {
+          onSuccess: async () => {
+            // ✅ Bidirectional assignment: Update location side
+            if (previousLocationId !== newLocationId) {
+              // If location changed, update both old and new locations
+              if (previousLocationId) {
+                // Clear guest from old location (no longer assigned)
+                // Location will automatically show no guest
+              }
+              if (newLocationId) {
+                // Location will automatically pick up the new guest via foreign key
+                toast.success(`Guest assigned to ${formData.cabin}`);
+              }
+            }
             onOpenChange(false);
           },
         }
@@ -223,7 +257,11 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
       createGuest(
         formData as Omit<Guest, 'id' | 'createdAt' | 'updatedAt'>,
         {
-          onSuccess: () => {
+          onSuccess: async () => {
+            // ✅ Bidirectional assignment: If locationId is set, it's automatically handled by foreign key
+            if (formData.locationId) {
+              toast.success(`Guest added and assigned to ${formData.cabin}`);
+            }
             onOpenChange(false);
           },
         }
@@ -346,13 +384,11 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="primary">Primary Guest</SelectItem>
+                      <SelectItem value="guest">Guest</SelectItem>
                       <SelectItem value="partner">Partner</SelectItem>
                       <SelectItem value="family">Family</SelectItem>
-                      <SelectItem value="child">Child</SelectItem>
                       <SelectItem value="vip">VIP</SelectItem>
                       <SelectItem value="owner">Owner</SelectItem>
-                      <SelectItem value="charter">Charter</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -514,7 +550,11 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
                 <Label htmlFor="cabin">Cabin Assignment</Label>
                 <CabinSelect
                   value={formData.cabin}
+                  locationId={formData.locationId}
                   onValueChange={(value) => setFormData({ ...formData, cabin: value })}
+                  onLocationChange={(locationId, cabinName) =>
+                    setFormData({ ...formData, cabin: cabinName, locationId })
+                  }
                 />
               </div>
 

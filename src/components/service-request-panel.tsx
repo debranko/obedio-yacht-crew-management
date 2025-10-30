@@ -32,6 +32,9 @@ import { useAppData } from '../contexts/AppDataContext';
 import type { ServiceRequest } from '../contexts/AppDataContext';
 import { toast } from 'sonner';
 import { ImageWithFallback } from './figma/ImageWithFallback';
+import { useCompleteServiceRequest } from '../hooks/useServiceRequestsApi';
+import { authService } from '../services/auth';
+import { getPriorityColor, getPriorityBadgeColor, getTimeAgo } from '../utils/service-request-utils';
 
 interface ServiceRequestPanelProps {
   serviceName: string; // e.g., "Galley", "Pantry", "Crew Mess"
@@ -42,9 +45,12 @@ export function ServiceRequestPanel({ serviceName }: ServiceRequestPanelProps) {
     serviceRequests,
     acceptServiceRequest,
     delegateServiceRequest,
-    completeServiceRequest,
     crewMembers,
+    addActivityLog,
   } = useAppData();
+
+  // Use mutation to complete service request (saves to backend database)
+  const completeServiceRequestMutation = useCompleteServiceRequest();
 
   const [delegateDialogOpen, setDelegateDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null);
@@ -54,7 +60,7 @@ export function ServiceRequestPanel({ serviceName }: ServiceRequestPanelProps) {
   // Filter service requests that match this service category
   // In the future, this should filter by categoryId when service requests have that field
   const pendingRequests = serviceRequests.filter(request =>
-    request.status === 'pending' || request.status === 'forwarded'
+    request.status === 'pending'
   );
 
   // Get on-duty crew members for delegation
@@ -63,10 +69,21 @@ export function ServiceRequestPanel({ serviceName }: ServiceRequestPanelProps) {
   );
 
   const handleAccept = (request: ServiceRequest) => {
-    // In production, get from auth context
-    const currentUser = 'Maria Lopez';
-    acceptServiceRequest(request.id, currentUser);
+    const user = authService.getCurrentUser();
+    const currentUserName = user?.name || user?.username || 'Staff';
+    acceptServiceRequest(request.id, currentUserName);
     toast.success(`Request from ${request.guestName} accepted`);
+
+    // ✅ Log to Activity Log
+    if (addActivityLog) {
+      addActivityLog({
+        type: 'service',
+        action: 'Request Accepted',
+        user: currentUserName,
+        location: request.guestCabin || 'Unknown Location',
+        details: `${currentUserName} accepted ${request.requestType} request from ${request.guestName}`
+      });
+    }
   };
 
   const handleDelegateClick = (request: ServiceRequest) => {
@@ -87,45 +104,29 @@ export function ServiceRequestPanel({ serviceName }: ServiceRequestPanelProps) {
     setSelectedCrewMember('');
   };
 
-  const handleComplete = (request: ServiceRequest) => {
-    completeServiceRequest(request.id);
-    toast.success('Request marked as completed');
-  };
+  const handleComplete = async (request: ServiceRequest) => {
+    try {
+      // Complete request in backend database
+      await completeServiceRequestMutation.mutateAsync(request.id);
+      // Success toast is shown by the mutation hook
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'emergency':
-        return 'bg-destructive/20 border-destructive text-destructive';
-      case 'urgent':
-        return 'bg-warning/20 border-warning text-warning';
-      default:
-        return 'bg-primary/10 border-primary/30 text-foreground';
+      // ✅ Log to Activity Log
+      if (addActivityLog) {
+        const user = authService.getCurrentUser();
+        const currentUserName = user?.name || user?.username || 'Staff';
+
+        addActivityLog({
+          type: 'service',
+          action: 'Request Completed',
+          user: currentUserName,
+          location: request.guestCabin || 'Unknown Location',
+          details: `${currentUserName} completed ${request.requestType} request from ${request.guestName}`
+        });
+      }
+    } catch (error) {
+      console.error('Failed to complete service request:', error);
+      // Error toast is shown by the mutation hook
     }
-  };
-
-  const getPriorityBadgeColor = (priority: string) => {
-    switch (priority) {
-      case 'emergency':
-        return 'destructive';
-      case 'urgent':
-        return 'default';
-      default:
-        return 'secondary';
-    }
-  };
-
-  const getTimeAgo = (timestamp: Date): string => {
-    const now = new Date();
-    const diffMs = now.getTime() - timestamp.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins === 1) return '1 min ago';
-    if (diffMins < 60) return `${diffMins} mins ago`;
-
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours === 1) return '1 hour ago';
-    return `${diffHours} hours ago`;
   };
 
   if (pendingRequests.length === 0) {
@@ -232,27 +233,34 @@ export function ServiceRequestPanel({ serviceName }: ServiceRequestPanelProps) {
                   </div>
                 )}
 
-                {/* Request Type Info - Only show if no voice transcript */}
-                {!request.voiceTranscript && (
+                {/* Request Type Info - Only show if no voice transcript and no message */}
+                {!request.voiceTranscript && !request.message && (
                   <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
                     {request.requestType === 'call' && (
                       <>
                         <Bell className="h-3 w-3" />
-                        <span>Service call button pressed</span>
+                        <span>Service Call</span>
                       </>
                     )}
                     {request.requestType === 'service' && (
                       <>
                         <CheckCircle2 className="h-3 w-3" />
-                        <span>Service request button pressed</span>
+                        <span>Service Request</span>
                       </>
                     )}
                     {request.requestType === 'emergency' && (
                       <>
                         <AlertTriangle className="h-3 w-3" />
-                        <span>Emergency button pressed</span>
+                        <span>Emergency</span>
                       </>
                     )}
+                  </div>
+                )}
+
+                {/* Request Message (if available) */}
+                {!request.voiceTranscript && request.message && (
+                  <div className="mb-3 text-sm">
+                    <p className="text-muted-foreground">{request.message}</p>
                   </div>
                 )}
 

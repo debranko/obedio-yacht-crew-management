@@ -268,8 +268,8 @@ Find these lines at the top of the code and change them:
 
 ```cpp
 // WiFi Configuration (CHANGE THESE!)
-const char* WIFI_SSID = "YourYachtWiFi";        // Your WiFi name
-const char* WIFI_PASSWORD = "YourPassword";      // Your WiFi password
+const char* WIFI_SSID = "Blagojevic";        // Your WiFi name
+const char* WIFI_PASSWORD = "Lozinka12!";      // Your WiFi password
 
 // MQTT Broker Configuration
 const char* MQTT_BROKER = "192.168.1.100";      // Your Obedio server IP
@@ -353,8 +353,8 @@ const char* LOCATION_ID = "LOCATION_UUID_HERE"; // Get from database
 
 ```cpp
 // WiFi Configuration (CHANGE THESE!)
-const char* WIFI_SSID = "YourYachtWiFi";
-const char* WIFI_PASSWORD = "YourPassword";
+const char* WIFI_SSID = "Blagojevic";
+const char* WIFI_PASSWORD = "Lozinka12!";
 
 // MQTT Broker Configuration
 const char* MQTT_BROKER = "192.168.1.100";

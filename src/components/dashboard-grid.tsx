@@ -28,7 +28,6 @@ import { ClockWidget } from "./clock-widget";
 import { ClockWidget2 } from "./clock-widget-2";
 import { WeatherWindyWidget } from "./weather-windy-widget";
 import { DutyTimerCard } from "./duty-timer-card";
-import { ButtonSimulatorWidget } from "./button-simulator-widget";
 import { useAppData } from "../contexts/AppDataContext";
 import { useDND } from "../hooks/useDND";
 import { Activity, Clock, BatteryLow, Users, BellOff, GripVertical, Bell, Save } from "lucide-react";
@@ -51,10 +50,9 @@ const defaultLayout: WidgetLayout[] = [
   { i: "serving-now", x: 0, y: 0, w: 4, h: 3, minW: 2, minH: 3 },
   { i: "duty-timer", x: 4, y: 0, w: 4, h: 3, minW: 3, minH: 3 },
 
-  // Second row - DND, Guests, and Button Simulator
+  // Second row - DND and Guests
   { i: "dnd-auto", x: 0, y: 3, w: 3, h: 3, minW: 3, minH: 3 },
   { i: "guest-status", x: 3, y: 3, w: 2, h: 3, minW: 2, minH: 2 },
-  { i: "button-simulator", x: 5, y: 3, w: 3, h: 4, minW: 3, minH: 4 },
 
   // Third row - Clock and Weather
   { i: "clock", x: 0, y: 6, w: 2, h: 2, minW: 2, minH: 2 },
@@ -177,7 +175,7 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
   useImperativeHandle(ref, () => ({
     resetLayout: () => {
       // Reset to complete default layout with all widgets properly positioned
-      const resetWidgets = ["serving-now", "duty-timer", "guest-status", "clock", "weather", "weather-windy", "button-simulator"];
+      const resetWidgets = ["serving-now", "duty-timer", "guest-status", "clock", "weather", "weather-windy"];
       const resetLayout = defaultLayout.filter(l => resetWidgets.includes(l.i) || l.i === "dnd-auto");
 
       setLayout(resetLayout);
@@ -339,17 +337,6 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
           <div key="clock2" className="dashboard-widget">
             <WidgetWrapper id="clock2">
               <ClockWidget2 timezone="auto" />
-            </WidgetWrapper>
-          </div>
-        )}
-
-        {/* ESP32 Button Simulator Widget */}
-        {activeWidgets.includes("button-simulator") && (
-          <div key="button-simulator" className="dashboard-widget">
-            <WidgetWrapper id="button-simulator">
-              <Card className="h-full overflow-auto">
-                <ButtonSimulatorWidget />
-              </Card>
             </WidgetWrapper>
           </div>
         )}

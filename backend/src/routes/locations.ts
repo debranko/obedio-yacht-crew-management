@@ -3,23 +3,44 @@ import { prisma } from '../services/db';
 import { asyncHandler, validate } from '../middleware/error-handler';
 import { CreateLocationSchema, UpdateLocationSchema } from '../validators/schemas';
 import { websocketService } from '../services/websocket';
+import { requirePermission } from '../middleware/auth';
 
 const r = Router();
 
 // GET all locations
-r.get('/', asyncHandler(async (_, res) => {
+r.get('/', requirePermission('locations.view'), asyncHandler(async (req, res) => {
+  const { include: includeParam } = req.query;
+  const shouldIncludeRelations = includeParam === 'true' || includeParam === '1';
+
   const data = await prisma.location.findMany({
     orderBy: { name: 'asc' },
-    include: {
-      guests: true,
-      serviceRequests: true
-    }
+    ...(shouldIncludeRelations && {
+      include: {
+        guests: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            status: true,
+            type: true
+          }
+        },
+        serviceRequests: {
+          select: {
+            id: true,
+            status: true,
+            priority: true,
+            createdAt: true
+          }
+        }
+      }
+    })
   });
   res.json({ success: true, data, count: data.length });
 }));
 
 // GET single location by ID
-r.get('/:id', asyncHandler(async (req, res) => {
+r.get('/:id', requirePermission('locations.view'), asyncHandler(async (req, res) => {
   const data = await prisma.location.findUnique({
     where: { id: req.params.id },
     include: {
@@ -36,8 +57,23 @@ r.get('/:id', asyncHandler(async (req, res) => {
 }));
 
 // POST create new location
-r.post('/', validate(CreateLocationSchema), asyncHandler(async (req, res) => {
+r.post('/', requirePermission('locations.create'), validate(CreateLocationSchema), asyncHandler(async (req, res) => {
   const { name, type, floor, description, image, smartButtonId, doNotDisturb } = req.body;
+
+  // Check if smartButtonId is already assigned to another location
+  if (smartButtonId) {
+    const existingLocation = await prisma.location.findUnique({
+      where: { smartButtonId },
+      select: { name: true, id: true }
+    });
+
+    if (existingLocation) {
+      return res.status(400).json({
+        success: false,
+        message: `Smart button "${smartButtonId}" is already assigned to "${existingLocation.name}". One button can only be assigned to one location.`
+      });
+    }
+  }
 
   const data = await prisma.location.create({
     data: {
@@ -55,8 +91,26 @@ r.post('/', validate(CreateLocationSchema), asyncHandler(async (req, res) => {
 }));
 
 // PUT update location
-r.put('/:id', validate(UpdateLocationSchema), asyncHandler(async (req, res) => {
+r.put('/:id', requirePermission('locations.edit'), validate(UpdateLocationSchema), asyncHandler(async (req, res) => {
   const { name, type, floor, description, image, smartButtonId, doNotDisturb } = req.body;
+
+  // Check if smartButtonId is already assigned to another location (not this one)
+  if (smartButtonId !== undefined && smartButtonId !== null) {
+    const existingLocation = await prisma.location.findFirst({
+      where: {
+        smartButtonId,
+        id: { not: req.params.id } // Exclude current location
+      },
+      select: { name: true, id: true }
+    });
+
+    if (existingLocation) {
+      return res.status(400).json({
+        success: false,
+        message: `Smart button "${smartButtonId}" is already assigned to "${existingLocation.name}". One button can only be assigned to one location.`
+      });
+    }
+  }
 
   const data = await prisma.location.update({
     where: { id: req.params.id },
@@ -75,7 +129,7 @@ r.put('/:id', validate(UpdateLocationSchema), asyncHandler(async (req, res) => {
 }));
 
 // DELETE location
-r.delete('/:id', asyncHandler(async (req, res) => {
+r.delete('/:id', requirePermission('locations.delete'), asyncHandler(async (req, res) => {
   // Check if location has guests or service requests
   const location = await prisma.location.findUnique({
     where: { id: req.params.id },
@@ -107,7 +161,7 @@ r.delete('/:id', asyncHandler(async (req, res) => {
 }));
 
 // POST toggle DND
-r.post('/:id/toggle-dnd', asyncHandler(async (req, res) => {
+r.post('/:id/toggle-dnd', requirePermission('locations.edit'), asyncHandler(async (req, res) => {
   const { enabled } = req.body;
 
   const location = await prisma.location.update({
@@ -128,7 +182,7 @@ r.post('/:id/toggle-dnd', asyncHandler(async (req, res) => {
 }));
 
 // GET DND locations
-r.get('/dnd/active', asyncHandler(async (_, res) => {
+r.get('/dnd/active', requirePermission('locations.view'), asyncHandler(async (_, res) => {
   const data = await prisma.location.findMany({
     where: { doNotDisturb: true }
   });

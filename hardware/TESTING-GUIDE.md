@@ -94,7 +94,7 @@ Plus visual confirmation on OLED display.
 **Expected Output**:
 ```
 🔌 Connecting to WiFi...
-SSID: YourYachtWiFi
+SSID: Blagojevic
 ............
 ✅ WiFi connected!
 IP Address: 192.168.1.xxx

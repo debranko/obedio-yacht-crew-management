@@ -515,8 +515,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           guestName,
           guestCabin: cabinName,
           cabinId: apiReq.locationId || '',
-          requestType: apiReq.priority === 'emergency' ? 'emergency' : 'call',
-          priority: apiReq.priority === 'low' ? 'normal' : apiReq.priority,
+          requestType: apiReq.requestType,
+          priority: apiReq.priority,
           timestamp: new Date(apiReq.createdAt),
           voiceTranscript: apiReq.voiceTranscript || undefined,
           voiceAudioUrl: apiReq.voiceAudioUrl || undefined,
@@ -1070,7 +1070,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     setServiceRequests(prev =>
       prev.map(req =>
         req.id === requestId
-          ? { ...req, status: 'delegated' as const, assignedTo: toCrewMember, acceptedAt: new Date() }
+          ? { ...req, status: 'accepted' as const, assignedTo: toCrewMember, acceptedAt: new Date() }
           : req
       )
     );
@@ -1124,7 +1124,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             return false;
           }
           
-          if (req.status === 'accepted' || req.status === 'delegated') {
+          if (req.status === 'accepted') {
             const acceptedTime = req.acceptedAt instanceof Date ? req.acceptedAt : (req.acceptedAt ? new Date(req.acceptedAt) : null);
             
             if (acceptedTime && acceptedTime instanceof Date && !isNaN(acceptedTime.getTime())) {

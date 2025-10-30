@@ -3,11 +3,14 @@ import { prisma } from '../services/db';
 import type { Prisma } from '@prisma/client';
 import { asyncHandler, validate } from '../middleware/error-handler';
 import { CreateGuestSchema, UpdateGuestSchema } from '../validators/schemas';
+import { requirePermission } from '../middleware/auth';
+import { generalRateLimiter } from '../middleware/rate-limiter';
+import { validateGuestStatusTransition, validateCheckIn, validateCheckOut, type GuestStatus } from '../utils/guest-state-machine';
 
 const router = Router();
 
 // GET /api/guests - List guests with filtering, sorting, and pagination
-router.get('/', asyncHandler(async (req, res) => {
+router.get('/', requirePermission('guests.view'), asyncHandler(async (req, res) => {
     // Parse query parameters
     const {
       q = '',
@@ -125,7 +128,24 @@ router.get('/', asyncHandler(async (req, res) => {
         take: limitNum,
         include: {
           serviceRequests: {
-            select: { id: true, status: true }
+            select: {
+              id: true,
+              status: true,
+              priority: true,
+              createdAt: true
+            },
+            orderBy: {
+              createdAt: 'desc'
+            },
+            take: 5 // Limit to recent 5 requests per guest to avoid loading too much data
+          },
+          location: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+              floor: true
+            }
           }
         }
       }),
@@ -146,7 +166,7 @@ router.get('/', asyncHandler(async (req, res) => {
 }));
 
 // GET /api/guests/stats - Get guest statistics
-router.get('/stats', async (req, res) => {
+router.get('/stats', requirePermission('guests.view'), asyncHandler(async (req, res) => {
   try {
     const [onboard, expected, vip, dietaryAlerts] = await Promise.all([
       prisma.guest.count({ where: { status: 'onboard' } }),
@@ -167,63 +187,65 @@ router.get('/stats', async (req, res) => {
       })
     ]);
 
-    res.json({
-      success: true,
-      data: {
-        onboard,
-        expected,
-        vip,
-        dietaryAlerts
-      }
-    });
+  const stats = {
+    onboard,
+    expected,
+    vip,
+    dietaryAlerts
+  };
+
+  res.json({
+    success: true,
+    data: stats
+  });
   } catch (error) {
-    res.status(500).json({ success: false, error: 'Failed to fetch guest stats' });
+    console.error('Error fetching guest stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch guest statistics'
+    });
   }
-});
+}));
 
 // GET /api/guests/meta - Get metadata for filters
-router.get('/meta', async (req, res) => {
-  try {
-    const [guests, locations] = await Promise.all([
-      prisma.guest.findMany({
-        select: {
-          status: true,
-          type: true,
-          allergies: true,
-          dietaryRestrictions: true
-        }
-      }),
-      prisma.location.findMany({
-        select: {
-          id: true,
-          name: true
-        }
-      })
-    ]);
-
-    // Extract unique values
-    const statuses = [...new Set(guests.map(g => g.status))];
-    const types = [...new Set(guests.map(g => g.type))];
-    const allergies = [...new Set(guests.flatMap(g => g.allergies))];
-    const diets = [...new Set(guests.flatMap(g => g.dietaryRestrictions))];
-    const cabins = locations.map(l => ({ id: l.id, name: l.name }));
-
-    res.json({
-      success: true,
-      data: {
-        statuses,
-        types,
-        allergies,
-        diets,
-        cabins
+router.get('/meta', requirePermission('guests.view'), asyncHandler(async (req, res) => {
+  const [guests, locations] = await Promise.all([
+    prisma.guest.findMany({
+      select: {
+        status: true,
+        type: true,
+        allergies: true,
+        dietaryRestrictions: true
       }
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Failed to fetch metadata' });
-  }
-});
+    }),
+    prisma.location.findMany({
+      select: {
+        id: true,
+        name: true
+      }
+    })
+  ]);
 
-router.post('/', validate(CreateGuestSchema), asyncHandler(async (req, res) => {
+  // Extract unique values
+  const statuses = [...new Set(guests.map(g => g.status))];
+  const types = [...new Set(guests.map(g => g.type))];
+  const allergies = [...new Set(guests.flatMap(g => g.allergies))];
+  const diets = [...new Set(guests.flatMap(g => g.dietaryRestrictions))];
+  const cabins = locations.map(l => ({ id: l.id, name: l.name }));
+
+  res.json({
+    success: true,
+    data: {
+      statuses,
+      types,
+      allergies,
+      diets,
+      cabins
+    }
+  });
+}));
+
+router.post('/', generalRateLimiter, requirePermission('guests.create'), validate(CreateGuestSchema), asyncHandler(async (req, res) => {
   const item = await prisma.guest.create({
     data: req.body
   });
@@ -231,28 +253,61 @@ router.post('/', validate(CreateGuestSchema), asyncHandler(async (req, res) => {
   res.json({ success: true, data: item });
 }));
 
-router.get('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const data = await prisma.guest.findUnique({
+router.get('/:id', requirePermission('guests.view'), asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const data = await prisma.guest.findUnique({
+    where: { id },
+    include: {
+      serviceRequests: true
+    }
+  });
+
+  if (!data) {
+    return res.status(404).json({ success: false, error: 'Guest not found' });
+  }
+
+  res.json({ success: true, data });
+}));
+
+router.put('/:id', requirePermission('guests.edit'), validate(UpdateGuestSchema), asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  // If status is being updated, validate the transition
+  if (req.body.status) {
+    const currentGuest = await prisma.guest.findUnique({
       where: { id },
-      include: {
-        serviceRequests: true
-      }
+      select: { status: true, firstName: true, lastName: true, checkInDate: true, checkOutDate: true }
     });
-    
-    if (!data) {
+
+    if (!currentGuest) {
       return res.status(404).json({ success: false, error: 'Guest not found' });
     }
-    
-    res.json({ success: true, data });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Failed to fetch guest' });
-  }
-});
 
-router.put('/:id', validate(UpdateGuestSchema), asyncHandler(async (req, res) => {
-  const { id } = req.params;
+    const guestName = `${currentGuest.firstName} ${currentGuest.lastName}`;
+
+    // Validate state transition
+    validateGuestStatusTransition(
+      currentGuest.status as GuestStatus,
+      req.body.status as GuestStatus,
+      guestName
+    );
+
+    // Additional validation for check-in
+    if (req.body.status === 'onboard' && currentGuest.status === 'expected') {
+      validateCheckIn(
+        new Date(req.body.checkInDate || currentGuest.checkInDate),
+        new Date(req.body.checkOutDate || currentGuest.checkOutDate)
+      );
+    }
+
+    // Additional validation for check-out
+    if (req.body.status === 'departed' && currentGuest.status === 'onboard') {
+      validateCheckOut(
+        new Date(currentGuest.checkInDate),
+        new Date(currentGuest.checkOutDate)
+      );
+    }
+  }
 
   const data = await prisma.guest.update({
     where: { id },
@@ -262,7 +317,7 @@ router.put('/:id', validate(UpdateGuestSchema), asyncHandler(async (req, res) =>
   res.json({ success: true, data });
 }));
 
-router.delete('/:id', asyncHandler(async (req, res) => {
+router.delete('/:id', requirePermission('guests.delete'), asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   await prisma.guest.delete({

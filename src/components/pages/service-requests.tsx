@@ -29,8 +29,12 @@ import type { ServiceRequest, InteriorTeam } from '../../contexts/AppDataContext
 import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { ServiceRequestsSettingsDialog } from '../service-requests-settings-dialog';
 import { ServingRequestCard } from '../serving-request-card';
-import { useCreateServiceRequest } from '../../hooks/useServiceRequestsApi';
+import { useCreateServiceRequest, useCompleteServiceRequest, useCancelServiceRequest, useAcceptServiceRequest, useServiceRequestsApi } from '../../hooks/useServiceRequestsApi';
 import { useServiceCategories } from '../../hooks/useServiceCategories';
+import { useCrewMembers } from '../../hooks/useCrewMembers';
+import { useAssignments } from '../../hooks/useAssignments';
+import { useShifts } from '../../hooks/useShifts';
+import { getOnDutyCrew } from '../../utils/crew-utils';
 import {
   Dialog,
   DialogContent,
@@ -47,6 +51,8 @@ import {
 } from '../ui/select';
 import { Label } from '../ui/label';
 import { toast } from 'sonner';
+import { authService } from '../../services/auth';
+import { getPriorityColor, getPriorityBadgeColor, getTimeAgo } from '../../utils/service-request-utils';
 
 interface ServiceRequestsPageProps {
   isFullscreen?: boolean;
@@ -58,19 +64,30 @@ export function ServiceRequestsPage({
   onToggleFullscreen: externalToggleFullscreen
 }: ServiceRequestsPageProps = {}) {
   const {
-    serviceRequests,
     acceptServiceRequest,
     delegateServiceRequest,
-    completeServiceRequest,
     // simulateNewRequest removed - using API directly
     // forwardServiceRequest removed - using service categories instead
     serviceRequestHistory,
     clearServiceRequestHistory,
-    crewMembers,
     userPreferences,
+    addActivityLog,
   } = useAppData();
 
+  // ✅ GET DATA FROM REAL DATABASE (NOT MOCK DATA!)
+  const { serviceRequests: apiServiceRequests, isLoading: isLoadingRequests, refetch: refetchRequests } = useServiceRequestsApi();
+  const { crewMembers: apiCrewMembers } = useCrewMembers();
+  const { data: apiAssignments = [] } = useAssignments({});
+  const { data: apiShifts = [] } = useShifts();
+
   const createServiceRequest = useCreateServiceRequest();
+
+  // Use mutation to accept service request (saves to backend database)
+  const acceptServiceRequestMutation = useAcceptServiceRequest();
+
+  // Use mutations to complete/cancel service request (saves to backend database)
+  const completeServiceRequestMutation = useCompleteServiceRequest();
+  const cancelServiceRequestMutation = useCancelServiceRequest();
 
   // Track completing requests with timers
   const [completingRequests, setCompletingRequests] = useState<Record<string, number>>({});
@@ -85,10 +102,12 @@ export function ServiceRequestsPage({
     return () => clearInterval(interval);
   }, []);
 
+  const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
   const [delegateDialogOpen, setDelegateDialogOpen] = useState(false);
   const [forwardDialogOpen, setForwardDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null);
   const [selectedCrewMember, setSelectedCrewMember] = useState('');
+  const [selectedCrewMemberId, setSelectedCrewMemberId] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const [internalFullscreen, setInternalFullscreen] = useState(false);
@@ -147,6 +166,18 @@ export function ServiceRequestsPage({
   const { data: serviceCategories = [], isLoading: categoriesLoading } = useServiceCategories();
   const activeCategories = serviceCategories.filter(cat => cat.isActive);
 
+  // Transform API data to format expected by components
+  const serviceRequests = useMemo(() => {
+    return apiServiceRequests.map((apiReq: any) => ({
+      ...apiReq,
+      timestamp: new Date(apiReq.createdAt),
+      acceptedAt: apiReq.acceptedAt ? new Date(apiReq.acceptedAt) : undefined,
+      guestName: apiReq.guest ? `${apiReq.guest.firstName} ${apiReq.guest.lastName}` : apiReq.guestName || 'Unknown Guest',
+      guestCabin: apiReq.location?.name || apiReq.guestCabin || 'Unknown Location',
+      cabinImage: apiReq.location?.imageUrl || apiReq.cabinImage,
+    }));
+  }, [apiServiceRequests]);
+
   // Separate pending, serving, and completing requests
   const pendingRequests = useMemo(() => {
     return serviceRequests.filter(request => request.status === 'pending');
@@ -157,7 +188,7 @@ export function ServiceRequestsPage({
   }, [serviceRequests]);
 
   const completedRequestsWithTimer = useMemo(() => {
-    return serviceRequests.filter(request => 
+    return serviceRequests.filter(request =>
       request.status === 'completed' && completingRequests[request.id] !== undefined
     );
   }, [serviceRequests, completingRequests]);
@@ -172,40 +203,82 @@ export function ServiceRequestsPage({
     return { pending, urgent, emergency, accepted };
   }, [serviceRequests]);
 
-  // Get on-duty crew members for delegation
-  const onDutyCrewMembers = crewMembers.filter(
-    (crew) => crew.status === 'on-duty' && crew.department === 'Interior'
+  // ✅ Get crew members currently on duty from REAL DATABASE ASSIGNMENTS
+  const dutyStatus = getOnDutyCrew(apiCrewMembers, apiAssignments, apiShifts);
+  const onDutyCrewMembers = dutyStatus.onDuty.filter(
+    (crew) => crew.department === 'Interior'  // Filter for Interior department only
   );
 
-  const handleAccept = (request: ServiceRequest) => {
-    // In production, get from auth context
-    const currentUser = 'Maria Lopez';
-    acceptServiceRequest(request.id, currentUser);
-    toast.success(`Now serving ${userPreferences.serviceRequestDisplayMode === 'guest-name' ? request.guestName : request.guestCabin}`);
-  };
+  const handleAccept = useCallback((request: ServiceRequest) => {
+    setSelectedRequest(request);
+    setAcceptDialogOpen(true);
+  }, []);
 
-  const handleDelegateClick = (request: ServiceRequest) => {
+  const confirmAccept = useCallback(async () => {
+    if (!selectedRequest || !selectedCrewMemberId) return;
+
+    try {
+      // Accept request via API
+      await acceptServiceRequestMutation.mutateAsync({
+        id: selectedRequest.id,
+        crewMemberId: selectedCrewMemberId,
+      });
+
+      // ✅ Manually refetch to ensure immediate UI update
+      await refetchRequests();
+
+      // Close dialog and reset
+      setAcceptDialogOpen(false);
+      setSelectedRequest(null);
+      setSelectedCrewMember('');
+      setSelectedCrewMemberId('');
+
+      console.log('✅ Accept completed and UI refreshed');
+      // Note: Success toast is shown by the mutation hook
+    } catch (error) {
+      console.error('Failed to accept service request:', error);
+      // Error toast is shown by the mutation hook
+    }
+  }, [selectedRequest, selectedCrewMemberId, acceptServiceRequestMutation, refetchRequests]);
+
+  const handleDelegateClick = useCallback((request: ServiceRequest) => {
     setSelectedRequest(request);
     setDelegateDialogOpen(true);
-  };
+  }, []);
 
-  const handleForwardClick = (request: ServiceRequest) => {
+  const handleForwardClick = useCallback((request: ServiceRequest) => {
     setSelectedRequest(request);
     setForwardDialogOpen(true);
-  };
+  }, []);
 
-  const confirmDelegate = () => {
-    if (!selectedRequest || !selectedCrewMember) return;
+  const confirmDelegate = useCallback(async () => {
+    if (!selectedRequest || !selectedCrewMemberId) return;
 
-    delegateServiceRequest(selectedRequest.id, selectedCrewMember);
-    toast.success(`Request delegated to ${selectedCrewMember}`);
+    try {
+      // Delegate request via API (same endpoint as accept)
+      await acceptServiceRequestMutation.mutateAsync({
+        id: selectedRequest.id,
+        crewMemberId: selectedCrewMemberId,
+      });
 
-    setDelegateDialogOpen(false);
-    setSelectedRequest(null);
-    setSelectedCrewMember('');
-  };
+      // ✅ Manually refetch to ensure immediate UI update
+      await refetchRequests();
 
-  const confirmForward = () => {
+      // Close dialog and reset
+      setDelegateDialogOpen(false);
+      setSelectedRequest(null);
+      setSelectedCrewMember('');
+      setSelectedCrewMemberId('');
+
+      console.log('✅ Delegate completed and UI refreshed');
+      // Note: Success toast is shown by the mutation hook
+    } catch (error) {
+      console.error('Failed to delegate service request:', error);
+      // Error toast is shown by the mutation hook
+    }
+  }, [selectedRequest, selectedCrewMemberId, acceptServiceRequestMutation, refetchRequests]);
+
+  const confirmForward = useCallback(() => {
     if (!selectedRequest || !selectedCategoryId) return;
 
     const selectedCategory = serviceCategories.find(cat => cat.id === selectedCategoryId);
@@ -218,18 +291,86 @@ export function ServiceRequestsPage({
     setForwardDialogOpen(false);
     setSelectedRequest(null);
     setSelectedCategoryId('');
-  };
+  }, [selectedRequest, selectedCategoryId, serviceCategories]);
 
-  const handleComplete = (request: ServiceRequest) => {
-    const currentUser = 'Maria Lopez'; // In production, get from auth context
-    completeServiceRequest(request.id, currentUser);
-    
-    // Start countdown timer
-    const timeoutSeconds = userPreferences.servingNowTimeout || 5;
-    setCompletingRequests(prev => ({ ...prev, [request.id]: timeoutSeconds }));
-    
-    toast.success(`Completed! Removing in ${timeoutSeconds}s...`);
-  };
+  const handleComplete = useCallback(async (request: ServiceRequest) => {
+    console.log('🎯 [Service Requests Page] FINISH BUTTON CLICKED', {
+      requestId: request.id,
+      requestStatus: request.status,
+      requestGuestName: request.guestName,
+      requestCabin: request.guestCabin,
+      hasAcceptedAt: !!request.acceptedAt
+    });
+
+    try {
+      console.log('🚀 [Service Requests Page] Calling complete mutation...');
+      const result = await completeServiceRequestMutation.mutateAsync(request.id);
+      console.log('✅ [Service Requests Page] Complete mutation succeeded:', result);
+
+      // ✅ Manually refetch to ensure immediate UI update
+      await refetchRequests();
+      console.log('✅ [Service Requests Page] Service requests refreshed after completion');
+
+      // Start countdown timer
+      const timeoutSeconds = userPreferences.servingNowTimeout || 5;
+      setCompletingRequests(prev => ({ ...prev, [request.id]: timeoutSeconds }));
+
+      // Note: Success toast is shown by the mutation hook
+    } catch (error: any) {
+      console.error('❌ [Service Requests Page] Failed to complete service request:', {
+        error,
+        errorMessage: error?.message,
+        errorResponse: error?.response,
+        requestId: request.id
+      });
+      // Error toast is shown by the mutation hook
+      toast.error(`Failed to complete: ${error?.message || 'Unknown error'}`);
+    }
+  }, [completeServiceRequestMutation, userPreferences.servingNowTimeout, refetchRequests]);
+
+  const handleCancel = useCallback(async (request: ServiceRequest) => {
+    console.log('🚫 [Service Requests Page] CANCEL BUTTON CLICKED', {
+      requestId: request.id,
+      requestStatus: request.status,
+      requestGuestName: request.guestName,
+      requestCabin: request.guestCabin
+    });
+
+    try {
+      console.log('🚀 [Service Requests Page] Calling cancel mutation...');
+      const result = await cancelServiceRequestMutation.mutateAsync(request.id);
+      console.log('✅ [Service Requests Page] Cancel mutation succeeded:', result);
+
+      // ✅ Log to Activity Log
+      if (addActivityLog) {
+        const user = authService.getCurrentUser();
+        const currentUserName = user?.name || user?.username || 'Staff';
+
+        addActivityLog({
+          type: 'service',
+          action: 'Request Cancelled',
+          user: currentUserName,
+          location: request.guestCabin || 'Unknown Location',
+          details: `${currentUserName} cancelled ${request.requestType} request from ${request.guestName}`
+        });
+      }
+
+      // ✅ Manually refetch to ensure immediate UI update
+      await refetchRequests();
+      console.log('✅ [Service Requests Page] Service requests refreshed after cancellation');
+
+      // Note: Success toast is shown by the mutation hook
+    } catch (error: any) {
+      console.error('❌ [Service Requests Page] Failed to cancel service request:', {
+        error,
+        errorMessage: error?.message,
+        errorResponse: error?.response,
+        requestId: request.id
+      });
+      // Error toast is shown by the mutation hook
+      toast.error(`Failed to cancel: ${error?.message || 'Unknown error'}`);
+    }
+  }, [cancelServiceRequestMutation, refetchRequests]);
 
   // Countdown timer effect
   useEffect(() => {
@@ -266,47 +407,11 @@ export function ServiceRequestsPage({
     // For now, just simulate play state
     setPlayingAudio(requestId);
     toast.info('Playing voice message...');
-    
+
     // Simulate audio playback
     setTimeout(() => {
       setPlayingAudio(null);
     }, 3000);
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'emergency':
-        return 'bg-destructive/20 border-destructive text-destructive';
-      case 'urgent':
-        return 'bg-warning/20 border-warning/50 text-foreground';
-      default:
-        return 'bg-card border-border text-foreground';
-    }
-  };
-
-  const getPriorityBadgeColor = (priority: string) => {
-    switch (priority) {
-      case 'emergency':
-        return 'destructive';
-      case 'urgent':
-        return 'default';
-      default:
-        return 'secondary';
-    }
-  };
-
-  const getTimeAgo = (timestamp: Date): string => {
-    const now = new Date();
-    const diffMs = now.getTime() - timestamp.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins === 1) return '1 min ago';
-    if (diffMins < 60) return `${diffMins} mins ago`;
-
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours === 1) return '1 hour ago';
-    return `${diffHours} hours ago`;
   };
 
   return (
@@ -549,6 +654,7 @@ export function ServiceRequestsPage({
                       key={`${request.id}-${userPreferences.serviceRequestDisplayMode}`}
                       request={request}
                       onComplete={handleComplete}
+                      onCancel={handleCancel}
                       isFullscreen={isFullscreen}
                       userPreferences={userPreferences}
                       currentTime={currentTime}
@@ -713,6 +819,92 @@ export function ServiceRequestsPage({
         </DialogContent>
       </Dialog>
 
+      {/* Accept Dialog - Select crew member to assign */}
+      <Dialog open={acceptDialogOpen} onOpenChange={setAcceptDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Accept Service Request</DialogTitle>
+            <DialogDescription>
+              {selectedRequest &&
+                `Select a crew member to handle ${selectedRequest.guestName}'s request`}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Request Summary */}
+            {selectedRequest && (
+              <div className="p-3 bg-muted/30 rounded-lg border border-border">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium mb-1">
+                      {selectedRequest.guestName} - {selectedRequest.guestCabin}
+                    </p>
+                    {selectedRequest.voiceTranscript && (
+                      <p className="text-xs text-muted-foreground italic">
+                        "{selectedRequest.voiceTranscript.substring(0, 80)}..."
+                      </p>
+                    )}
+                  </div>
+                  <Badge variant={getPriorityBadgeColor(selectedRequest.priority) as any}>
+                    {selectedRequest.priority}
+                  </Badge>
+                </div>
+              </div>
+            )}
+
+            {/* Crew Member Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="accept-crew">Assign to Crew Member</Label>
+              <Select
+                value={selectedCrewMemberId}
+                onValueChange={(crewId) => {
+                  setSelectedCrewMemberId(crewId);
+                  const crew = onDutyCrewMembers.find((c) => c.id === crewId);
+                  setSelectedCrewMember(crew?.name || '');
+                }}
+              >
+                <SelectTrigger id="accept-crew">
+                  <SelectValue placeholder="Select crew member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {onDutyCrewMembers.map((crew) => (
+                    <SelectItem key={crew.id} value={crew.id}>
+                      <div className="flex items-center gap-2">
+                        <User className="h-3 w-3" />
+                        <span>{crew.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({crew.position})
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {onDutyCrewMembers.length === 0 && (
+              <div className="p-3 bg-warning/10 border border-warning/30 rounded-md text-xs text-warning">
+                <AlertCircle className="h-4 w-4 inline mr-2" />
+                No crew members available
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setAcceptDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmAccept}
+              disabled={!selectedCrewMemberId || onDutyCrewMembers.length === 0}
+            >
+              <Play className="h-4 w-4 mr-2" />
+              Accept
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Delegate Dialog */}
       <Dialog open={delegateDialogOpen} onOpenChange={setDelegateDialogOpen}>
         <DialogContent>
@@ -749,13 +941,20 @@ export function ServiceRequestsPage({
             {/* Crew Member Selection */}
             <div className="space-y-2">
               <Label htmlFor="delegate-crew">Assign to Crew Member</Label>
-              <Select value={selectedCrewMember} onValueChange={setSelectedCrewMember}>
+              <Select
+                value={selectedCrewMemberId}
+                onValueChange={(crewId) => {
+                  setSelectedCrewMemberId(crewId);
+                  const crew = onDutyCrewMembers.find((c) => c.id === crewId);
+                  setSelectedCrewMember(crew?.name || '');
+                }}
+              >
                 <SelectTrigger id="delegate-crew">
                   <SelectValue placeholder="Select crew member" />
                 </SelectTrigger>
                 <SelectContent>
                   {onDutyCrewMembers.map((crew) => (
-                    <SelectItem key={crew.id} value={crew.name}>
+                    <SelectItem key={crew.id} value={crew.id}>
                       <div className="flex items-center gap-2">
                         <User className="h-3 w-3" />
                         <span>{crew.name}</span>
@@ -783,7 +982,7 @@ export function ServiceRequestsPage({
             </Button>
             <Button
               onClick={confirmDelegate}
-              disabled={!selectedCrewMember || onDutyCrewMembers.length === 0}
+              disabled={!selectedCrewMemberId || onDutyCrewMembers.length === 0}
             >
               <Send className="h-4 w-4 mr-2" />
               Delegate

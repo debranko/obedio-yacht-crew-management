@@ -71,18 +71,128 @@ async function seedLocations() {
 
 async function seedCrew() {
   console.log(' Seeding crew members (Interior Department only)...');
-  
+
   const crew = [
     // Interior Department ONLY - Stewardesses
-    { name: 'Sarah Johnson', position: 'Chief Stewardess', department: 'Interior', status: 'active', email: 'sarah@yacht.local', role: 'chief-stewardess' },
-    { name: 'Emma Williams', position: 'Senior Stewardess', department: 'Interior', status: 'active', email: 'emma@yacht.local', role: 'stewardess' },
-    { name: 'Lisa Brown', position: 'Stewardess', department: 'Interior', status: 'active', email: 'lisa@yacht.local', role: 'stewardess' },
-    { name: 'Maria Garcia', position: 'Stewardess', department: 'Interior', status: 'active', email: 'maria@yacht.local', role: 'stewardess' },
-    { name: 'Sophie Martin', position: 'Junior Stewardess', department: 'Interior', status: 'active', email: 'sophie@yacht.local', role: 'stewardess' },
-    { name: 'Isabella Rossi', position: 'Laundry Stewardess', department: 'Interior', status: 'active', email: 'isabella@yacht.local', role: 'stewardess' },
-    { name: 'Chloe Anderson', position: 'Night Stewardess', department: 'Interior', status: 'active', email: 'chloe@yacht.local', role: 'stewardess' },
-    { name: 'Olivia Taylor', position: 'Stewardess', department: 'Interior', status: 'on-leave', email: 'olivia@yacht.local', role: 'stewardess' },
-    
+    {
+      name: 'Sarah Johnson',
+      nickname: 'Sarah',
+      position: 'Chief Stewardess',
+      department: 'Interior',
+      status: 'active',
+      email: 'sarah@yacht.local',
+      phone: '+1-555-0101',
+      onBoardContact: 'Radio Ch 3',
+      role: 'chief-stewardess',
+      color: '#FF6B9D',
+      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop',
+      languages: ['English', 'French'],
+      skills: ['Guest Relations', 'Wine Service', 'Fine Dining'],
+    },
+    {
+      name: 'Emma Williams',
+      position: 'Senior Stewardess',
+      department: 'Interior',
+      status: 'active',
+      email: 'emma@yacht.local',
+      phone: '+1-555-0102',
+      onBoardContact: 'Radio Ch 4',
+      role: 'stewardess',
+      color: '#4ECDC4',
+      avatar: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=400&h=400&fit=crop',
+      languages: ['English', 'Spanish'],
+      skills: ['Housekeeping', 'Laundry Management'],
+    },
+    {
+      name: 'Lisa Brown',
+      position: 'Stewardess',
+      department: 'Interior',
+      status: 'active',
+      email: 'lisa@yacht.local',
+      phone: '+1-555-0103',
+      onBoardContact: 'Radio Ch 5',
+      role: 'stewardess',
+      color: '#95E1D3',
+      avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&h=400&fit=crop',
+      languages: ['English', 'Italian'],
+      skills: ['Table Setting', 'Event Planning'],
+    },
+    {
+      name: 'Maria Garcia',
+      nickname: 'Mari',
+      position: 'Stewardess',
+      department: 'Interior',
+      status: 'active',
+      email: 'maria@yacht.local',
+      phone: '+1-555-0104',
+      onBoardContact: 'Radio Ch 6',
+      role: 'stewardess',
+      color: '#F38181',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop',
+      languages: ['English', 'Spanish', 'Portuguese'],
+      skills: ['Housekeeping', 'Guest Service'],
+    },
+    {
+      name: 'Sophie Martin',
+      position: 'Junior Stewardess',
+      department: 'Interior',
+      status: 'active',
+      email: 'sophie@yacht.local',
+      phone: '+1-555-0105',
+      onBoardContact: 'Radio Ch 7',
+      role: 'stewardess',
+      color: '#AA96DA',
+      avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop',
+      languages: ['English', 'French'],
+      skills: ['Cabin Service', 'Bar Service'],
+    },
+    {
+      name: 'Isabella Rossi',
+      nickname: 'Bella',
+      position: 'Laundry Stewardess',
+      department: 'Interior',
+      status: 'active',
+      email: 'isabella@yacht.local',
+      phone: '+1-555-0106',
+      onBoardContact: 'Radio Ch 8',
+      role: 'stewardess',
+      color: '#FCBAD3',
+      avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop',
+      languages: ['English', 'Italian'],
+      skills: ['Laundry', 'Textile Care', 'Ironing'],
+    },
+    {
+      name: 'Chloe Anderson',
+      position: 'Night Stewardess',
+      department: 'Interior',
+      status: 'active',
+      email: 'chloe@yacht.local',
+      phone: '+1-555-0107',
+      onBoardContact: 'Radio Ch 9',
+      role: 'stewardess',
+      color: '#FFFFD2',
+      avatar: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=400&h=400&fit=crop',
+      languages: ['English'],
+      skills: ['Night Service', 'Security Checks'],
+    },
+    {
+      name: 'Olivia Taylor',
+      nickname: 'Liv',
+      position: 'Stewardess',
+      department: 'Interior',
+      status: 'on_leave',
+      email: 'olivia@yacht.local',
+      phone: '+1-555-0108',
+      onBoardContact: 'Radio Ch 10',
+      role: 'stewardess',
+      color: '#C7CEEA',
+      avatar: 'https://images.unsplash.com/photo-1489424731084-a5d8b219a5bb?w=400&h=400&fit=crop',
+      leaveStart: '2025-01-15',
+      leaveEnd: '2025-02-01',
+      languages: ['English', 'German'],
+      skills: ['Guest Service', 'Bar Service'],
+    },
+
     // NOTE: Removed all non-Interior departments:
     // - Deck Department (Captain, Officers, Deckhand) - REMOVED
     // - Engineering Department (Engineers, ETO) - REMOVED
@@ -98,7 +208,7 @@ async function seedCrew() {
     })),
     skipDuplicates: true,
   });
-  
+
   console.log(` Created ${crew.length} Interior crew members`);
 }
 
@@ -118,87 +228,103 @@ async function seedGuests() {
   
   const guests = [
     // MASTER BEDROOM (Owner's Deck) - Leonardo DiCaprio & Scarlett Johansson
-    { 
-      firstName: 'Leonardo', 
+    {
+      firstName: 'Leonardo',
       lastName: 'DiCaprio',
       preferredName: 'Leo',
-      type: 'owner', 
+      email: 'leo.dicaprio@example.com',
+      phone: '+1-555-1001',
+      type: 'owner',
       status: 'onboard',
       nationality: 'American',
       languages: ['English', 'German'],
       locationId: masterBedroom?.id,
       photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop'
     },
-    { 
-      firstName: 'Scarlett', 
+    {
+      firstName: 'Scarlett',
       lastName: 'Johansson',
-      type: 'partner', 
+      email: 'scarlett.johansson@example.com',
+      phone: '+1-555-1002',
+      type: 'partner',
       status: 'onboard',
       nationality: 'American',
       languages: ['English', 'French'],
       locationId: masterBedroom?.id,
       photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop'
     },
-    
+
     // VIP CABIN (Owner's Deck) - George Clooney & Amal
-    { 
-      firstName: 'George', 
+    {
+      firstName: 'George',
       lastName: 'Clooney',
-      type: 'vip', 
+      email: 'george.clooney@example.com',
+      phone: '+1-555-1003',
+      type: 'vip',
       status: 'onboard',
       nationality: 'American',
       languages: ['English', 'Italian'],
       locationId: vipCabin?.id,
       photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop'
     },
-    { 
-      firstName: 'Amal', 
+    {
+      firstName: 'Amal',
       lastName: 'Clooney',
-      type: 'vip', 
+      email: 'amal.clooney@example.com',
+      phone: '+44-555-1004',
+      type: 'vip',
       status: 'onboard',
       nationality: 'British',
       languages: ['English', 'Arabic', 'French'],
       locationId: vipCabin?.id,
       photo: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop'
     },
-    
+
     // VIP OFFICE (Owner's Deck) - Chris Hemsworth & Elsa Pataky
-    { 
-      firstName: 'Chris', 
+    {
+      firstName: 'Chris',
       lastName: 'Hemsworth',
-      type: 'vip', 
+      email: 'chris.hemsworth@example.com',
+      phone: '+61-555-1005',
+      type: 'vip',
       status: 'onboard',
       nationality: 'Australian',
       languages: ['English'],
       locationId: vipOffice?.id,
       photo: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=400&fit=crop'
     },
-    { 
-      firstName: 'Elsa', 
+    {
+      firstName: 'Elsa',
       lastName: 'Pataky',
-      type: 'vip', 
+      email: 'elsa.pataky@example.com',
+      phone: '+34-555-1006',
+      type: 'vip',
       status: 'onboard',
       nationality: 'Spanish',
       languages: ['Spanish', 'English'],
       locationId: vipOffice?.id,
       photo: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&h=400&fit=crop'
     },
-    
+
     // CABIN 1 (Tank Deck) - Ed Sheeran & Cherry Seaborn
-    { 
-      firstName: 'Ed', 
+    {
+      firstName: 'Ed',
       lastName: 'Sheeran',
-      type: 'guest', 
+      email: 'ed.sheeran@example.com',
+      phone: '+44-555-1007',
+      type: 'guest',
       status: 'onboard',
       nationality: 'British',
       languages: ['English'],
       locationId: cabin1?.id,
       photo: 'https://images.unsplash.com/photo-1552374196-c4e7ffc6e126?w=400&h=400&fit=crop'
     },
-    { 
-      firstName: 'Cherry', 
+    {
+      firstName: 'Cherry',
       lastName: 'Seaborn',
-      type: 'guest', 
+      email: 'cherry.seaborn@example.com',
+      phone: '+44-555-1008',
+      type: 'guest',
       status: 'onboard',
       nationality: 'British',
       languages: ['English'],
@@ -207,88 +333,104 @@ async function seedGuests() {
     },
     
     // CABIN 2 (Tank Deck) - Timothée Chalamet & Zendaya
-    { 
-      firstName: 'Timothée', 
+    {
+      firstName: 'Timothée',
       lastName: 'Chalamet',
-      type: 'guest', 
+      email: 'timothee.chalamet@example.com',
+      phone: '+1-555-1009',
+      type: 'guest',
       status: 'onboard',
       nationality: 'American',
       languages: ['English', 'French'],
       locationId: cabin2?.id,
       photo: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&h=400&fit=crop'
     },
-    { 
-      firstName: 'Zendaya', 
+    {
+      firstName: 'Zendaya',
       lastName: 'Coleman',
       preferredName: 'Z',
-      type: 'guest', 
+      email: 'zendaya@example.com',
+      phone: '+1-555-1010',
+      type: 'guest',
       status: 'onboard',
       nationality: 'American',
       languages: ['English'],
       locationId: cabin2?.id,
       photo: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&h=400&fit=crop'
     },
-    
+
     // CABIN 3 (Tank Deck) - Dwayne Johnson & Lauren
-    { 
-      firstName: 'Dwayne', 
+    {
+      firstName: 'Dwayne',
       lastName: 'Johnson',
       preferredName: 'The Rock',
-      type: 'guest', 
+      email: 'dwayne.johnson@example.com',
+      phone: '+1-555-1011',
+      type: 'guest',
       status: 'onboard',
       nationality: 'American',
       languages: ['English'],
       locationId: cabin3?.id,
       photo: 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=400&h=400&fit=crop'
     },
-    { 
-      firstName: 'Lauren', 
+    {
+      firstName: 'Lauren',
       lastName: 'Hashian',
-      type: 'guest', 
+      email: 'lauren.hashian@example.com',
+      phone: '+1-555-1012',
+      type: 'guest',
       status: 'onboard',
       nationality: 'American',
       languages: ['English'],
       locationId: cabin3?.id,
       photo: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=400&h=400&fit=crop'
     },
-    { 
-      firstName: 'Ryan', 
+    {
+      firstName: 'Ryan',
       lastName: 'Reynolds',
-      type: 'guest', 
+      email: 'ryan.reynolds@example.com',
+      phone: '+1-555-1013',
+      type: 'guest',
       status: 'onboard',
       nationality: 'Canadian',
       languages: ['English', 'French'],
       locationId: cabin4?.id,
       photo: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=400&h=400&fit=crop'
     },
-    { 
-      firstName: 'Blake', 
+    {
+      firstName: 'Blake',
       lastName: 'Lively',
-      type: 'guest', 
+      email: 'blake.lively@example.com',
+      phone: '+1-555-1014',
+      type: 'guest',
       status: 'onboard',
       nationality: 'American',
       languages: ['English'],
       locationId: cabin4?.id,
       photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop'
     },
-    
-    // CABIN 5 (Tank Deck) - Tom Holland & Zendaya's friend
-    { 
-      firstName: 'Tom', 
+
+    // CABIN 5 (Tank Deck) - Tom Holland
+    {
+      firstName: 'Tom',
       lastName: 'Holland',
-      type: 'guest', 
+      email: 'tom.holland@example.com',
+      phone: '+44-555-1015',
+      type: 'guest',
       status: 'onboard',
       nationality: 'British',
       languages: ['English'],
       locationId: cabin5?.id,
       photo: 'https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?w=400&h=400&fit=crop'
     },
-    
+
     // CABIN 6 (Tank Deck) - Margot Robbie (solo guest)
-    { 
-      firstName: 'Margot', 
+    {
+      firstName: 'Margot',
       lastName: 'Robbie',
-      type: 'guest', 
+      email: 'margot.robbie@example.com',
+      phone: '+61-555-1016',
+      type: 'guest',
       status: 'onboard',
       nationality: 'Australian',
       languages: ['English'],
@@ -319,7 +461,7 @@ async function seedServiceRequests() {
         guestId: guests[0]?.id,
         locationId: locations[0]?.id,
         priority: 'normal',
-        status: 'open',
+        status: 'pending',
         notes: 'Guest requested coffee service'
       },
       {

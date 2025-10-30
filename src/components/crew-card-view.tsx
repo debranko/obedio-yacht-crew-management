@@ -3,16 +3,17 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
-import { 
-  MessageSquare, 
-  Edit, 
-  Trash2, 
-  Mail, 
-  Phone, 
+import {
+  MessageSquare,
+  Edit,
+  Trash2,
+  Mail,
+  Phone,
   Radio,
   Power
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import { getStatusBadge } from '../utils/crew-utils';
 
 interface CrewCardViewProps {
   crew: CrewMember;
@@ -35,18 +36,6 @@ export function CrewCardView({
   onDelete,
   onClick,
 }: CrewCardViewProps) {
-  const getStatusBadge = (status?: string) => {
-    switch (status) {
-      case 'on-leave':
-        return <Badge variant="destructive" className="text-xs">On Leave</Badge>;
-      case 'on-duty':
-        return <Badge className="bg-success text-white text-xs">On Duty</Badge>;
-      case 'off-duty':
-      default:
-        return <Badge variant="secondary" className="text-xs">Off Duty</Badge>;
-    }
-  };
-
   return (
     <Card 
       className="p-4 cursor-pointer hover:bg-muted/50 transition-colors"
@@ -111,6 +100,11 @@ export function CrewCardView({
             </div>
             <div className="flex flex-col gap-1 items-end">
               {getStatusBadge(crew.status)}
+              {crew.status === 'on-leave' && crew.leaveStart && crew.leaveEnd && (
+                <span className="text-[10px] text-muted-foreground text-right">
+                  {new Date(crew.leaveStart).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} - {new Date(crew.leaveEnd).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                </span>
+              )}
             </div>
           </div>
 

@@ -59,7 +59,7 @@ export interface CrewMemberDTO {
   name: string;
   position: string;
   department: string;
-  status: string;
+  status: 'active' | 'on-duty' | 'off-duty' | 'on-leave';
   contact?: string | null;
   email?: string | null;
   joinDate?: string | null;
@@ -143,43 +143,9 @@ export interface GuestDTO {
   updatedAt: string;
 }
 
-export const guestsApi = {
-  /**
-   * Get all guests
-   */
-  getAll: () => fetchApi<GuestDTO[]>('/guests'),
-
-  /**
-   * Get single guest by ID
-   */
-  getById: (id: string) => fetchApi<GuestDTO>(`/guests/${id}`),
-
-  /**
-   * Create new guest
-   */
-  create: (data: Partial<GuestDTO>) =>
-    fetchApi<GuestDTO>('/guests', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  /**
-   * Update guest
-   */
-  update: (id: string, data: Partial<GuestDTO>) =>
-    fetchApi<GuestDTO>(`/guests/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-
-  /**
-   * Delete guest
-   */
-  delete: (id: string) =>
-    fetchApi<void>(`/guests/${id}`, {
-      method: 'DELETE',
-    }),
-};
+// NOTE: Guest API operations have been moved to GuestsService in '../services/guests'
+// which provides pagination, stats, filters, data cleaning, and CSV export.
+// Use import { GuestsService } from '../services/guests' for all guest operations.
 
 // =====================
 // SERVICE REQUESTS API
@@ -189,7 +155,8 @@ export interface ServiceRequestDTO {
   id: string;
   guestId: string;
   locationId?: string | null;
-  status: 'pending' | 'in-progress' | 'completed' | 'cancelled' | 'serving' | 'accepted' | 'delegated';
+  requestType: 'call' | 'service' | 'emergency';
+  status: 'pending' | 'accepted' | 'completed' | 'cancelled';
   priority: 'low' | 'normal' | 'urgent' | 'emergency';
   message?: string | null;
   voiceTranscript?: string | null;
@@ -233,11 +200,12 @@ export const serviceRequestsApi = {
 
   /**
    * Accept service request (assign to crew member)
+   * Must provide crewMemberId to assign the request
    */
-  accept: (id: string, crewId: string) =>
+  accept: (id: string, crewMemberId: string) =>
     fetchApi<ServiceRequestDTO>(`/service-requests/${id}/accept`, {
       method: 'POST',
-      body: JSON.stringify({ crewId }),
+      body: JSON.stringify({ crewMemberId }),
     }),
 
   /**
@@ -324,11 +292,19 @@ export const devicesApi = {
     }),
 
   /**
-   * Get device logs
+   * Get device logs (for specific device)
    */
   getLogs: (id: string, params?: Record<string, string>) => {
     const query = params ? `?${new URLSearchParams(params).toString()}` : '';
     return fetchApi<any[]>(`/devices/${id}/logs${query}`);
+  },
+
+  /**
+   * Get all device logs (global)
+   */
+  getAllLogs: (params?: Record<string, string>) => {
+    const query = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return fetchApi<any>(`/devices/logs${query}`);
   },
 
   /**
@@ -431,6 +407,78 @@ export interface AssignmentDTO {
   shift?: ShiftDTO; // Populated when included
 }
 
+// =====================
+// LOCATIONS API
+// =====================
+
+export interface LocationDTO {
+  id: string;
+  name: string;
+  type: string;
+  floor?: string;
+  description?: string;
+  image?: string;
+  smartButtonId?: string;
+  doNotDisturb?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  guests?: any[];
+  serviceRequests?: any[];
+}
+
+export const locationsApi = {
+  /**
+   * Get all locations
+   */
+  getAll: (includeRelations = false) =>
+    fetchApi<LocationDTO[]>(`/locations?include=${includeRelations}`),
+
+  /**
+   * Get single location by ID
+   */
+  getById: (id: string) => fetchApi<LocationDTO>(`/locations/${id}`),
+
+  /**
+   * Create new location
+   */
+  create: (data: Partial<LocationDTO>) =>
+    fetchApi<LocationDTO>('/locations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Update location
+   */
+  update: (id: string, data: Partial<LocationDTO>) =>
+    fetchApi<LocationDTO>(`/locations/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Delete location
+   */
+  delete: (id: string) =>
+    fetchApi<void>(`/locations/${id}`, {
+      method: 'DELETE',
+    }),
+
+  /**
+   * Toggle Do Not Disturb status
+   */
+  toggleDnd: (id: string, enabled: boolean) =>
+    fetchApi<{ location: LocationDTO }>(`/locations/${id}/toggle-dnd`, {
+      method: 'POST',
+      body: JSON.stringify({ enabled }),
+    }),
+
+  /**
+   * Get all locations with DND enabled
+   */
+  getDndActive: () => fetchApi<LocationDTO[]>('/locations/dnd/active'),
+};
+
 export const assignmentsApi = {
   /**
    * Get all assignments with optional filters
@@ -530,11 +578,12 @@ export const assignmentsApi = {
 
 export const api = {
   crew: crewApi,
-  guests: guestsApi,
+  // guests: Use GuestsService from '../services/guests' instead
   serviceRequests: serviceRequestsApi,
   devices: devicesApi,
   shifts: shiftsApi,
   assignments: assignmentsApi,
+  locations: locationsApi,
 
   // Direct methods for convenience
   get: (endpoint: string) => fetchApi<any>(endpoint),

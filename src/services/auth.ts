@@ -17,7 +17,7 @@ interface AuthResponse {
   message?: string;
 }
 
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
 class AuthService {
   private token: string | null = null;
@@ -39,16 +39,30 @@ class AuthService {
 
       const data = await response.json();
 
-      if (response.ok && data.token) {
-        this.token = data.token;
-        localStorage.setItem('obedio-auth-token', data.token);
-        
+      console.log('🔐 Login response:', { success: data.success, hasToken: !!(data.data?.token || data.token), hasUser: !!(data.data?.user || data.user) });
+
+      // Backend returns token in data.data.token
+      const token = data.data?.token || data.token;
+      const user = data.data?.user || data.user;
+
+      if (response.ok && token) {
+        this.token = token;
+        localStorage.setItem('obedio-auth-token', token);
+        console.log('✅ Token saved to localStorage:', token.substring(0, 20) + '...');
+
+        // Store user info for easy access
+        if (user) {
+          localStorage.setItem('obedio-auth-user', JSON.stringify(user));
+          console.log('✅ User saved to localStorage:', user.username);
+        }
+
         return {
           success: true,
-          token: data.token,
-          user: data.user,
+          token: token,
+          user: user,
         };
       } else {
+        console.error('❌ Login failed:', data.message);
         return {
           success: false,
           message: data.message || 'Login failed',
@@ -66,6 +80,7 @@ class AuthService {
   logout(): void {
     this.token = null;
     localStorage.removeItem('obedio-auth-token');
+    localStorage.removeItem('obedio-auth-user');
   }
 
   getToken(): string | null {
@@ -74,6 +89,20 @@ class AuthService {
 
   isAuthenticated(): boolean {
     return !!this.token;
+  }
+
+  // Get current logged-in user
+  getCurrentUser(): { id: string; username: string; name: string; role: string } | null {
+    const userJson = localStorage.getItem('obedio-auth-user');
+    if (userJson) {
+      try {
+        return JSON.parse(userJson);
+      } catch (error) {
+        console.error('Failed to parse user data:', error);
+        return null;
+      }
+    }
+    return null;
   }
 
   // Get Authorization header for API requests

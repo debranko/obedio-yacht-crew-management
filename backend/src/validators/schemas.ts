@@ -20,6 +20,11 @@ export const CreateGuestSchema = z.object({
   status: z.enum(['expected', 'onboard', 'ashore', 'departed'], {
     errorMap: () => ({ message: 'Invalid status' })
   }).default('onboard'),
+
+  // Contact Information
+  email: z.string().email('Invalid email').max(100).optional().nullable(),
+  phone: z.string().max(50).optional().nullable(),
+
   nationality: z.string().max(50).optional().nullable(),
   languages: z.array(z.string()).optional().default([]),
   passportNumber: z.string().max(50).optional().nullable(),
@@ -53,14 +58,30 @@ export const UpdateGuestSchema = CreateGuestSchema.partial();
 
 export const CreateCrewMemberSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
+  nickname: z.string().max(50).optional().nullable(),
   position: z.string().min(1, 'Position is required').max(100, 'Position too long'),
   department: z.string().min(1, 'Department is required').max(100, 'Department too long'),
   status: z.enum(['active', 'on-duty', 'off-duty', 'on-leave']).default('active'),
   contact: z.string().max(50).optional().nullable(),
   email: z.string().email('Invalid email').max(100).optional().nullable(),
+  phone: z.string().max(50).optional().nullable(),
+  onBoardContact: z.string().max(50).optional().nullable(),
   joinDate: z.string().datetime().optional().nullable(),
   role: z.string().max(50).optional().nullable(),
   userId: z.string().optional().nullable(),
+
+  // Visual identification
+  avatar: z.string().max(500).optional().nullable(), // URL to avatar image
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid color format (hex)').optional().default('#C8A96B'),
+
+  // Leave tracking
+  leaveStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional().nullable(),
+  leaveEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional().nullable(),
+
+  // Additional info
+  languages: z.array(z.string()).optional().default([]),
+  skills: z.array(z.string()).optional().default([]),
+  notes: z.string().max(2000).optional().nullable(),
 });
 
 export const UpdateCrewMemberSchema = CreateCrewMemberSchema.partial();

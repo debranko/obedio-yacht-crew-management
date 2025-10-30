@@ -5,12 +5,13 @@
 
 import { useState, useRef } from "react";
 import { useAppData } from "../contexts/AppDataContext";
+import { useCreateServiceRequest } from "../hooks/useServiceRequestsApi";
 import { Button } from "./ui/button";
-import { 
-  Mic, 
-  Phone, 
-  Coffee, 
-  Lightbulb, 
+import {
+  Mic,
+  Phone,
+  Coffee,
+  Lightbulb,
   Fan,
   Bell,
   CheckCircle2,
@@ -64,7 +65,8 @@ interface ButtonSimulatorDialogProps {
 
 export function ButtonSimulatorDialog({ open, onOpenChange }: ButtonSimulatorDialogProps) {
   const { locations = [], crew = [], guests = [] } = useAppData();
-  
+  const createServiceRequest = useCreateServiceRequest();
+
   const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [auxButtons] = useState<AuxButton[]>(defaultAuxButtons);
   
@@ -79,8 +81,8 @@ export function ButtonSimulatorDialog({ open, onOpenChange }: ButtonSimulatorDia
   const onDutyCrew = crew.filter(member => member.status === "on-duty");
   const currentLocation = locations.find(loc => loc.id === selectedLocation);
 
-  const generateServiceRequest = (
-    requestType: string, 
+  const generateServiceRequest = async (
+    requestType: string,
     requestLabel: string,
     isVoice: boolean = false,
     voiceDuration?: number
@@ -98,48 +100,57 @@ export function ButtonSimulatorDialog({ open, onOpenChange }: ButtonSimulatorDia
     }
 
     const location = currentLocation!;
-    const guestAtLocation = guests.find(g => 
+    const guestAtLocation = guests.find(g =>
       g.preferences?.cabin?.toLowerCase().includes(location.name.toLowerCase())
     ) || guests[0];
-    const assignedCrew = onDutyCrew[0];
 
-    toast.success(
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <CheckCircle2 className="h-5 w-5 text-success" />
-          <span className="font-semibold">Service Request Created</span>
-        </div>
-        <div className="space-y-1 text-sm">
-          <div className="flex items-center gap-2">
-            <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-            <span><strong>Location:</strong> {location.name}</span>
-          </div>
-          {location.floor && (
-            <div className="text-muted-foreground pl-5.5">{location.floor}</div>
-          )}
-          <div className="pl-5.5"><strong>Request:</strong> {requestLabel}</div>
-          {isVoice && voiceDuration && (
-            <div className="pl-5.5 text-accent">🎤 Voice: {voiceDuration.toFixed(1)}s</div>
-          )}
-          {guestAtLocation && (
-            <div className="pl-5.5 text-muted-foreground">Guest: {guestAtLocation.name}</div>
-          )}
-          {assignedCrew && (
-            <div className="pl-5.5 text-muted-foreground">Assigned: {assignedCrew.name}</div>
-          )}
-        </div>
-      </div>,
-      { duration: 6000 }
-    );
+    if (!guestAtLocation) {
+      toast.error("No guest found", {
+        description: "Please assign a guest to this location first"
+      });
+      return;
+    }
 
-    console.log("🔘 BUTTON PRESS:", {
+    // Map button function to request type for API
+    const apiRequestType = requestType === 'main' ? 'call' :
+      requestType === 'call_service' ? 'service' :
+        requestType === 'request_drink' ? 'service' : 'service';
+
+    // Determine priority
+    const priority = isVoice ? 'urgent' : 'normal';
+
+    // Create message
+    let message = requestLabel;
+    if (isVoice && voiceDuration) {
+      message += ` (Voice message: ${voiceDuration.toFixed(1)}s)`;
+    }
+
+    console.log("🔘 BUTTON PRESS - Creating service request via API:", {
       timestamp: new Date().toISOString(),
       buttonType: isVoice ? "MAIN_HOLD" : requestType === "main" ? "MAIN_TAP" : "AUX_" + requestType.toUpperCase(),
       location: { id: location.id, name: location.name, floor: location.floor, smartButtonId: location.smartButtonId },
-      request: { type: requestType, label: requestLabel, isVoice, voiceDuration: isVoice ? voiceDuration : null },
-      guest: guestAtLocation ? { id: guestAtLocation.id, name: guestAtLocation.name } : null,
-      assignedTo: assignedCrew ? { id: assignedCrew.id, name: assignedCrew.name, role: assignedCrew.role } : null
+      request: { type: apiRequestType, label: requestLabel, isVoice, voiceDuration: isVoice ? voiceDuration : null },
+      guest: { id: guestAtLocation.id, name: guestAtLocation.name }
     });
+
+    // ✅ Create REAL service request via API (will trigger WebSocket event and show IncomingRequestDialog!)
+    try {
+      await createServiceRequest.mutateAsync({
+        guestId: guestAtLocation.id,
+        locationId: location.id,
+        requestType: apiRequestType as 'call' | 'service' | 'emergency',
+        status: 'pending',
+        priority: priority as 'low' | 'normal' | 'urgent' | 'emergency',
+        message: message,
+        voiceTranscript: isVoice ? `Voice message (${voiceDuration?.toFixed(1)}s)` : undefined
+      });
+
+      // Success feedback (API hook already shows toast)
+      console.log("✅ Service request created successfully - IncomingRequestDialog will pop up!");
+    } catch (error) {
+      console.error("❌ Failed to create service request:", error);
+      // Error toast already shown by API hook
+    }
   };
 
   const handleMainButtonDown = () => {

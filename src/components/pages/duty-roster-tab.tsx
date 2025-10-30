@@ -54,25 +54,25 @@ import {
 } from '../duty-roster/utils';
 import { toast } from 'sonner';
 import { NotifyCrewDialog } from '../notify-crew-dialog';
+import { useCrewMembers } from '../../hooks/useCrewMembers';
+import { useAssignments, useCreateBulkAssignments } from '../../hooks/useAssignments';
+import { useShifts, useBulkSaveShifts } from '../../hooks/useShifts';
 
 export function DutyRosterTab() {
-  const {
-    crewMembers: contextCrewMembers,
-    assignments: contextAssignments,
-    setAssignments: setContextAssignments,
-    shifts: contextShifts,
-    setShifts: setContextShifts,
-    saveAssignments,
-    lastSaved,
-    isSaving,
-    detectRosterChanges,
-    markChangesAsNotified,
-  } = useAppData();
+  // ✅ GET DATA FROM BACKEND API (NOT MOCK DATA FROM AppDataContext)
+  const { crewMembers: apiCrewMembers, isLoading: isLoadingCrew } = useCrewMembers();
+  const { data: apiAssignments = [], isLoading: isLoadingAssignments } = useAssignments({});
+  const { data: apiShifts = [], isLoading: isLoadingShifts } = useShifts();
+  const createBulkAssignmentsMutation = useCreateBulkAssignments();
+  const bulkSaveShiftsMutation = useBulkSaveShifts();
+
+  // Keep detectRosterChanges/markChangesAsNotified for legacy notifications
+  const { detectRosterChanges, markChangesAsNotified } = useAppData();
 
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [assignments, setAssignments] = useState<Assignment[]>(contextAssignments);
-  const [shifts, setShifts] = useState<ShiftConfig[]>(contextShifts);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [shifts, setShifts] = useState<ShiftConfig[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
@@ -82,18 +82,27 @@ export function DutyRosterTab() {
   const [dayDetailOpen, setDayDetailOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [assignmentHistory, setAssignmentHistory] = useState<Assignment[][]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
-  // Sync with context on mount only
+  // Sync backend data to local state when loaded
   useEffect(() => {
-    setAssignments(contextAssignments);
-    setShifts(contextShifts);
-  }, []);
+    if (apiAssignments && apiAssignments.length > 0) {
+      setAssignments(apiAssignments);
+    }
+  }, [apiAssignments]);
 
-  // Track unsaved changes
   useEffect(() => {
-    const isDifferent = JSON.stringify(assignments) !== JSON.stringify(contextAssignments);
+    if (apiShifts && apiShifts.length > 0) {
+      setShifts(apiShifts);
+    }
+  }, [apiShifts]);
+
+  // Track unsaved changes (compare with backend data)
+  useEffect(() => {
+    const isDifferent = JSON.stringify(assignments) !== JSON.stringify(apiAssignments);
     setHasUnsavedChanges(isDifferent);
-  }, [assignments, contextAssignments]);
+  }, [assignments, apiAssignments]);
 
   const today = getTodayDate();
 
@@ -111,7 +120,7 @@ export function DutyRosterTab() {
 
   // Filter and sort crew members - on-leave at bottom
   const filteredCrewMembers = useMemo(() => {
-    let filtered = contextCrewMembers;
+    let filtered = apiCrewMembers;
 
     // Search filter
     if (searchTerm) {
@@ -144,7 +153,7 @@ export function DutyRosterTab() {
       // Both same status - sort alphabetically by name
       return a.name.localeCompare(b.name);
     });
-  }, [searchTerm, showOnlyAvailable, assignments, viewMode, today, contextCrewMembers]);
+  }, [searchTerm, showOnlyAvailable, assignments, viewMode, today, apiCrewMembers]);
   
   // Separate available and on-leave crew for visual grouping
   const availableCrewMembers = useMemo(
@@ -169,7 +178,7 @@ export function DutyRosterTab() {
     const shift = shifts.find((s) => s.id === shiftId);
     if (!shift) return;
 
-    const crew = contextCrewMembers.find((c) => c.id === crewId);
+    const crew = apiCrewMembers.find((c) => c.id === crewId);
     const crewName = crew?.name.split(' ')[0] || 'Crew member';
 
     // Check if crew is on leave for this date
@@ -201,12 +210,11 @@ export function DutyRosterTab() {
       const primaryCount = currentAssignments.filter((a) => a.type === 'primary').length;
       const backupCount = currentAssignments.filter((a) => a.type === 'backup').length;
 
+      // For MANUAL drag & drop: NO LIMITS!
+      // Automatically determine type based on current counts, but allow unlimited assignments
       let type: 'primary' | 'backup' = 'primary';
       if (primaryCount >= shift.primaryCount) {
-        if (backupCount >= shift.backupCount) {
-          toast.error('Shift is at full capacity');
-          return prevAssignments; // Return unchanged state
-        }
+        // Already have enough primary, make this one backup
         type = 'backup';
       }
 
@@ -237,7 +245,7 @@ export function DutyRosterTab() {
 
   // Handle autofill
   const handleAutofill = () => {
-    const newAssignments = autoFillAssignments(dates, shifts, contextCrewMembers, true);
+    const newAssignments = autoFillAssignments(dates, shifts, apiCrewMembers, true);
     
     if (newAssignments.length === 0) {
       toast.error('No crew members available for assignment');
@@ -268,7 +276,7 @@ export function DutyRosterTab() {
         assignments,
         dates,
         shift.id,
-        contextCrewMembers,
+        apiCrewMembers,
         true
       );
       allNewAssignments.push(...newAssignments);
@@ -419,7 +427,7 @@ export function DutyRosterTab() {
       const dateAssignments = assignments.filter(a => a.date === date);
       
       dateAssignments.forEach(assignment => {
-        const crew = contextCrewMembers.find(c => c.id === assignment.crewId);
+        const crew = apiCrewMembers.find(c => c.id === assignment.crewId);
         const shift = shifts.find(s => s.id === assignment.shiftId);
         
         if (crew && shift) {
@@ -524,12 +532,28 @@ export function DutyRosterTab() {
 
               <div className="flex items-center gap-2">
                 <Button 
-                  size="sm" 
+                  size="sm"
                   onClick={async () => {
-                    setContextAssignments(assignments);
-                    await saveAssignments();
-                    setAssignmentHistory([]); // Clear history after save
-                    toast.success('Duty roster saved successfully');
+                    setIsSaving(true);
+                    try {
+                      // Save assignments to backend database via API
+                      await createBulkAssignmentsMutation.mutateAsync(
+                        assignments.map(a => ({
+                          date: a.date,
+                          shiftId: a.shiftId,
+                          crewId: a.crewId,
+                          type: a.type,
+                          notes: a.notes
+                        }))
+                      );
+                      setAssignmentHistory([]); // Clear history after save
+                      setLastSaved(new Date());
+                      toast.success('Duty roster saved to database successfully');
+                    } catch (error: any) {
+                      toast.error(error.message || 'Failed to save duty roster');
+                    } finally {
+                      setIsSaving(false);
+                    }
                   }}
                   disabled={!hasUnsavedChanges || isSaving}
                   className="min-w-[100px]"
@@ -792,7 +816,7 @@ export function DutyRosterTab() {
                         date={date}
                         shifts={shifts}
                         assignments={assignments}
-                        crewMembers={contextCrewMembers}
+                        crewMembers={apiCrewMembers}
                         onAssign={handleAssign}
                         onRemove={handleRemove}
                         onDayClick={handleDayClick}
@@ -859,7 +883,7 @@ export function DutyRosterTab() {
                       date={date}
                       shifts={shifts}
                       assignments={assignments}
-                      crewMembers={contextCrewMembers}
+                      crewMembers={apiCrewMembers}
                       onAssign={handleAssign}
                       onRemove={handleRemove}
                       onDayClick={handleDayClick}
@@ -910,7 +934,7 @@ export function DutyRosterTab() {
                     date={today}
                     shifts={shifts}
                     assignments={assignments}
-                    crewMembers={contextCrewMembers}
+                    crewMembers={apiCrewMembers}
                     onAssign={handleAssign}
                     onRemove={handleRemove}
                     onDayClick={handleDayClick}
@@ -929,9 +953,18 @@ export function DutyRosterTab() {
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
         shifts={shifts}
-        onSave={(newShifts) => {
-          setShifts(newShifts);
-          setContextShifts(newShifts);
+        onSave={async (newShifts) => {
+          try {
+            // Save shifts to database via API
+            await bulkSaveShiftsMutation.mutateAsync({
+              newShifts,
+              existingShifts: apiShifts
+            });
+            toast.success('Shifts saved to database successfully');
+            setSettingsOpen(false); // Close dialog after successful save
+          } catch (error: any) {
+            toast.error(error.message || 'Failed to save shifts');
+          }
         }}
       />
 
@@ -951,7 +984,7 @@ export function DutyRosterTab() {
           date={selectedDate}
           shifts={shifts}
           assignments={assignments}
-          crewMembers={contextCrewMembers}
+          crewMembers={apiCrewMembers}
           onNavigate={handleNavigateDay}
           onAddCrew={handleAssign}
           onRemoveCrew={handleRemove}
