@@ -139,9 +139,9 @@ app.get('/api-docs/swagger.json', (req, res) => {
 
 // Routes - Apply strict rate limiting to auth endpoints
 app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/crew', authMiddleware, crewRoutes);
-app.use('/api/locations', authMiddleware, locationRoutes);
-app.use('/api/guests', authMiddleware, guestRoutes);
+app.use('/api/crew', crewRoutes);
+app.use('/api/locations', locationRoutes);
+app.use('/api/guests', guestRoutes);
 app.use('/api/transcribe', transcribeRoutes);
 app.use('/api/devices', deviceRoutes);
 app.use('/api/user-preferences', userPreferencesRoutes);
@@ -162,7 +162,7 @@ app.use('/api/device-discovery', deviceDiscoveryRoutes);
 app.use('/api/shifts', shiftsRoutes);
 app.use('/api/assignments', assignmentsRoutes);
 app.use('/api/system-settings', systemSettingsRoutes);
-app.use('/api/backup', authMiddleware, backupRoutes); // ✅ FIXED: Added authMiddleware for permission checks
+app.use('/api/backup', backupRoutes);
 
 // 404 handler (must come before error handler)
 app.use('*', (req, res) => {
@@ -187,14 +187,14 @@ async function startServer() {
     console.log('✅ MQTT service connected');
 
     // Start MQTT Monitor Dashboard
-    // mqttMonitor.start(); // DISABLED - Port 8888 conflict
+    mqttMonitor.start();
     
-    httpServer.listen(PORT, '0.0.0.0', () => {
+    httpServer.listen(PORT, () => {
       console.log(`
 🚀 Obedio Server Started Successfully!
 
 📍 Server Details:
-   • Host: 0.0.0.0:${PORT} (accessible from network)
+   • Host: localhost:${PORT}
    • Environment: ${process.env.NODE_ENV || 'development'}
    
 🌐 Access URLs:

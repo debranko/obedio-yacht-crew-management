@@ -9,20 +9,14 @@ import { useAppData } from "../contexts/AppDataContext";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ServingRequestCard } from "./serving-request-card";
-import { useCompleteServiceRequest, useCancelServiceRequest, useServiceRequestsApi } from "../hooks/useServiceRequestsApi";
 
 interface ServingNowWidgetProps {
   onNavigate?: (page: string) => void;
 }
 
 export function ServingNowWidget({ onNavigate }: ServingNowWidgetProps) {
-  const { userPreferences } = useAppData();
-  const { serviceRequests: apiServiceRequests, isLoading, refetch: refetchRequests } = useServiceRequestsApi(); // Get from backend API
+  const { serviceRequests, completeServiceRequest, userPreferences } = useAppData();
   const [currentTime, setCurrentTime] = useState(new Date());
-
-  // Use mutations to complete/cancel service request (saves to backend database)
-  const completeServiceRequestMutation = useCompleteServiceRequest();
-  const cancelServiceRequestMutation = useCancelServiceRequest();
 
   // Update time every second for duration display
   useEffect(() => {
@@ -32,20 +26,11 @@ export function ServingNowWidget({ onNavigate }: ServingNowWidgetProps) {
     return () => clearInterval(interval);
   }, []);
 
-  // Transform API data to format expected by ServingRequestCard
-  const transformApiRequest = (apiReq: any) => ({
-    ...apiReq,
-    timestamp: new Date(apiReq.createdAt),
-    acceptedAt: apiReq.acceptedAt ? new Date(apiReq.acceptedAt) : undefined,
-    guestName: apiReq.guest ? `${apiReq.guest.firstName} ${apiReq.guest.lastName}` : apiReq.guestName || 'Unknown Guest',
-    guestCabin: apiReq.location?.name || apiReq.guestCabin || 'Unknown Location',
-    cabinImage: apiReq.location?.imageUrl || apiReq.cabinImage,
-  });
-
-  // Get accepted requests (currently being served) from backend API and transform them
-  const servingNow = apiServiceRequests
-    .filter(req => req.status === 'accepted')
-    .map(transformApiRequest);
+  // Get accepted/delegated/serving requests (currently being served)
+  // Note: Completed requests are auto-removed by AppDataContext after timeout
+  const servingNow = serviceRequests.filter(
+    req => req.status === 'accepted' || req.status === 'delegated' || req.status === 'serving'
+  );
 
   const handleHeaderClick = () => {
     if (onNavigate) {
@@ -53,66 +38,11 @@ export function ServingNowWidget({ onNavigate }: ServingNowWidgetProps) {
     }
   };
 
-  const handleComplete = async (request: any) => {
-    console.log('🎯 FINISH BUTTON CLICKED', {
-      requestId: request.id,
-      requestStatus: request.status,
-      requestGuestName: request.guestName,
-      requestCabin: request.guestCabin,
-      hasAcceptedAt: !!request.acceptedAt
+  const handleComplete = (request: any) => {
+    completeServiceRequest(request.id);
+    toast.success("Request completed", {
+      description: `${request.guestCabin} - ${request.voiceTranscript || 'Service request'}`
     });
-
-    try {
-      console.log('🚀 Calling complete mutation...');
-      const result = await completeServiceRequestMutation.mutateAsync(request.id);
-      console.log('✅ Complete mutation succeeded:', result);
-
-      // ✅ Manually refetch to ensure immediate UI update
-      await refetchRequests();
-      console.log('✅ Service requests refreshed after completion');
-
-      // Success toast is shown by the mutation hook
-      // No need for additional toast here
-    } catch (error: any) {
-      console.error('❌ Failed to complete service request:', {
-        error,
-        errorMessage: error?.message,
-        errorResponse: error?.response,
-        requestId: request.id
-      });
-      // Error toast is shown by the mutation hook
-      toast.error(`Failed to complete: ${error?.message || 'Unknown error'}`);
-    }
-  };
-
-  const handleCancel = async (request: any) => {
-    console.log('🚫 CANCEL BUTTON CLICKED', {
-      requestId: request.id,
-      requestStatus: request.status,
-      requestGuestName: request.guestName,
-      requestCabin: request.guestCabin
-    });
-
-    try {
-      console.log('🚀 Calling cancel mutation...');
-      const result = await cancelServiceRequestMutation.mutateAsync(request.id);
-      console.log('✅ Cancel mutation succeeded:', result);
-
-      // ✅ Manually refetch to ensure immediate UI update
-      await refetchRequests();
-      console.log('✅ Service requests refreshed after cancellation');
-
-      // Success toast is shown by the mutation hook
-    } catch (error: any) {
-      console.error('❌ Failed to cancel service request:', {
-        error,
-        errorMessage: error?.message,
-        errorResponse: error?.response,
-        requestId: request.id
-      });
-      // Error toast is shown by the mutation hook
-      toast.error(`Failed to cancel: ${error?.message || 'Unknown error'}`);
-    }
   };
 
   if (servingNow.length === 0) {
@@ -158,7 +88,6 @@ export function ServingNowWidget({ onNavigate }: ServingNowWidgetProps) {
             key={request.id}
             request={request}
             onComplete={handleComplete}
-            onCancel={handleCancel}
             userPreferences={userPreferences}
             currentTime={currentTime}
             compact={true}

@@ -1,11 +1,9 @@
 /**
  * Shared Serving Request Card Component
  * Used in both ServingNowWidget and Service Requests Page
- * Memoized to prevent unnecessary re-renders
  */
 
-import { memo } from 'react';
-import { Clock, MapPin, User, CheckCircle2, Image as ImageIcon, X } from "lucide-react";
+import { Clock, MapPin, User, CheckCircle2, Image as ImageIcon } from "lucide-react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -15,17 +13,15 @@ import type { ServiceRequest, UserPreferences } from "../contexts/AppDataContext
 interface ServingRequestCardProps {
   request: ServiceRequest;
   onComplete: (request: ServiceRequest) => void;
-  onCancel: (request: ServiceRequest) => void;
   isFullscreen?: boolean;
   userPreferences: UserPreferences;
   currentTime?: Date; // For live timer
   compact?: boolean; // For widget vs full page display
 }
 
-export const ServingRequestCard = memo(function ServingRequestCard({
+export function ServingRequestCard({
   request,
   onComplete,
-  onCancel,
   isFullscreen = false,
   userPreferences,
   currentTime = new Date(),
@@ -125,32 +121,18 @@ export const ServingRequestCard = memo(function ServingRequestCard({
                 <User className="h-3 w-3" />
                 <span className="truncate">Handled by {request.assignedTo}</span>
               </div>
-              <div className="flex gap-1 flex-shrink-0">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={(e: React.MouseEvent) => {
-                    e.stopPropagation();
-                    onCancel(request);
-                  }}
-                  className="h-7 text-xs border-destructive text-destructive hover:bg-destructive/10"
-                >
-                  <X className="h-3 w-3 mr-1" />
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={(e: React.MouseEvent) => {
-                    e.stopPropagation();
-                    onComplete(request);
-                  }}
-                  className="h-7 text-xs border-success text-success hover:bg-success/10"
-                >
-                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                  Finish
-                </Button>
-              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  onComplete(request);
+                }}
+                className="h-7 text-xs border-success text-success hover:bg-success/10 flex-shrink-0"
+              >
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Finish
+              </Button>
             </div>
           </div>
         </div>
@@ -233,29 +215,18 @@ export const ServingRequestCard = memo(function ServingRequestCard({
             <User className="h-3 w-3" />
             <span>Handled by {request.assignedTo}</span>
           </div>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onCancel(request)}
-              className={`${isFullscreen ? 'h-10 px-4' : 'h-8'} border-destructive text-destructive hover:bg-destructive/10`}
-            >
-              <X className="h-4 w-4 mr-1" />
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onComplete(request)}
-              className={`${isFullscreen ? 'h-10 px-4' : 'h-8'} border-success text-success hover:bg-success/10`}
-            >
-              <CheckCircle2 className="h-4 w-4 mr-1" />
-              Finish
-            </Button>
-          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onComplete(request)}
+            className={`${isFullscreen ? 'h-10 px-4' : 'h-8'} border-success text-success hover:bg-success/10`}
+          >
+            <CheckCircle2 className="h-4 w-4 mr-1" />
+            Finish
+          </Button>
         </div>
         </div>
       </div>
     </Card>
   );
-});
+}

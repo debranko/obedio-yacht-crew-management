@@ -1671,18 +1671,6 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
         {/* Backup Tab */}
         <TabsContent value="backup" className="space-y-6">
           <div className="grid gap-6">
-            {/* Security Status - FIXED 2025-01-30 */}
-            <Alert className="border-green-500 bg-green-50 dark:bg-green-950/20">
-              <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-              <AlertTitle className="text-green-700 dark:text-green-300 font-semibold">
-                ✅ Security: Backup Permissions Active
-              </AlertTitle>
-              <AlertDescription className="text-green-600 dark:text-green-400 text-sm">
-                <strong>FIXED 2025-01-30:</strong> Backup endpoints now properly require 'system.backup' permission.
-                Only authorized administrators can access backup operations.
-              </AlertDescription>
-            </Alert>
-
             <Card>
               <CardHeader>
                 <CardTitle>Backup Schedule</CardTitle>

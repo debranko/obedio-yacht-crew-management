@@ -28,8 +28,8 @@
 // ==================== CONFIGURATION ====================
 
 // WiFi Configuration (CHANGE THESE!)
-const char* WIFI_SSID = "Blagojevic";        // Change to your yacht WiFi name
-const char* WIFI_PASSWORD = "Lozinka12!";      // Change to your yacht WiFi password
+const char* WIFI_SSID = "YourYachtWiFi";        // Change to your yacht WiFi name
+const char* WIFI_PASSWORD = "YourPassword";      // Change to your yacht WiFi password
 
 // MQTT Broker Configuration
 const char* MQTT_BROKER = "192.168.1.100";      // Change to your Obedio server IP

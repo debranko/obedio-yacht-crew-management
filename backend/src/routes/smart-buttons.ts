@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/error-handler';
-import { requirePermission, esp32AuthMiddleware } from '../middleware/auth';
+import { requirePermission } from '../middleware/auth';
 import { DatabaseService } from '../services/database';
 import { mqttService } from '../services/mqtt.service';
 import { websocketService } from '../services/websocket';
@@ -9,11 +9,10 @@ const router = Router();
 const dbService = new DatabaseService();
 
 /**
- * Handle smart button press from ESP32 devices
- * Requires ESP32 API key authentication
- * Header: X-Device-API-Key: <api_key>
+ * Handle smart button press from web simulator or direct API
+ * This endpoint can be used for testing without actual ESP32 hardware
  */
-router.post('/press', esp32AuthMiddleware, asyncHandler(async (req, res) => {
+router.post('/press', asyncHandler(async (req, res) => {
   const { deviceId, locationId, guestId, priority, type, notes } = req.body;
   
   // Simulate MQTT message for testing
@@ -45,9 +44,8 @@ router.post('/press', esp32AuthMiddleware, asyncHandler(async (req, res) => {
 
 /**
  * Update device status (battery, signal, etc)
- * Requires ESP32 API key authentication
  */
-router.post('/status/:deviceId', esp32AuthMiddleware, asyncHandler(async (req, res) => {
+router.post('/status/:deviceId', asyncHandler(async (req, res) => {
   const { deviceId } = req.params;
   const status = req.body;
   
@@ -59,9 +57,8 @@ router.post('/status/:deviceId', esp32AuthMiddleware, asyncHandler(async (req, r
 
 /**
  * Send telemetry data
- * Requires ESP32 API key authentication
  */
-router.post('/telemetry/:deviceId', esp32AuthMiddleware, asyncHandler(async (req, res) => {
+router.post('/telemetry/:deviceId', asyncHandler(async (req, res) => {
   const { deviceId } = req.params;
   const telemetry = req.body;
   
@@ -73,9 +70,8 @@ router.post('/telemetry/:deviceId', esp32AuthMiddleware, asyncHandler(async (req
 
 /**
  * Test device connection
- * Requires ESP32 API key authentication
  */
-router.post('/test/:deviceId', esp32AuthMiddleware, asyncHandler(async (req, res) => {
+router.post('/test/:deviceId', asyncHandler(async (req, res) => {
   const { deviceId } = req.params;
   
   // Send test command via MQTT

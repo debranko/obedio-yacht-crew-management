@@ -11,28 +11,12 @@ import { useActivityLogs } from "../../hooks/useActivityLogs";
 import { Search, Smartphone, Bell, Users, Circle, User, MapPin, Loader2, Activity } from "lucide-react";
 
 // Simple date formatting helper
-const formatDateTime = (date: Date | string | undefined | null) => {
-  try {
-    if (!date) return 'N/A';
-    const dateObj = new Date(date);
-    if (isNaN(dateObj.getTime())) return 'Invalid Date';
-    return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  } catch (error) {
-    console.error('Error formatting date time:', error);
-    return 'Error';
-  }
+const formatDateTime = (date: Date) => {
+  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
-const formatDate = (date: Date | string | undefined | null) => {
-  try {
-    if (!date) return 'N/A';
-    const dateObj = new Date(date);
-    if (isNaN(dateObj.getTime())) return 'Invalid Date';
-    return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  } catch (error) {
-    console.error('Error formatting date:', error);
-    return 'Error';
-  }
+const formatDate = (date: Date | string) => {
+  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
 export function ActivityLogPage() {

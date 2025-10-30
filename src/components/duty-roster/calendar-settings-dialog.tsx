@@ -140,10 +140,12 @@ export function CalendarSettingsDialog({
             </div>
           ))}
 
-          <Button variant="outline" onClick={addShift} className="w-full">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Shift
-          </Button>
+          {localShifts.length < 4 && (
+            <Button variant="outline" onClick={addShift} className="w-full">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Shift
+            </Button>
+          )}
         </div>
 
         <div className="flex justify-end gap-2">

@@ -3,7 +3,6 @@ import { asyncHandler } from '../middleware/error-handler';
 import { requirePermission, authMiddleware } from '../middleware/auth';
 import { prisma } from '../services/db';
 import { websocketService } from '../services/websocket';
-import { deviceTestRateLimiter } from '../middleware/rate-limiter';
 
 const router = Router();
 
@@ -385,9 +384,8 @@ router.put('/:id/config', requirePermission('devices.edit'), asyncHandler(async 
 /**
  * POST /api/devices/:id/test
  * Send test signal to device (LED blink, beep, etc.)
- * Rate limited to prevent abuse of device testing
  */
-router.post('/:id/test', deviceTestRateLimiter, requirePermission('devices.edit'), asyncHandler(async (req, res) => {
+router.post('/:id/test', requirePermission('devices.edit'), asyncHandler(async (req, res) => {
   const device = await prisma.device.findUnique({
     where: { id: req.params.id }
   });

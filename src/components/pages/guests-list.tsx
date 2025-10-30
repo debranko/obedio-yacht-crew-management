@@ -53,13 +53,14 @@ import { Skeleton } from '../ui/skeleton';
 import { toast } from 'sonner';
 import type { Guest } from '../../contexts/AppDataContext';
 import { KpiCard } from '../kpi-card';
+import { GuestStatusWidget } from '../guest-status-widget';
 
 export function GuestsListPage() {
   const queryClient = useQueryClient();
-  const { guests } = useAppData();
-  const { locations = [], updateLocation } = useLocations();
+  const { guests, updateGuest, getLocationByGuestId } = useAppData();
+  const { locations, updateLocation } = useLocations();
   const { qp, set, reset } = useGuestsQueryParams();
-  const { updateGuest, deleteGuest, isDeleting } = useGuestMutations();
+  const { deleteGuest, isDeleting } = useGuestMutations();
   
   // Dialog states
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -130,11 +131,10 @@ export function GuestsListPage() {
 
   // Handler to remove DND from guest
   const handleRemoveDND = async (guest: Guest) => {
-    // ✅ Find guest's location using React Query locations data
-    const location = locations.find(l => l.id === guest.locationId);
+    // Use proper foreign key relationship to find guest's location
+    const location = getLocationByGuestId(guest.id);
 
-    // Use backend mutation to persist the change
-    updateGuest({ id: guest.id, data: { doNotDisturb: false } });
+    updateGuest(guest.id, { doNotDisturb: false });
 
     if (location) {
       await updateLocation({
@@ -142,6 +142,10 @@ export function GuestsListPage() {
         doNotDisturb: false
       });
     }
+
+    toast.success("DND Removed", {
+      description: `${guest.firstName} ${guest.lastName} can now receive requests`
+    });
   };
 
   // Handle guest deletion
@@ -178,16 +182,20 @@ export function GuestsListPage() {
 
   const toggleVip = (guest: Guest, e: React.MouseEvent) => {
     e.stopPropagation();
-    // Valid GuestType values: 'owner', 'vip', 'guest', 'partner', 'family'
-    const newType = (guest.type === 'vip' || guest.type === 'owner') ? 'guest' : 'vip';
-
-    // Use backend mutation to persist the change
-    updateGuest({ id: guest.id, data: { type: newType } });
+    const newType = (guest.type === 'vip' || guest.type === 'owner') ? 'primary' : 'vip';
+    updateGuest(guest.id, { type: newType });
+    
+    // Invalidate queries to refresh data
+    queryClient.invalidateQueries({ queryKey: ['guests'] });
+    
+    toast.success(
+      newType === 'vip' ? 'Guest marked as VIP' : 'VIP status removed'
+    );
   };
 
-  const handleBulkAction = (action: 'export' | 'delete') => {
+  const handleBulkAction = (action: 'export' | 'message' | 'delete') => {
     const selectedGuests = guestsData?.items.filter(g => selectedIds.has(g.id)) || [];
-
+    
     switch (action) {
       case 'export':
         const csv = GuestsService.exportToCsv(selectedGuests);
@@ -199,6 +207,9 @@ export function GuestsListPage() {
         a.click();
         URL.revokeObjectURL(url);
         toast.success(`Exported ${selectedIds.size} guests`);
+        break;
+      case 'message':
+        toast.info(`Message feature for ${selectedIds.size} guests (coming soon)`);
         break;
       case 'delete':
         toast.info(`Bulk delete for ${selectedIds.size} guests (coming soon)`);
@@ -320,27 +331,37 @@ export function GuestsListPage() {
         </Card>
       )}
 
-      {/* Dietary Alerts - Standalone */}
-      <KpiCard
-        title="Dietary Alerts"
-        value={isLoadingStats ? "..." : stats?.dietaryAlerts.toString() || "0"}
-        icon={AlertTriangle}
-        iconColor="text-destructive"
-        inlineValue={true}
-        onClick={() => {
-          reset();
-          set({ status: 'onboard', allergy: 'has-allergies' });
-        }}
-        details={
-          stats && stats.dietaryAlerts > 0 ? (
-            <p className="text-xs text-muted-foreground">
-              Active allergy alerts
-            </p>
-          ) : (
-            <p className="text-xs text-muted-foreground">No active allergies</p>
-          )
-        }
-      />
+      {/* Compact Status Row: Guest Status (75%) + Dietary Alerts (25%) */}
+      <div className="grid grid-cols-4 gap-4">
+        {/* Guest Status Widget - 3/4 width */}
+        <div className="col-span-3">
+          <GuestStatusWidget />
+        </div>
+        
+        {/* Dietary Alerts - 1/4 width */}
+        <div className="col-span-1">
+          <KpiCard
+            title="Dietary Alerts"
+            value={isLoadingStats ? "..." : stats?.dietaryAlerts.toString() || "0"}
+            icon={AlertTriangle}
+            iconColor="text-destructive"
+            inlineValue={true}
+            onClick={() => {
+              reset();
+              set({ status: 'onboard', allergy: 'has-allergies' });
+            }}
+            details={
+              stats && stats.dietaryAlerts > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Active allergy alerts
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">No active allergies</p>
+              )
+            }
+          />
+        </div>
+      </div>
 
       {/* New GuestsToolbar Component */}
       <div className="sticky top-0 z-20 bg-background/95 backdrop-blur -mx-6 lg:-mx-8 px-6 lg:px-8 py-4 border-b border-border">
@@ -378,6 +399,13 @@ export function GuestsListPage() {
                 >
                   <Download className="h-3.5 w-3.5 mr-1" />
                   Export
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleBulkAction('message')}
+                >
+                  Message
                 </Button>
               </div>
             </div>

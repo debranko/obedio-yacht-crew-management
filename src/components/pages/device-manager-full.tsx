@@ -7,7 +7,6 @@ import { useState } from 'react';
 import { useDevices, useDeviceMutations, Device } from '../../hooks/useDevices';
 import { useLocations } from '../../hooks/useLocations';
 import { SmartButtonConfigDialog } from '../devices/SmartButtonConfigDialog';
-import { WatchConfigDialog } from '../devices/WatchConfigDialog';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -618,21 +617,8 @@ export function DeviceManagerPage() {
         />
       )}
 
-      {/* Watch Configuration Dialog */}
-      {selectedDevice?.type === 'watch' && (
-        <WatchConfigDialog
-          device={selectedDevice}
-          open={isConfigDialogOpen}
-          onClose={() => {
-            setIsConfigDialogOpen(false);
-            setSelectedDevice(null);
-          }}
-          onSave={handleConfigSave}
-        />
-      )}
-
-      {/* TODO: Other device type dialogs (repeaters, mobile_app) */}
-      {selectedDevice?.type !== 'smart_button' && selectedDevice?.type !== 'watch' && (
+      {/* TODO: Other device type dialogs */}
+      {selectedDevice?.type !== 'smart_button' && (
         <Dialog open={isConfigDialogOpen} onOpenChange={setIsConfigDialogOpen}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>

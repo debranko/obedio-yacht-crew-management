@@ -161,7 +161,7 @@ export function AppSidebar({ currentPath = "/dashboard", onNavigate }: AppSideba
           </nav>
         </div>
 
-        {/* ESP32 Simulator - Always visible when not collapsed */}
+        {/* Button Simulator Widget - Always visible when not collapsed */}
         {!collapsed && <ButtonSimulatorWidget />}
 
         {/* Collapse Toggle */}

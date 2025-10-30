@@ -151,7 +151,7 @@ router.get('/completed', authMiddleware, async (req: Request, res: Response) => 
       const completedAt = req.updatedAt;
       const createdAt = new Date(req.createdAt);
       const duration = Math.floor((completedAt.getTime() - createdAt.getTime()) / 1000);
-
+      
       return {
         id: req.id,
         originalRequest: {
@@ -164,10 +164,10 @@ router.get('/completed', authMiddleware, async (req: Request, res: Response) => 
           timestamp: createdAt,
           voiceTranscript: req.notes,
           status: req.status,
-          assignedTo: req.assignedTo || 'Staff', // Use actual assigned crew member
+          assignedTo: 'Staff', // TODO: Get from crew assignment
           notes: req.notes
         },
-        completedBy: req.assignedTo || 'Staff', // Use actual assigned crew member who completed it
+        completedBy: 'Staff', // TODO: Get from history
         completedAt,
         duration
       };

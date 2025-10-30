@@ -71,57 +71,10 @@ export function useUpdateShift() {
 
 export function useDeleteShift() {
   const queryClient = useQueryClient();
-
+  
   return useMutation({
-    mutationFn: (id: string) =>
+    mutationFn: (id: string) => 
       api.delete(`/shifts/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['shifts'] });
-    },
-  });
-}
-
-/**
- * Bulk save shifts - handles create, update, and delete operations
- */
-export function useBulkSaveShifts() {
-  const queryClient = useQueryClient();
-  const createShift = useCreateShift();
-  const updateShift = useUpdateShift();
-  const deleteShift = useDeleteShift();
-
-  return useMutation({
-    mutationFn: async ({ newShifts, existingShifts }: { newShifts: ShiftConfig[], existingShifts: ShiftConfig[] }) => {
-      const results = [];
-
-      // Determine which shifts to create, update, or delete
-      const existingIds = new Set(existingShifts.map(s => s.id));
-      const newIds = new Set(newShifts.map(s => s.id));
-
-      // Update or create shifts
-      for (const shift of newShifts) {
-        // If shift ID starts with 'shift-' or 'cmh', it's a temporary ID (new shift)
-        const isNewShift = shift.id.startsWith('shift-');
-
-        if (isNewShift) {
-          // Create new shift (backend will generate proper CUID)
-          const { id, ...shiftData } = shift;
-          results.push(await createShift.mutateAsync(shiftData));
-        } else if (existingIds.has(shift.id)) {
-          // Update existing shift
-          results.push(await updateShift.mutateAsync(shift));
-        }
-      }
-
-      // Delete shifts that are no longer in the new list
-      for (const shift of existingShifts) {
-        if (!newIds.has(shift.id) && !shift.id.startsWith('shift-')) {
-          await deleteShift.mutateAsync(shift.id);
-        }
-      }
-
-      return results;
-    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
     },

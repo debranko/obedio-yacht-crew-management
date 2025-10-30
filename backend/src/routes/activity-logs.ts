@@ -13,7 +13,7 @@ router.get('/', requirePermission('system.view-logs'), asyncHandler(async (req, 
   res.json({ success: true, data: result.items, pagination: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages } });
 }));
 
-router.post('/', requirePermission('system.create-logs'), asyncHandler(async (req, res) => {
+router.post('/', requirePermission('system.view-logs'), asyncHandler(async (req, res) => {
   const log = await dbService.createActivityLog(req.body);
   res.status(201).json({ success: true, data: log });
 }));

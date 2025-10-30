@@ -39,6 +39,13 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Checkbox } from "../ui/checkbox";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "../ui/sheet";
 import { Label } from "../ui/label";
 import {
   Select,
@@ -58,7 +65,6 @@ import { PermissionGuard } from "../PermissionGuard";
 import { usePermissions } from "../../hooks/usePermissions";
 import { ROLE_NAMES } from "../../config/permissions";
 import { Role } from "../../types/crew";
-import { api } from "../../services/api";
 
 interface DutyInfo {
   shift: string;
@@ -85,8 +91,9 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState<string>("All");
   const [sortConfig, setSortConfig] = useState<{ key: keyof CrewMember; direction: "asc" | "desc" } | null>(null);
-  // Dialog state
+  // Dialog & Sheet state
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isCrewSheetOpen, setIsCrewSheetOpen] = useState(false);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
@@ -106,6 +113,7 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
   const { can } = usePermissions();
   
   // Selected items state
+  const [selectedCrew, setSelectedCrew] = useState<CrewMember | null>(null);
   const [selectedCrewForDetails, setSelectedCrewForDetails] = useState<CrewMember | null>(null);
   const [messageRecipient, setMessageRecipient] = useState<{ name: string; id: string } | null>(null);
   const [crewToRemove, setCrewToRemove] = useState<{ crew: CrewMember; dutyInfo: DutyInfo } | null>(null);
@@ -269,51 +277,77 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
     }
   };
 
-  // handleEditCrew removed - now using CrewMemberDetailsDialog for editing
+  const handleEditCrew = () => {
+    if (!selectedCrew) return;
 
-  const handleDeleteCrew = async (crew: CrewMember) => {
-    try {
-      console.log('🗑️ Deleting crew member:', crew.id, crew.name);
-
-      // ✅ Use API service with proper authentication and port (8080)
-      await api.crew.delete(crew.id);
-
-      console.log('✅ Crew member deleted from database successfully');
-
-      // Update context state to remove deleted crew member
-      setContextCrewMembers(contextCrewMembers.filter(c => c.id !== crew.id));
-
-      // Close details dialog if open
-      setIsDetailsDialogOpen(false);
-
-      toast.success(`${crew.name} has been removed from the crew`);
-    } catch (error: any) {
-      console.error('❌ Error deleting crew member:', error);
-      toast.error(error.message || 'Failed to delete crew member');
+    // Check if status changed to "on-leave"
+    const wasOnLeave = selectedCrew.status === 'on-leave';
+    const isNowOnLeave = formData.status === 'on-leave';
+    
+    // If status changed TO "on-leave", remove all duty assignments
+    if (!wasOnLeave && isNowOnLeave) {
+      // Remove all assignments for this crew member
+      const updatedAssignments = contextAssignments.filter(
+        assignment => assignment.crewId !== selectedCrew.id
+      );
+      setContextAssignments(updatedAssignments);
+      
+      toast.info(`${formData.name} removed from all duty assignments`);
     }
+
+    // Update context crew members
+    const updatedContextCrew = contextCrewMembers.map(c =>
+      c.id === selectedCrew.id ? { 
+        ...c, 
+        name: formData.name,
+        nickname: formData.nickname || undefined,
+        position: formData.position,
+        department: formData.department,
+        email: formData.email || undefined,
+        phone: formData.phone || formData.contact || undefined,
+        onBoardContact: formData.onBoardContact || formData.contact || undefined,
+        status: formData.status,
+        avatar: formData.avatar || undefined,
+        languages: formData.languages.length > 0 ? formData.languages : undefined,
+        skills: formData.skills.length > 0 ? formData.skills : undefined,
+        notes: formData.notes || undefined,
+        leaveStart: formData.leaveStart || undefined,
+        leaveEnd: formData.leaveEnd || undefined
+      } : c
+    );
+    setContextCrewMembers(updatedContextCrew);
+
+    setIsCrewSheetOpen(false);
+    toast.success(`${formData.name}'s details have been updated`);
+  };
+
+  const handleDeleteCrew = (crew: CrewMember) => {
+    setContextCrewMembers(contextCrewMembers.filter(c => c.id !== crew.id));
+    setIsDetailsDialogOpen(false);
+    toast.success(`${crew.name} has been removed from the crew`);
   };
 
   // Handler for confirming removal of crew from duty
-  const handleConfirmRemoval = async () => {
+  const handleConfirmRemoval = () => {
     if (!crewToRemove) return;
-
+    
     const { crew, dutyInfo } = crewToRemove;
-
+    
     // Find the crew member from context by ID
     const contextCrew = contextCrewMembers.find(c => c.id === crew.id);
     if (!contextCrew) return;
-
+    
     // Check if this is an emergency override (not from Duty Roster)
     const isEmergencyOverride = dutyInfo.shift === 'Emergency';
-
+    
     if (!isEmergencyOverride) {
       // Remove from Duty Roster assignments only if assigned in calendar
       const today = new Date().toISOString().split('T')[0];
-
+      
       // Parse shift time string (e.g., "06:00 - 14:00") to find matching shift config
       const shiftTimeMatch = dutyInfo.shift.match(/^(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})$/);
       let currentShiftId: string | undefined;
-
+      
       if (shiftTimeMatch) {
         const [, startTime, endTime] = shiftTimeMatch;
         const currentShift = contextShifts.find(
@@ -321,13 +355,13 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
         );
         currentShiftId = currentShift?.id;
       }
-
+      
       // Filter out assignments for this crew member on today's date and current shift
       const updatedAssignments = contextAssignments.filter(assignment => {
         // Remove assignment if it matches this crew member, today, and current shift
         if (
-          assignment.crewId === contextCrew.id &&
-          assignment.date === today &&
+          assignment.crewId === contextCrew.id && 
+          assignment.date === today && 
           currentShiftId &&
           assignment.shiftId === currentShiftId
         ) {
@@ -335,49 +369,24 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
         }
         return true; // Keep all other assignments
       });
-
+      
       // Update context assignments
       setContextAssignments(updatedAssignments);
     }
-
-    try {
-      // Update crew status to off-duty in backend
-      const response = await fetch(`http://localhost:3001/api/crew/${crew.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          status: 'off-duty',
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update crew status');
-      }
-
-      const data = await response.json();
-
-      if (data.success && data.data) {
-        // Update context crew status with backend data
-        const updatedContextCrew = contextCrewMembers.map(c =>
-          c.id === crew.id ? { ...c, ...data.data } : c
-        );
-        setContextCrewMembers(updatedContextCrew);
-
-        // Show success toast
-        toast.success(`${crew.name} removed from duty`, {
-          description: shouldNotify
-            ? `Notification sent (${isEmergencyOverride ? 'Emergency' : dutyInfo.shift})`
-            : `Removed without notification (${isEmergencyOverride ? 'Emergency' : dutyInfo.shift})`
-        });
-      }
-    } catch (error: any) {
-      console.error('Error updating crew status:', error);
-      toast.error(error.message || 'Failed to remove crew from duty');
-    }
-
+    
+    // Update context crew status to off-duty
+    const updatedContextCrew = contextCrewMembers.map(c =>
+      c.id === crew.id ? { ...c, status: 'off-duty' } : c
+    );
+    setContextCrewMembers(updatedContextCrew);
+    
+    // Show success toast
+    toast.success(`${crew.name} removed from duty`, {
+      description: shouldNotify 
+        ? `Notification sent (${isEmergencyOverride ? 'Emergency' : dutyInfo.shift})`
+        : `Removed without notification (${isEmergencyOverride ? 'Emergency' : dutyInfo.shift})`
+    });
+    
     // Reset state
     setIsConfirmDialogOpen(false);
     setCrewToRemove(null);
@@ -385,19 +394,19 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
   };
   
   // Handler for confirming activation (toggle ON)
-  const handleConfirmActivation = async () => {
+  const handleConfirmActivation = () => {
     if (!crewToActivate) return;
-
+    
     // Determine shift display (same logic as in dialog)
     const today = new Date().toISOString().split('T')[0];
     const contextCrew = contextCrewMembers.find(c => c.id === crewToActivate.id);
-
+    
     let activeShift = null;
     if (contextCrew) {
       const todayAssignments = contextAssignments.filter(
         a => a.crewId === contextCrew.id && a.date === today
       );
-
+      
       for (const assignment of todayAssignments) {
         const shift = contextShifts.find(s => s.id === assignment.shiftId);
         if (shift) {
@@ -405,21 +414,21 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
           const currentHour = now.getHours();
           const currentMinutes = now.getMinutes();
           const currentTime = currentHour * 60 + currentMinutes;
-
+          
           const [startHour, startMin] = shift.startTime.split(':').map(Number);
           const [endHour, endMin] = shift.endTime.split(':').map(Number);
           let startTime = startHour * 60 + startMin;
           let endTime = endHour * 60 + endMin;
-
+          
           if (endTime < startTime) {
             endTime += 24 * 60;
           }
-
+          
           let adjustedCurrentTime = currentTime;
           if (currentTime < startTime && endTime > 24 * 60) {
             adjustedCurrentTime += 24 * 60;
           }
-
+          
           if (adjustedCurrentTime >= startTime && adjustedCurrentTime < endTime) {
             activeShift = shift;
             break;
@@ -427,49 +436,24 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
         }
       }
     }
-
-    const shiftDisplay = activeShift
+    
+    const shiftDisplay = activeShift 
       ? `${activeShift.name} (${activeShift.startTime} - ${activeShift.endTime})`
       : 'Emergency';
-
-    try {
-      // Update crew status to on-duty in backend
-      const response = await fetch(`http://localhost:3001/api/crew/${crewToActivate.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          status: 'on-duty',
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update crew status');
-      }
-
-      const data = await response.json();
-
-      if (data.success && data.data) {
-        // Update context state with backend data
-        const updatedContextCrew = contextCrewMembers.map(c =>
-          c.id === crewToActivate.id ? { ...c, ...data.data } : c
-        );
-        setContextCrewMembers(updatedContextCrew);
-
-        // Show success toast with notification status
-        toast.success(`${crewToActivate.name} activated for duty`, {
-          description: shouldNotifyActivate
-            ? `App notification sent (${shiftDisplay})`
-            : `Activated without notification (${shiftDisplay})`
-        });
-      }
-    } catch (error: any) {
-      console.error('Error updating crew status:', error);
-      toast.error(error.message || 'Failed to activate crew member');
-    }
-
+    
+    // Update context state to on-duty
+    const updatedContextCrew = contextCrewMembers.map(c =>
+      c.id === crewToActivate.id ? { ...c, status: 'on-duty' } : c
+    );
+    setContextCrewMembers(updatedContextCrew);
+    
+    // Show success toast with notification status
+    toast.success(`${crewToActivate.name} activated for duty`, {
+      description: shouldNotifyActivate 
+        ? `App notification sent (${shiftDisplay})`
+        : `Activated without notification (${shiftDisplay})`
+    });
+    
     // Reset state
     setIsActivateDialogOpen(false);
     setCrewToActivate(null);
@@ -545,8 +529,26 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
   };
 
   const openEdit = (crew: CrewMember) => {
-    // Use Details Dialog for editing (which has built-in edit mode)
-    openDetails(crew);
+    setSelectedCrew(crew);
+    setFormData({
+      name: crew.name,
+      nickname: crew.nickname || "",
+      position: crew.position,
+      department: crew.department,
+      status: crew.status || "off-duty",
+      contact: crew.onBoardContact || crew.phone || "",
+      phone: crew.phone || "",
+      onBoardContact: crew.onBoardContact || "",
+      email: crew.email || "",
+      avatar: crew.avatar || "",
+      color: crew.color || "#C8A96B",
+      languages: crew.languages || [],
+      skills: crew.skills || [],
+      notes: crew.notes || "",
+      leaveStart: crew.leaveStart || "",
+      leaveEnd: crew.leaveEnd || ""
+    });
+    setIsCrewSheetOpen(true);
   };
 
   const openDetails = (crew: CrewMember) => {
@@ -797,18 +799,12 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
                       <div className="flex items-center gap-3">
                         <Avatar className="h-8 w-8">
                           <AvatarImage src={crew.avatar || getCrewAvatar(crew.name)} alt={crew.name} />
-                          <AvatarFallback
-                            className="text-white text-xs"
-                            style={{ backgroundColor: crew.color }}
-                          >
+                          <AvatarFallback className="bg-primary/10 text-primary text-xs">
                             {crew.name.split(' ').map(n => n[0]).join('')}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex flex-col">
                           <span className="font-medium">{crew.name}</span>
-                          {crew.nickname && (
-                            <span className="text-xs text-muted-foreground">"{crew.nickname}"</span>
-                          )}
                           {isOnDuty && (
                             <div className="flex items-center gap-1.5">
                               <div className="h-2 w-2 rounded-full bg-success animate-pulse" />
@@ -816,14 +812,7 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
                             </div>
                           )}
                           {crew.status === 'on-leave' && (
-                            <div className="flex flex-col gap-0.5 mt-0.5">
-                              <Badge variant="destructive" className="text-[10px] w-fit">On Leave</Badge>
-                              {crew.leaveStart && crew.leaveEnd && (
-                                <span className="text-[10px] text-muted-foreground">
-                                  {new Date(crew.leaveStart).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} - {new Date(crew.leaveEnd).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
-                                </span>
-                              )}
-                            </div>
+                            <Badge variant="destructive" className="text-[10px] w-fit mt-0.5">On Leave</Badge>
                           )}
                         </div>
                       </div>
@@ -1256,6 +1245,315 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Crew Sheet */}
+      <Sheet open={isCrewSheetOpen} onOpenChange={setIsCrewSheetOpen}>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Edit Crew Member</SheetTitle>
+            <SheetDescription>
+              Update crew member information
+            </SheetDescription>
+          </SheetHeader>
+          {selectedCrew && (
+            <div className="space-y-6 py-6">
+              {/* Edit Form */}
+              <div className="space-y-4">
+                {/* Avatar Upload */}
+                  <div className="flex flex-col items-center gap-3 p-4 bg-muted/30 rounded-lg border border-border">
+                    <Avatar className="h-24 w-24 border-2 border-border">
+                      {formData.avatar ? (
+                        <AvatarImage src={formData.avatar} />
+                      ) : (
+                        <AvatarImage src={getCrewAvatar(formData.name)} />
+                      )}
+                      <AvatarFallback className="bg-muted text-muted-foreground">
+                        {formData.name ? formData.name.split(' ').map(n => n[0]).join('') : <UserPlus className="h-8 w-8" />}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleFileUpload}
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        {formData.avatar ? 'Change Photo' : 'Upload Photo'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setCameraDialogMode('edit');
+                          setIsCameraDialogOpen(true);
+                        }}
+                      >
+                        <Camera className="h-4 w-4 mr-2" />
+                        Take Photo
+                      </Button>
+                      {formData.avatar && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setFormData({ ...formData, avatar: '' })}
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Recommended: Square image, min 200x200px
+                    </p>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-name">Full Name *</Label>
+                    <Input
+                      id="edit-name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="John Doe"
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-nickname">Nickname (Optional)</Label>
+                    <Input
+                      id="edit-nickname"
+                      value={formData.nickname}
+                      onChange={(e) => setFormData({ ...formData, nickname: e.target.value })}
+                      placeholder="Johnny"
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-position">Position *</Label>
+                    <Input
+                      id="edit-position"
+                      value={formData.position}
+                      onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                      placeholder="Steward"
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-department">Department</Label>
+                    <Select
+                      value={formData.department}
+                      onValueChange={(value) => setFormData({ ...formData, department: value })}
+                    >
+                      <SelectTrigger id="edit-department">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Interior">Interior</SelectItem>
+                        <SelectItem value="Deck">Deck</SelectItem>
+                        <SelectItem value="Engineering">Engineering</SelectItem>
+                        <SelectItem value="Galley">Galley</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-status">Status</Label>
+                    <Select
+                      value={formData.status}
+                      onValueChange={(value: "on-duty" | "off-duty" | "on-leave") => setFormData({ ...formData, status: value })}
+                    >
+                      <SelectTrigger id="edit-status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="on-duty">On Duty</SelectItem>
+                        <SelectItem value="off-duty">Off Duty</SelectItem>
+                        <SelectItem value="on-leave">On Leave</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-phone">Phone</Label>
+                    <Input
+                      id="edit-phone"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="+1 555 0100"
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-email">Email *</Label>
+                    <Input
+                      id="edit-email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="crew@yacht.com"
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-onBoardContact">On-Board Contact</Label>
+                    <Input
+                      id="edit-onBoardContact"
+                      value={formData.onBoardContact}
+                      onChange={(e) => setFormData({ ...formData, onBoardContact: e.target.value })}
+                      placeholder="Extension or Radio"
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Languages</Label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {formData.languages.map((lang, index) => (
+                        <Badge key={index} variant="secondary" className="gap-1">
+                          {lang}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData({
+                                ...formData,
+                                languages: formData.languages.filter((_, i) => i !== index)
+                              });
+                            }}
+                            className="ml-1 hover:text-destructive"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        id="edit-language-input"
+                        placeholder="Add language..."
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const input = e.currentTarget;
+                            const lang = input.value.trim();
+                            if (lang) {
+                              setFormData({
+                                ...formData,
+                                languages: [...formData.languages, lang]
+                              });
+                              input.value = '';
+                            }
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => {
+                          const input = document.getElementById('edit-language-input') as HTMLInputElement;
+                          const lang = input.value.trim();
+                          if (lang) {
+                            setFormData({
+                              ...formData,
+                              languages: [...formData.languages, lang]
+                            });
+                            input.value = '';
+                          }
+                        }}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Skills & Certifications</Label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {formData.skills.map((skill, index) => (
+                        <Badge key={index} variant="secondary" className="gap-1">
+                          {skill}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData({
+                                ...formData,
+                                skills: formData.skills.filter((_, i) => i !== index)
+                              });
+                            }}
+                            className="ml-1 hover:text-destructive"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        id="edit-skill-input"
+                        placeholder="Add skill..."
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const input = e.currentTarget;
+                            const skill = input.value.trim();
+                            if (skill) {
+                              setFormData({
+                                ...formData,
+                                skills: [...formData.skills, skill]
+                              });
+                              input.value = '';
+                            }
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => {
+                          const input = document.getElementById('edit-skill-input') as HTMLInputElement;
+                          const skill = input.value.trim();
+                          if (skill) {
+                            setFormData({
+                              ...formData,
+                              skills: [...formData.skills, skill]
+                            });
+                            input.value = '';
+                          }
+                        }}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-notes">Notes</Label>
+                    <Textarea
+                      id="edit-notes"
+                      value={formData.notes}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                      placeholder="Additional notes..."
+                      rows={3}
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-4">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setIsCrewSheetOpen(false)} 
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                    <Button onClick={handleEditCrew} className="flex-1">
+                      Save Changes
+                    </Button>
+                  </div>
+                </div>
+              </div>
+          )}
+        </SheetContent>
+      </Sheet>
 
       {/* Crew Member Details Dialog */}
       {selectedCrewForDetails && (

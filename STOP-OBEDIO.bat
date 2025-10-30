@@ -12,25 +12,13 @@ echo.
 echo Stopping services...
 echo.
 
-REM Stop OBEDIO Node.js processes by port (safer than killing all Node.js)
-echo [1/2] Stopping OBEDIO Node.js processes...
-set STOPPED_COUNT=0
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8080" ^| findstr "LISTENING"') do (
-    taskkill /F /PID %%a >nul 2>&1
-    set STOPPED_COUNT=1
-)
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":5173" ^| findstr "LISTENING"') do (
-    taskkill /F /PID %%a >nul 2>&1
-    set STOPPED_COUNT=1
-)
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8888" ^| findstr "LISTENING"') do (
-    taskkill /F /PID %%a >nul 2>&1
-    set STOPPED_COUNT=1
-)
-if %STOPPED_COUNT%==1 (
-    echo      ✓ OBEDIO processes stopped
+REM Stop all Node.js processes
+echo [1/2] Stopping all Node.js processes...
+taskkill /F /IM node.exe >nul 2>&1
+if %errorlevel%==0 (
+    echo      ✓ Node.js processes stopped
 ) else (
-    echo      ℹ No OBEDIO processes running
+    echo      ℹ No Node.js processes running
 )
 
 timeout /t 2 /nobreak >nul

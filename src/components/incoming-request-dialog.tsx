@@ -3,7 +3,7 @@
  * Eye-catching alert that pops up when a new service request arrives
  */
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { 
   AlertCircle, 
   Bell, 
@@ -33,11 +33,6 @@ import { useWebSocket } from "../hooks/useWebSocket";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "./ui/dialog";
 import { toast } from "sonner";
-import { useAcceptServiceRequest, useCompleteServiceRequest, useServiceRequestsApi } from "../hooks/useServiceRequestsApi";
-import { useCrewMembers } from "../hooks/useCrewMembers";
-import { useAssignments } from "../hooks/useAssignments";
-import { useShifts } from "../hooks/useShifts";
-import { getOnDutyCrew } from "../utils/crew-utils";
 
 interface IncomingRequestDialogProps {
   isOpen: boolean;
@@ -50,20 +45,13 @@ export function IncomingRequestDialog({
   onClose,
   request,
 }: IncomingRequestDialogProps) {
-  const { forwardServiceRequest, addActivityLog } = useAppData(); // Forward not yet implemented in backend
-
-  // ✅ GET DATA FROM REAL DATABASE (NOT MOCK DATA!)
-  const { crewMembers: apiCrewMembers } = useCrewMembers();
-  const { data: apiAssignments = [] } = useAssignments({});
-  const { data: apiShifts = [] } = useShifts();
-
-  const acceptMutation = useAcceptServiceRequest();
+  const { acceptServiceRequest, delegateServiceRequest, forwardServiceRequest, crewMembers, getCurrentDutyStatus } = useAppData();
   const [timeAgo, setTimeAgo] = useState<string>("Just now");
   const [showDelegateDropdown, setShowDelegateDropdown] = useState(false);
   const [showAvailableCrew, setShowAvailableCrew] = useState(false);
   const [showForwardDropdown, setShowForwardDropdown] = useState(false);
   const [playingAudio, setPlayingAudio] = useState(false);
-
+  
   // Department/Team options for forwarding
   const forwardOptions = [
     { value: 'Galley', label: 'Galley', icon: UtensilsCrossed },
@@ -75,11 +63,11 @@ export function IncomingRequestDialog({
     { value: 'Bar Service', label: 'Bar Service', icon: Wine },
     { value: 'Deck Service', label: 'Deck Service', icon: Waves },
   ];
-
-  // ✅ Get crew organized by duty status from REAL DATABASE ASSIGNMENTS
-  const dutyStatus = getOnDutyCrew(apiCrewMembers, apiAssignments, apiShifts);
+  
+  // Get crew organized by duty status
+  const dutyStatus = getCurrentDutyStatus();
   const onDutyCrew = dutyStatus.onDuty;
-  const availableCrew = apiCrewMembers.filter(
+  const availableCrew = crewMembers.filter(
     (crew) => crew.department === 'Interior' && crew.status !== 'on-leave' && !onDutyCrew.find(c => c.id === crew.id)
   );
 
@@ -111,91 +99,25 @@ export function IncomingRequestDialog({
 
   const handleAccept = () => {
     if (!request) return;
-
-    // ✅ Get first on-duty crew member from REAL DATABASE ASSIGNMENTS
-    const firstOnDutyCrew = onDutyCrew[0];
-
-    if (!firstOnDutyCrew) {
-      toast.error('No crew member currently on duty to accept request');
-      console.log('❌ No on-duty crew found. onDutyCrew:', onDutyCrew);
-      return;
-    }
-
-    console.log('✅ Accepting request with crew:', {
-      requestId: request.id,
-      crewId: firstOnDutyCrew.id,
-      crewName: firstOnDutyCrew.name
-    });
-
-    // Call backend API to accept service request
-    acceptMutation.mutate(
-      { id: request.id, crewMemberId: firstOnDutyCrew.id },
-      {
-        onSuccess: () => {
-          toast.success(`Request from ${request.guestName} accepted by ${firstOnDutyCrew.name}`);
-
-          // ✅ Log to Activity Log
-          if (addActivityLog) {
-            addActivityLog({
-              type: 'service',
-              action: 'Request Accepted',
-              user: firstOnDutyCrew.name,
-              location: request.guestCabin || 'Unknown Location',
-              details: `${firstOnDutyCrew.name} accepted ${request.requestType} request from ${request.guestName}`
-            });
-          }
-
-          onClose();
-        },
-        onError: (error: any) => {
-          console.error('❌ Accept failed:', error);
-          toast.error(error.message || 'Failed to accept request');
-        }
-      }
-    );
+    
+    // Get current user (in production, from auth context)
+    const currentUser = onDutyCrew[0]?.name || 'Crew Member';
+    acceptServiceRequest(request.id, currentUser);
+    toast.success(`Request from ${request.guestName} accepted`);
+    onClose();
   };
 
   const handleDelegateClick = () => {
     setShowDelegateDropdown(!showDelegateDropdown);
   };
 
-  const handleSelectCrew = (crewId: string, crewName: string) => {
+  const handleSelectCrew = (crewName: string) => {
     if (!request) return;
-
-    console.log('✅ Delegating request to crew:', {
-      requestId: request.id,
-      crewId,
-      crewName
-    });
-
-    // ✅ Use backend API to accept/delegate request
-    acceptMutation.mutate(
-      { id: request.id, crewMemberId: crewId },
-      {
-        onSuccess: () => {
-          toast.success(`Request delegated to ${crewName}`);
-
-          // ✅ Log to Activity Log
-          if (addActivityLog) {
-            addActivityLog({
-              type: 'service',
-              action: 'Request Delegated',
-              user: crewName,
-              location: request.guestCabin || 'Unknown Location',
-              details: `Request from ${request.guestName} delegated to ${crewName}`
-            });
-          }
-
-          setShowDelegateDropdown(false);
-          setShowAvailableCrew(false);
-          onClose();
-        },
-        onError: (error: any) => {
-          console.error('❌ Delegate failed:', error);
-          toast.error(error.message || 'Failed to delegate request');
-        }
-      }
-    );
+    
+    delegateServiceRequest(request.id, crewName);
+    toast.success(`Request delegated to ${crewName}`);
+    setShowDelegateDropdown(false);
+    onClose();
   };
 
   const handleForwardClick = () => {
@@ -458,7 +380,7 @@ export function IncomingRequestDialog({
                     {onDutyCrew.map((crew) => (
                       <button
                         key={crew.id}
-                        onClick={() => handleSelectCrew(crew.id, crew.name)}
+                        onClick={() => handleSelectCrew(crew.name)}
                         className="w-full px-3 py-2.5 flex items-center justify-between gap-2 hover:bg-muted/50 transition-colors text-left"
                       >
                         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -499,7 +421,7 @@ export function IncomingRequestDialog({
                       {availableCrew.map((crew) => (
                         <button
                           key={crew.id}
-                          onClick={() => handleSelectCrew(crew.id, crew.name)}
+                          onClick={() => handleSelectCrew(crew.name)}
                           className="w-full px-3 py-2.5 flex items-center gap-2 hover:bg-muted/50 transition-colors text-left"
                         >
                           <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -573,22 +495,7 @@ export function IncomingRequestDialog({
  * Hook to listen for new service requests with repeat notification support
  */
 export function useIncomingRequests() {
-  const { userPreferences } = useAppData();
-  // ✅ GET SERVICE REQUESTS FROM REAL DATABASE (NOT MOCK DATA!)
-  const { serviceRequests: apiServiceRequests } = useServiceRequestsApi();
-
-  // Transform API data to expected format
-  const serviceRequests = useMemo(() => {
-    return apiServiceRequests.map((apiReq: any) => ({
-      ...apiReq,
-      timestamp: new Date(apiReq.createdAt),
-      acceptedAt: apiReq.acceptedAt ? new Date(apiReq.acceptedAt) : undefined,
-      guestName: apiReq.guest ? `${apiReq.guest.firstName} ${apiReq.guest.lastName}` : apiReq.guestName || 'Unknown Guest',
-      guestCabin: apiReq.location?.name || apiReq.guestCabin || 'Unknown Location',
-      cabinImage: apiReq.location?.imageUrl || apiReq.cabinImage,
-    }));
-  }, [apiServiceRequests]);
-
+  const { serviceRequests, userPreferences } = useAppData();
   const [lastRequestId, setLastRequestId] = useState<string | null>(null);
   const [lastShownTime, setLastShownTime] = useState<Record<string, number>>({});
   const [currentRequest, setCurrentRequest] = useState<ServiceRequest | null>(null);
@@ -596,7 +503,6 @@ export function useIncomingRequests() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [lastClosedTime, setLastClosedTime] = useState<number>(0);
   const [initializationTime, setInitializationTime] = useState<number>(0);
-  const [preExistingRequestIds, setPreExistingRequestIds] = useState<Set<string>>(new Set());
 
   // Import WebSocket hook
   const { on, off } = useWebSocket();
@@ -625,31 +531,11 @@ export function useIncomingRequests() {
     };
   }, [on, off, currentRequest]);
 
-  // Mark as initialized after 2 seconds AND mark all existing pending requests as "already shown"
-  // This prevents old pending requests from triggering dialogs
+  // Mark as initialized after 2 seconds to ignore initial mock data
   useEffect(() => {
     const timer = setTimeout(() => {
-      const now = Date.now();
-
-      // Mark all existing pending requests as already shown (with timestamp WAY in past)
-      // so they won't trigger dialogs unless repeat interval has passed
-      const existingPendingRequests = serviceRequests.filter(req => req.status === 'pending');
-      const initialShownTimes: Record<string, number> = {};
-      const preExistingIds = new Set<string>();
-
-      existingPendingRequests.forEach(req => {
-        // Set to 1 hour ago so they won't show up immediately
-        initialShownTimes[req.id] = now - (60 * 60 * 1000);
-        // Remember this request as pre-existing (will never repeat)
-        preExistingIds.add(req.id);
-      });
-
-      setLastShownTime(initialShownTimes);
-      setPreExistingRequestIds(preExistingIds);
       setIsInitialized(true);
-      setInitializationTime(now);
-
-      console.log('🔔 Dialog initialized - marked', existingPendingRequests.length, 'existing requests as pre-existing (will not repeat)');
+      setInitializationTime(Date.now());
     }, 2000);
     return () => clearTimeout(timer);
   }, []);
@@ -670,43 +556,22 @@ export function useIncomingRequests() {
 
     // Find oldest pending request that should be shown
     const pendingRequests = serviceRequests.filter(req => req.status === 'pending');
-
-    console.log('🔍 Dialog check:', {
-      pendingCount: pendingRequests.length,
-      initTime: new Date(initializationTime).toISOString(),
-      cooldownRemaining: Math.max(0, cooldownPeriod - (now - lastClosedTime))
-    });
-
+    
     for (const request of pendingRequests) {
       const age = now - request.timestamp.getTime();
       const lastShown = lastShownTime[request.id];
-
+      
       // Additional guard: prevent showing same request if shown very recently (within 1500ms)
       const shownRecently = lastShown && (now - lastShown) < 1500;
-
+      
       // Show if:
       // 1. New request created AFTER initialization (< 5 seconds old AND created after init) OR
-      // 2. Repeat interval passed since last shown (ONLY for requests created AFTER initialization)
+      // 2. Repeat interval passed since last shown (if repeatInterval > 0)
       const wasCreatedAfterInit = request.timestamp.getTime() > initializationTime;
       const isNewRequest = age < 5000 && request.id !== lastRequestId && wasCreatedAfterInit;
-
-      // ✅ FIX: Don't repeat pre-existing requests (prevents showing old pending requests after page refresh)
-      const isPreExisting = preExistingRequestIds.has(request.id);
-      const shouldRepeat = !isPreExisting && repeatInterval > 0 && lastShown && (now - lastShown) >= repeatInterval;
-
-      console.log('  Request', request.id.slice(-4), {
-        age: Math.round(age / 1000) + 's',
-        lastShown: lastShown ? Math.round((now - lastShown) / 1000) + 's ago' : 'never',
-        wasCreatedAfterInit,
-        isPreExisting,
-        isNewRequest,
-        shouldRepeat,
-        shownRecently,
-        willShow: (isNewRequest || shouldRepeat) && !shownRecently
-      });
-
+      const shouldRepeat = repeatInterval > 0 && lastShown && (now - lastShown) >= repeatInterval;
+      
       if ((isNewRequest || shouldRepeat) && !shownRecently) {
-        console.log('✅ Showing dialog for request:', request.id);
         setLastRequestId(request.id);
         setLastShownTime(prev => ({ ...prev, [request.id]: now }));
         setCurrentRequest(request);

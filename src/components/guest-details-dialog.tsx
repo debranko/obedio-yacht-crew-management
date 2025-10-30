@@ -1,12 +1,7 @@
-import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Textarea } from './ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Separator } from './ui/separator';
 import {
   Calendar,
@@ -24,11 +19,7 @@ import {
   Phone,
   Mail,
   Briefcase,
-  Edit,
-  X,
 } from 'lucide-react';
-import { useGuestMutations } from '../hooks/useGuestMutations';
-import { toast } from 'sonner';
 import type { Guest } from '../contexts/AppDataContext';
 
 interface GuestDetailsDialogProps {
@@ -39,35 +30,7 @@ interface GuestDetailsDialogProps {
 }
 
 export function GuestDetailsDialog({ open, onOpenChange, guest, onEdit }: GuestDetailsDialogProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedGuest, setEditedGuest] = useState<Guest | null>(guest);
-  const { updateGuest, isUpdating } = useGuestMutations();
-
-  useEffect(() => {
-    if (guest) {
-      setEditedGuest(guest);
-      setIsEditing(false);
-    }
-  }, [guest]);
-
-  if (!guest || !editedGuest) return null;
-
-  const handleSave = () => {
-    updateGuest(
-      { id: editedGuest.id, data: editedGuest },
-      {
-        onSuccess: () => {
-          toast.success('Guest updated successfully');
-          setIsEditing(false);
-        },
-      }
-    );
-  };
-
-  const handleCancel = () => {
-    setEditedGuest(guest);
-    setIsEditing(false);
-  };
+  if (!guest) return null;
 
   const getStatusBadgeVariant = (status: Guest['status']) => {
     switch (status) {
@@ -133,79 +96,28 @@ export function GuestDetailsDialog({ open, onOpenChange, guest, onEdit }: GuestD
         {/* Guest Header */}
         <div className="flex items-start gap-6 pb-6 border-b border-border">
           <Avatar className="h-24 w-24">
-            <AvatarImage src={isEditing ? editedGuest.photo : guest.photo} />
+            <AvatarImage src={guest.photo} />
             <AvatarFallback className="bg-primary/10 text-primary text-2xl">
-              {getInitials(isEditing ? editedGuest.firstName : guest.firstName, isEditing ? editedGuest.lastName : guest.lastName)}
+              {getInitials(guest.firstName, guest.lastName)}
             </AvatarFallback>
           </Avatar>
 
           <div className="flex-1">
-            {isEditing ? (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="firstName">First Name *</Label>
-                    <Input
-                      id="firstName"
-                      value={editedGuest.firstName}
-                      onChange={(e) => setEditedGuest({ ...editedGuest, firstName: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="lastName">Last Name *</Label>
-                    <Input
-                      id="lastName"
-                      value={editedGuest.lastName}
-                      onChange={(e) => setEditedGuest({ ...editedGuest, lastName: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="preferredName">Preferred Name</Label>
-                  <Input
-                    id="preferredName"
-                    value={editedGuest.preferredName || ''}
-                    onChange={(e) => setEditedGuest({ ...editedGuest, preferredName: e.target.value })}
-                    placeholder="Optional"
-                  />
-                </div>
-              </div>
-            ) : (
-              <>
-                <h2 className="text-2xl mb-1">
-                  {guest.firstName} {guest.lastName}
-                </h2>
-                {guest.preferredName && (
-                  <p className="text-muted-foreground mb-2">Preferred: "{guest.preferredName}"</p>
-                )}
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant={getStatusBadgeVariant(guest.status)}>
-                    {getStatusLabel(guest.status)}
-                  </Badge>
-                  <Badge variant="outline">{getGuestTypeLabel(guest.type)}</Badge>
-                </div>
-              </>
+            <h2 className="text-2xl mb-1">
+              {guest.firstName} {guest.lastName}
+            </h2>
+            {guest.preferredName && (
+              <p className="text-muted-foreground mb-2">Preferred: "{guest.preferredName}"</p>
             )}
+            <div className="flex flex-wrap gap-2">
+              <Badge variant={getStatusBadgeVariant(guest.status)}>
+                {getStatusLabel(guest.status)}
+              </Badge>
+              <Badge variant="outline">{getGuestTypeLabel(guest.type)}</Badge>
+            </div>
           </div>
 
-          <div className="flex gap-2">
-            {isEditing ? (
-              <>
-                <Button variant="outline" onClick={handleCancel} disabled={isUpdating}>
-                  <X className="h-4 w-4 mr-2" />
-                  Cancel
-                </Button>
-                <Button onClick={handleSave} disabled={isUpdating}>
-                  {isUpdating ? 'Saving...' : 'Save Changes'}
-                </Button>
-              </>
-            ) : (
-              <Button onClick={() => setIsEditing(true)}>
-                <Edit className="h-4 w-4 mr-2" />
-                Edit
-              </Button>
-            )}
-          </div>
+          <Button onClick={() => onEdit?.(guest)}>Edit Guest</Button>
         </div>
 
         {/* Basic Information Card */}
@@ -214,61 +126,29 @@ export function GuestDetailsDialog({ open, onOpenChange, guest, onEdit }: GuestD
             <Globe className="h-5 w-5 text-primary" />
             Basic Information
           </h3>
-
-          {isEditing ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="nationality">Nationality</Label>
-                <Input
-                  id="nationality"
-                  value={editedGuest.nationality || ''}
-                  onChange={(e) => setEditedGuest({ ...editedGuest, nationality: e.target.value })}
-                  placeholder="e.g., American"
-                />
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {guest.nationality && (
+              <div className="space-y-1">
+                <div className="text-sm text-muted-foreground">Nationality</div>
+                <div className="font-medium">{guest.nationality}</div>
               </div>
-              <div>
-                <Label htmlFor="passportNumber">Passport Number</Label>
-                <Input
-                  id="passportNumber"
-                  value={editedGuest.passportNumber || ''}
-                  onChange={(e) => setEditedGuest({ ...editedGuest, passportNumber: e.target.value })}
-                  placeholder="Passport #"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <Label htmlFor="languages">Languages (comma-separated)</Label>
-                <Input
-                  id="languages"
-                  value={editedGuest.languages?.join(', ') || ''}
-                  onChange={(e) => setEditedGuest({ ...editedGuest, languages: e.target.value.split(',').map(l => l.trim()).filter(Boolean) })}
-                  placeholder="English, Spanish, French"
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {guest.nationality && (
-                <div className="space-y-1">
-                  <div className="text-sm text-muted-foreground">Nationality</div>
-                  <div className="font-medium">{guest.nationality}</div>
-                </div>
-              )}
+            )}
 
-              {guest.languages?.length > 0 && (
-                <div className="space-y-1">
-                  <div className="text-sm text-muted-foreground">Languages</div>
-                  <div className="font-medium">{guest.languages.join(', ')}</div>
-                </div>
-              )}
+            {guest.languages?.length > 0 && (
+              <div className="space-y-1">
+                <div className="text-sm text-muted-foreground">Languages</div>
+                <div className="font-medium">{guest.languages.join(', ')}</div>
+              </div>
+            )}
 
-              {guest.passportNumber && (
-                <div className="space-y-1 md:col-span-2">
-                  <div className="text-sm text-muted-foreground">Passport Number</div>
-                  <div className="font-mono font-medium">{guest.passportNumber}</div>
-                </div>
-              )}
-            </div>
-          )}
+            {guest.passportNumber && (
+              <div className="space-y-1 md:col-span-2">
+                <div className="text-sm text-muted-foreground">Passport Number</div>
+                <div className="font-mono font-medium">{guest.passportNumber}</div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Accommodation Card */}
@@ -277,107 +157,48 @@ export function GuestDetailsDialog({ open, onOpenChange, guest, onEdit }: GuestD
             <MapPin className="h-5 w-5 text-primary" />
             Accommodation
           </h3>
-
-          {isEditing ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="cabin">Cabin</Label>
-                <Input
-                  id="cabin"
-                  value={editedGuest.cabin || ''}
-                  onChange={(e) => setEditedGuest({ ...editedGuest, cabin: e.target.value })}
-                  placeholder="Cabin number/name"
-                />
-              </div>
-              <div>
-                <Label htmlFor="specialOccasion">Special Occasion</Label>
-                <Input
-                  id="specialOccasion"
-                  value={editedGuest.specialOccasion || ''}
-                  onChange={(e) => setEditedGuest({ ...editedGuest, specialOccasion: e.target.value })}
-                  placeholder="Birthday, Anniversary, etc."
-                />
-              </div>
-              <div>
-                <Label htmlFor="checkInDate">Check-in Date</Label>
-                <Input
-                  id="checkInDate"
-                  type="date"
-                  value={editedGuest.checkInDate}
-                  onChange={(e) => setEditedGuest({ ...editedGuest, checkInDate: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="checkInTime">Check-in Time</Label>
-                <Input
-                  id="checkInTime"
-                  type="time"
-                  value={editedGuest.checkInTime || ''}
-                  onChange={(e) => setEditedGuest({ ...editedGuest, checkInTime: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="checkOutDate">Check-out Date</Label>
-                <Input
-                  id="checkOutDate"
-                  type="date"
-                  value={editedGuest.checkOutDate}
-                  onChange={(e) => setEditedGuest({ ...editedGuest, checkOutDate: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="checkOutTime">Check-out Time</Label>
-                <Input
-                  id="checkOutTime"
-                  type="time"
-                  value={editedGuest.checkOutTime || ''}
-                  onChange={(e) => setEditedGuest({ ...editedGuest, checkOutTime: e.target.value })}
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {guest.cabin && (
-                <div className="space-y-1">
-                  <div className="text-sm text-muted-foreground">Cabin</div>
-                  <div className="font-medium">{guest.cabin}</div>
-                </div>
-              )}
-
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {guest.cabin && (
               <div className="space-y-1">
-                <div className="text-sm text-muted-foreground">Check-in</div>
-                <div className="font-medium">
-                  {formatDate(guest.checkInDate)}
-                </div>
-                {guest.checkInTime && (
-                  <div className="text-sm text-muted-foreground">{guest.checkInTime}</div>
-                )}
+                <div className="text-sm text-muted-foreground">Cabin</div>
+                <div className="font-medium">{guest.cabin}</div>
               </div>
+            )}
 
-              <div className="space-y-1">
-                <div className="text-sm text-muted-foreground">Check-out</div>
-                <div className="font-medium">
-                  {formatDate(guest.checkOutDate)}
-                </div>
-                {guest.checkOutTime && (
-                  <div className="text-sm text-muted-foreground">{guest.checkOutTime}</div>
-                )}
+            <div className="space-y-1">
+              <div className="text-sm text-muted-foreground">Check-in</div>
+              <div className="font-medium">
+                {formatDate(guest.checkInDate)}
               </div>
-
-              {guest.specialOccasion && (
-                <div className="space-y-1">
-                  <div className="text-sm text-muted-foreground">Special Occasion</div>
-                  <div className="font-medium flex items-center gap-2">
-                    <Cake className="h-4 w-4 text-primary" />
-                    {guest.specialOccasion}
-                  </div>
-                  {guest.specialOccasionDate && (
-                    <div className="text-sm text-muted-foreground">{formatDate(guest.specialOccasionDate)}</div>
-                  )}
-                </div>
+              {guest.checkInTime && (
+                <div className="text-sm text-muted-foreground">{guest.checkInTime}</div>
               )}
             </div>
-          )}
+
+            <div className="space-y-1">
+              <div className="text-sm text-muted-foreground">Check-out</div>
+              <div className="font-medium">
+                {formatDate(guest.checkOutDate)}
+              </div>
+              {guest.checkOutTime && (
+                <div className="text-sm text-muted-foreground">{guest.checkOutTime}</div>
+              )}
+            </div>
+
+            {guest.specialOccasion && (
+              <div className="space-y-1">
+                <div className="text-sm text-muted-foreground">Special Occasion</div>
+                <div className="font-medium flex items-center gap-2">
+                  <Cake className="h-4 w-4 text-primary" />
+                  {guest.specialOccasion}
+                </div>
+                {guest.specialOccasionDate && (
+                  <div className="text-sm text-muted-foreground">{formatDate(guest.specialOccasionDate)}</div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Dietary Information Card */}
@@ -473,70 +294,35 @@ export function GuestDetailsDialog({ open, onOpenChange, guest, onEdit }: GuestD
         </div>
 
         {/* Notes & Requests */}
-        {(isEditing || guest.specialRequests || guest.vipNotes || guest.crewNotes) && (
+        {(guest.specialRequests || guest.vipNotes || guest.crewNotes) && (
           <div className="space-y-4">
             <h3 className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-primary" />
               Notes & Requests
             </h3>
 
-            {isEditing ? (
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="specialRequests">Special Requests</Label>
-                  <Textarea
-                    id="specialRequests"
-                    value={editedGuest.specialRequests || ''}
-                    onChange={(e) => setEditedGuest({ ...editedGuest, specialRequests: e.target.value })}
-                    placeholder="Any special requests..."
-                    rows={3}
-                  />
+            <div className="space-y-3">
+              {guest.specialRequests && (
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <div className="font-medium text-sm mb-2">Special Requests</div>
+                  <p className="text-muted-foreground">{guest.specialRequests}</p>
                 </div>
-                <div>
-                  <Label htmlFor="vipNotes">VIP Notes</Label>
-                  <Textarea
-                    id="vipNotes"
-                    value={editedGuest.vipNotes || ''}
-                    onChange={(e) => setEditedGuest({ ...editedGuest, vipNotes: e.target.value })}
-                    placeholder="Important VIP information..."
-                    rows={3}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="crewNotes">Crew Notes</Label>
-                  <Textarea
-                    id="crewNotes"
-                    value={editedGuest.crewNotes || ''}
-                    onChange={(e) => setEditedGuest({ ...editedGuest, crewNotes: e.target.value })}
-                    placeholder="Internal crew notes..."
-                    rows={3}
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {guest.specialRequests && (
-                  <div className="bg-muted/30 rounded-lg p-4">
-                    <div className="font-medium text-sm mb-2">Special Requests</div>
-                    <p className="text-muted-foreground">{guest.specialRequests}</p>
-                  </div>
-                )}
+              )}
 
-                {guest.vipNotes && (
-                  <div className="bg-primary/10 border border-primary/30 rounded-lg p-4">
-                    <div className="font-medium text-sm text-primary mb-2">VIP Notes</div>
-                    <p>{guest.vipNotes}</p>
-                  </div>
-                )}
+              {guest.vipNotes && (
+                <div className="bg-primary/10 border border-primary/30 rounded-lg p-4">
+                  <div className="font-medium text-sm text-primary mb-2">VIP Notes</div>
+                  <p>{guest.vipNotes}</p>
+                </div>
+              )}
 
-                {guest.crewNotes && (
-                  <div className="bg-muted/30 rounded-lg p-4">
-                    <div className="font-medium text-sm mb-2">Crew Notes</div>
-                    <p className="text-muted-foreground">{guest.crewNotes}</p>
-                  </div>
-                )}
-              </div>
-            )}
+              {guest.crewNotes && (
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <div className="font-medium text-sm mb-2">Crew Notes</div>
+                  <p className="text-muted-foreground">{guest.crewNotes}</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Textarea } from "../ui/textarea";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
 import { toast } from "sonner";
+import { DNDWidget } from "../dnd-widget";
 
 export function LocationsPage() {
   const { locations, isLoading, createLocation, updateLocation, deleteLocation } = useLocations();
@@ -40,7 +41,7 @@ export function LocationsPage() {
   const { data: smartButtons = [], isLoading: isLoadingButtons } = useDevices({ type: 'smart_button' });
   const { updateDevice: updateDeviceMutation } = useDeviceMutations();
   
-  const { addActivityLog } = useAppData();
+  const { addActivityLog, getGuestByLocationId } = useAppData();
   const { user } = useAuth();
   
   // Get current user role from auth context
@@ -133,8 +134,8 @@ export function LocationsPage() {
 
   const handleEdit = (location: Location) => {
     setSelectedLocation(location);
-    // ✅ Find guest currently assigned to this location using React Query data
-    const currentGuest = guests.find(g => g.locationId === location.id);
+    // Find guest currently assigned to this location
+    const currentGuest = getGuestByLocationId(location.id);
     setFormData({
       name: location.name,
       type: location.type,
@@ -159,8 +160,8 @@ export function LocationsPage() {
     // Find selected button name
     const selectedButton = smartButtonOptions.find(b => b.id === formData.smartButtonId);
 
-    // ✅ Find guest currently assigned to this location using React Query data
-    const currentGuest = guests.find(g => g.locationId === selectedLocation.id);
+    // Find guest currently assigned to this location
+    const currentGuest = getGuestByLocationId(selectedLocation.id);
     const previousGuestId = currentGuest?.id;
     const newGuestId = formData.assignedGuestId;
 
@@ -194,24 +195,11 @@ export function LocationsPage() {
       if (previousGuestId !== newGuestId) {
         // Remove previous guest from this location
         if (previousGuestId) {
-          updateGuestMutation({ id: previousGuestId, data: { locationId: null } });
+          updateGuestMutation({ id: previousGuestId, data: { locationId: undefined } });
         }
-
+        
         // Assign new guest to this location
         if (newGuestId) {
-          // ✅ Check if guest is already assigned to another location
-          const selectedGuest = guests.find(g => g.id === newGuestId);
-          const currentLocation = selectedGuest?.locationId
-            ? locations.find(l => l.id === selectedGuest.locationId)
-            : null;
-
-          if (currentLocation && currentLocation.id !== selectedLocation.id) {
-            // Guest is being moved from another location
-            toast.info(`Moving guest from ${currentLocation.name}`, {
-              description: `${selectedGuest.firstName} ${selectedGuest.lastName} will be moved to ${selectedLocation.name}`
-            });
-          }
-
           updateGuestMutation({ id: newGuestId, data: { locationId: selectedLocation.id } });
         }
         
@@ -452,9 +440,9 @@ export function LocationsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
       {/* Main Content */}
-      <div className="space-y-6">
+      <div className="lg:col-span-9 space-y-6">
         {/* DND Alert Widget */}
         {hasDND && (
         <Card className="border-destructive/30 bg-destructive/5">
@@ -593,8 +581,8 @@ export function LocationsPage() {
                         });
                         assignedGuest = guestsAtLocation[0];  // Take highest priority guest
                       } else {
-                        // ✅ Fallback to React Query data
-                        assignedGuest = guests.find(g => g.locationId === location.id);
+                        // Fallback to context helper
+                        assignedGuest = getGuestByLocationId(location.id);
                       }
                       
                       if (assignedGuest) {
@@ -632,15 +620,10 @@ export function LocationsPage() {
                       const button = smartButtonOptions.find(b => b.id === location.smartButtonId);
                       return button ? (
                         <div className="bg-primary/5 rounded-md p-2">
-                          <div className="flex flex-col gap-0.5 text-xs">
-                            <div className="flex items-center gap-1.5">
-                              <Smartphone className="h-3.5 w-3.5 text-primary" />
-                              <span className="text-muted-foreground">Smart Button:</span>
-                              <span className="font-medium text-foreground">{button.name}</span>
-                            </div>
-                            <div className="pl-5 text-muted-foreground">
-                              {button.deviceId}
-                            </div>
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <Smartphone className="h-3.5 w-3.5 text-primary" />
+                            <span className="text-muted-foreground">Smart Button:</span>
+                            <span className="font-medium text-foreground">{button.name}</span>
                           </div>
                         </div>
                       ) : null;
@@ -1313,6 +1296,11 @@ export function LocationsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
+
+      {/* Sidebar - DND Widget */}
+      <div className="lg:col-span-3 space-y-6">
+        <DNDWidget />
       </div>
     </div>
   );

@@ -11,7 +11,7 @@ model User {
   username     String        @unique
   email        String        @unique
   password     String
-  role         UserRole      // Enum: admin, chief-stewardess, stewardess, crew, eto
+  role         String        // "admin","chief-stewardess","stewardess","crew","eto"
   firstName    String?
   lastName     String?
   isActive     Boolean       @default(true)
@@ -47,39 +47,20 @@ model UserPreferences {
 model CrewMember {
   id         String   @id @default(cuid())
   name       String
-  nickname   String?
   position   String
   department String
-  status     CrewMemberStatus @default(active)
+  status     String   @default("active") // "on-duty","off-duty","on-leave"
   contact    String?
   email      String?
-  phone      String?
-  onBoardContact String? // On-board contact (radio, intercom, etc.)
   joinDate   DateTime?
   role       String?
   userId     String?  @unique
-
-  // Visual identification
-  avatar     String?  // Avatar image URL
-  color      String   @default("#C8A96B") // Color for visual identification in UI
-
-  // Leave tracking
-  leaveStart String?  // YYYY-MM-DD format
-  leaveEnd   String?  // YYYY-MM-DD format
-
-  // Additional info
-  languages  String[] @default([])
-  skills     String[] @default([])
-  notes      String?
-
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   user              User?               @relation(fields: [userId], references: [id])
   deviceAssignments DeviceAssignment[]
   devices           Device[]
-  assignedRequests  ServiceRequest[]    // Service requests assigned to this crew member
-  assignments       Assignment[]        @relation("AssignmentToCrew") // Duty roster assignments
 
   @@index([userId])
   @@index([department])
@@ -93,11 +74,11 @@ model Location {
   floor          String?  // Yacht deck or building floor: Sun Deck, Main Deck, etc.
   description    String?
   image          String?  // URL to location image/photo
-  smartButtonId  String?  @unique // ESP32 smart button device ID assigned to this location (UNIQUE - one button per location)
+  smartButtonId  String?  // ESP32 smart button device ID assigned to this location
   doNotDisturb   Boolean  @default(false) // Do Not Disturb status
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-
+  
   guests          Guest[]
   serviceRequests ServiceRequest[]
   devices         Device[]
@@ -110,40 +91,35 @@ model Guest {
   lastName       String
   preferredName  String?
   photo          String?
-  type           GuestType @default(guest)
-  status         GuestStatus @default(onboard)
-
-  // Contact Information
-  email          String?
-  phone          String?
-
+  type           String   @default("guest")
+  status         String   @default("onboard")
   nationality    String?
   languages      String[] @default([])
   passportNumber String?
   locationId     String?
   doNotDisturb   Boolean  @default(false) // Guest DND status
-
+  
   // Accommodation & Check-in Info
   checkInDate    DateTime?
   checkOutDate   DateTime?
-
+  
   // Dietary & Medical
   allergies              String[] @default([])
   dietaryRestrictions    String[] @default([])
   medicalConditions      String[] @default([])
-
+  
   // Preferences & Notes
   preferences            String?  // General preferences
   notes                  String?  // Staff notes
-
+  
   // Emergency Contact
   emergencyContactName   String?
   emergencyContactPhone  String?
   emergencyContactRelation String?
-
+  
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-
+  
   location        Location?        @relation(fields: [locationId], references: [id])
   serviceRequests ServiceRequest[]
   activityLogs    ActivityLog[]
@@ -153,94 +129,6 @@ model Guest {
   @@index([type])
   @@index([checkInDate])
   @@index([checkOutDate])
-  // Note: CHECK constraint for checkOutDate > checkInDate is added via migration SQL
-  // Prisma doesn't support CHECK constraints in schema yet, but they exist in DB
-}
-
-// User Enums
-enum UserRole {
-  admin
-  chief_stewardess @map("chief-stewardess")
-  stewardess
-  crew
-  eto
-}
-
-// Crew Member Enums
-enum CrewMemberStatus {
-  active
-  on_duty  @map("on-duty")
-  off_duty @map("off-duty")
-  on_leave @map("on-leave")
-}
-
-// Guest Enums
-enum GuestStatus {
-  expected
-  onboard
-  ashore
-  departed
-}
-
-enum GuestType {
-  owner
-  vip
-  guest
-  partner
-  family
-}
-
-// Service Request Enums
-enum ServiceRequestPriority {
-  low
-  normal
-  urgent
-  emergency
-}
-
-enum ServiceRequestType {
-  call
-  service
-  emergency
-}
-
-enum ServiceRequestStatus {
-  pending
-  accepted
-  completed
-  cancelled
-}
-
-// Device Enums
-enum DeviceStatus {
-  online
-  offline
-  low_battery
-  error
-}
-
-// Message Enums
-enum MessageType {
-  text
-  alert
-  announcement
-}
-
-enum MessagePriority {
-  low
-  normal
-  high
-  urgent
-}
-
-// Activity Log Enums
-enum ActivityLogType {
-  CREW
-  GUEST
-  SERVICE_REQUEST
-  DEVICE
-  DND
-  SYSTEM
 }
 
 model ServiceRequestHistory {
@@ -248,8 +136,8 @@ model ServiceRequestHistory {
   serviceRequestId String?
   originalRequestId String? // Original request ID
   action           String   // "created", "accepted", "completed", "cancelled"
-  previousStatus   ServiceRequestStatus?
-  newStatus        ServiceRequestStatus
+  previousStatus   String?
+  newStatus        String
   notes            String?
   userId           String?  // Who performed the action
   metadata         Json?    // Additional data like response times, etc.
@@ -261,8 +149,8 @@ model ServiceRequestHistory {
   completionTime   Int?     // Seconds
   guestName        String?
   location         String?
-  requestType      ServiceRequestType?
-  priority         ServiceRequestPriority?
+  requestType      String?
+  priority         String?
   
   createdAt        DateTime @default(now())
   
@@ -273,28 +161,27 @@ model ServiceRequestHistory {
 
 model ServiceRequest {
   id          String   @id @default(cuid())
-  requestType ServiceRequestType @default(call)
+  requestType String   @default("call")
   guestId     String?
   locationId  String?
   cabinId     String?
   categoryId  String?  // Service category
-  priority    ServiceRequestPriority @default(normal)
-  status      ServiceRequestStatus @default(pending)
+  priority    String   @default("normal")
+  status      String   @default("open")
   notes       String?
   voiceTranscript String? // Voice command transcript
-  assignedTo  String?  // Crew member name assigned (deprecated - use assignedCrew relation)
-  assignedToId String? // Crew member ID - FK to CrewMember
+  assignedTo  String?  // Crew member name assigned
+  assignedToId String? // Crew member ID
   guestName   String?  // Guest name for display
   guestCabin  String?  // Cabin/location name for display
   acceptedAt  DateTime?
   completedAt DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
-  guest        Guest?          @relation(fields: [guestId], references: [id])
-  location     Location?       @relation(fields: [locationId], references: [id])
-  category     ServiceCategory? @relation(fields: [categoryId], references: [id])
-  assignedCrew CrewMember?     @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  
+  guest    Guest?    @relation(fields: [guestId], references: [id])
+  location Location? @relation(fields: [locationId], references: [id])
+  category ServiceCategory? @relation(fields: [categoryId], references: [id])
 
   @@index([guestId])
   @@index([locationId])
@@ -320,12 +207,12 @@ model ServiceCategory {
 }
 
 model Device {
-  id              String        @id @default(cuid())
-  deviceId        String        @unique  // BTN-001, WCH-001, RPT-001, APP-IOS-001
+  id              String    @id @default(cuid())
+  deviceId        String    @unique  // BTN-001, WCH-001, RPT-001, APP-IOS-001
   name            String
-  type            String        // "smart_button", "watch", "repeater", "mobile_app"
-  subType         String?       // "ios", "android", "esp32"
-  status          DeviceStatus  @default(online) // Enum: online, offline, low_battery, error
+  type            String    // "smart_button", "watch", "repeater", "mobile_app"
+  subType         String?   // "ios", "android", "esp32"
+  status          String    @default("online") // "online", "offline", "low_battery", "error"
   
   // Location & Assignment
   locationId      String?
@@ -394,16 +281,14 @@ model DeviceAssignment {
 
 // Duty Roster Models - Re-added for database persistence (Phase 4)
 model Shift {
-  id           String   @id @default(cuid())
-  name         String   // "Morning", "Afternoon", "Night"
-  startTime    String   // "08:00"
-  endTime      String   // "20:00"
-  color        String   @default("#3B82F6") // Color for UI display
-  description  String?
-  isActive     Boolean  @default(true)
-  order        Int      @default(0) // For sorting
-  primaryCount Int      @default(2) // Number of primary crew members needed
-  backupCount  Int      @default(1) // Number of backup crew members needed
+  id          String   @id @default(cuid())
+  name        String   // "Morning", "Afternoon", "Night"
+  startTime   String   // "08:00"
+  endTime     String   // "20:00"
+  color       String   @default("#3B82F6") // Color for UI display
+  description String?
+  isActive    Boolean  @default(true)
+  order       Int      @default(0) // For sorting
 
   assignments Assignment[]
 
@@ -422,7 +307,6 @@ model Assignment {
   notes        String?
 
   shift        Shift      @relation(fields: [shiftId], references: [id], onDelete: Cascade)
-  crewMember   CrewMember @relation("AssignmentToCrew", fields: [crewMemberId], references: [id], onDelete: Cascade)
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -435,17 +319,17 @@ model Assignment {
 }
 
 model ActivityLog {
-  id         String          @id @default(cuid())
-  type       ActivityLogType // Enum: CREW, GUEST, SERVICE_REQUEST, DEVICE, DND, SYSTEM
-  action     String          // Dynamic action description
+  id         String   @id @default(cuid())
+  type       String
+  action     String
   details    String?
   userId     String?
   locationId String?
   guestId    String?
   deviceId   String?
   metadata   String?
-  timestamp  DateTime        @default(now())
-  createdAt  DateTime        @default(now())
+  timestamp  DateTime @default(now())
+  createdAt  DateTime @default(now())
   
   user       User?     @relation(fields: [userId], references: [id])
   location   Location? @relation(fields: [locationId], references: [id])
@@ -468,14 +352,14 @@ model YachtSettings {
 }
 
 model Message {
-  id         String          @id @default(cuid())
+  id         String   @id @default(cuid())
   senderId   String
-  receiverId String?         // Null for broadcast messages
-
+  receiverId String?  // Null for broadcast messages
+  
   // Message Content
   content    String
-  type       MessageType     @default(text) // Enum: text, alert, announcement
-  priority   MessagePriority @default(normal) // Enum: low, normal, high, urgent
+  type       String   @default("text") // "text", "alert", "announcement"
+  priority   String   @default("normal") // "low", "normal", "high", "urgent"
   
   // Status
   isRead     Boolean  @default(false)

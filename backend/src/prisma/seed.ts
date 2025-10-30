@@ -22,7 +22,7 @@ async function seed() {
     await prisma.device.deleteMany();
     await prisma.smartButton.deleteMany();
     await prisma.crewMember.deleteMany();
-    await prisma.shift.deleteMany();
+    await prisma.shiftConfig.deleteMany();
     await prisma.user.deleteMany();
 
     console.log('✅ Cleared existing data');
@@ -44,40 +44,31 @@ async function seed() {
 
     // Create shift configurations
     const shifts = await Promise.all([
-      prisma.shift.create({
+      prisma.shiftConfig.create({
         data: {
           id: 'morning',
-          name: 'Morning',
-          startTime: '06:00',
-          endTime: '14:00',
-          color: '#D4B877',
-          order: 0,
-          primaryCount: 2,
-          backupCount: 1
+          name: 'Morning Shift',
+          startTime: '07:00',
+          endTime: '15:00',
+          color: '#3b82f6'
         }
       }),
-      prisma.shift.create({
+      prisma.shiftConfig.create({
         data: {
           id: 'afternoon',
-          name: 'Afternoon',
-          startTime: '14:00',
-          endTime: '22:00',
-          color: '#06B6D4',
-          order: 1,
-          primaryCount: 2,
-          backupCount: 1
+          name: 'Afternoon Shift',
+          startTime: '15:00',
+          endTime: '23:00',
+          color: '#f59e0b'
         }
       }),
-      prisma.shift.create({
+      prisma.shiftConfig.create({
         data: {
           id: 'night',
-          name: 'Night',
-          startTime: '22:00',
-          endTime: '06:00',
-          color: '#7C3AED',
-          order: 2,
-          primaryCount: 1,
-          backupCount: 1
+          name: 'Night Shift',
+          startTime: '23:00',
+          endTime: '07:00',
+          color: '#8b5cf6'
         }
       })
     ]);
@@ -224,7 +215,7 @@ async function seed() {
           name: 'Maria Lopez',
           position: 'Chief Stewardess',
           department: 'INTERIOR',
-          status: 'on-duty',
+          status: 'ON_DUTY',
           contact: '+1 555 0101',
           email: 'maria.lopez@yacht.com'
         }
@@ -235,7 +226,7 @@ async function seed() {
           name: 'Sarah Johnson',
           position: 'Stewardess',
           department: 'INTERIOR',
-          status: 'on-duty',
+          status: 'ON_DUTY',
           contact: '+1 555 0102',
           email: 'sarah.johnson@yacht.com'
         }
@@ -246,7 +237,7 @@ async function seed() {
           name: 'Sophie Martin',
           position: 'Stewardess',
           department: 'INTERIOR',
-          status: 'off-duty',
+          status: 'OFF_DUTY',
           contact: '+1 555 0103',
           email: 'sophie.martin@yacht.com'
         }

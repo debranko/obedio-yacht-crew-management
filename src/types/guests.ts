@@ -1,23 +1,18 @@
 // Guest Management Types
 export interface Guest {
   id: string;
-
+  
   // Basic Info
   firstName: string;
   lastName: string;
   preferredName?: string;
   photo?: string;
-  type: 'owner' | 'vip' | 'guest' | 'partner' | 'family';
-  status: 'expected' | 'onboard' | 'ashore' | 'departed';
-
-  // Contact Information
-  email?: string;
-  phone?: string;
-
+  type: 'primary' | 'partner' | 'family' | 'child' | 'vip' | 'owner' | 'charter';
+  status: 'expected' | 'onboard' | 'departed';
   nationality?: string;
   languages: string[];
   passportNumber?: string;
-
+  
   // Accommodation
   cabin?: string; // Cabin name/ID (legacy - deprecated)
   locationId?: string; // Foreign key to Location.id (proper relationship)

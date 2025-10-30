@@ -16,10 +16,8 @@ export function useServiceRequestsApi() {
   const query = useQuery({
     queryKey: QUERY_KEY,
     queryFn: () => api.serviceRequests.getAll(),
-    staleTime: 1000 * 5, // 5 seconds - data is fresh for 5 seconds
-    refetchInterval: 1000 * 10, // Refetch every 10 seconds for near real-time updates
-    refetchOnWindowFocus: true, // Refetch when window regains focus
-    refetchOnMount: true, // Always refetch when component mounts
+    staleTime: 1000 * 30, // 30 seconds (more frequent for real-time data)
+    refetchInterval: 1000 * 60, // Refetch every minute
   });
 
   return {
@@ -89,14 +87,13 @@ export function useUpdateServiceRequest() {
 
 /**
  * Accept service request (assign to crew member)
- * Must provide crewMemberId to assign the request
  */
 export function useAcceptServiceRequest() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, crewMemberId }: { id: string; crewMemberId: string }) =>
-      api.serviceRequests.accept(id, crewMemberId),
+    mutationFn: ({ id, crewId }: { id: string; crewId: string }) =>
+      api.serviceRequests.accept(id, crewId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
       toast.success('Service request accepted');

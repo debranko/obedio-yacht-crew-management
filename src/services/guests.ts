@@ -43,7 +43,7 @@ export interface GuestMetaResponse {
 }
 
 export class GuestsService {
-  private static baseUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8080/api'}/guests`;
+  private static baseUrl = 'http://localhost:8080/api/guests';
 
   /**
    * Get JWT token for API authentication
@@ -53,65 +53,12 @@ export class GuestsService {
   }
 
   /**
-   * Clean guest data for backend API (remove frontend-only fields)
-   */
-  private static cleanGuestData(guestData: any): any {
-    const {
-      // Remove frontend-only fields
-      cabin,
-      checkInTime,
-      checkOutTime,
-      foodDislikes,
-      favoriteFoods,
-      favoriteDrinks,
-      specialOccasion,
-      specialOccasionDate,
-      specialRequests,
-      vipNotes,
-      crewNotes,
-      contactPerson,
-      createdBy,
-      // Keep the rest
-      ...cleanedData
-    } = guestData;
-
-    // Convert empty photo to null only if photo field is being explicitly updated
-    // Don't modify photo if it's not included in the update (undefined means "don't change")
-    if ('photo' in guestData) {
-      if (cleanedData.photo === undefined || cleanedData.photo === '') {
-        cleanedData.photo = null;
-      }
-    }
-
-    // Convert empty preferredName to null only if preferredName field is being explicitly updated
-    if ('preferredName' in guestData) {
-      if (cleanedData.preferredName === undefined || cleanedData.preferredName === '') {
-        cleanedData.preferredName = null;
-      }
-    }
-
-    // Convert dates to ISO datetime strings (backend expects full datetime, not just date)
-    // Only process dates if they're being explicitly updated
-    if ('checkInDate' in guestData && guestData.checkInDate) {
-      const time = guestData.checkInTime || '00:00';
-      cleanedData.checkInDate = new Date(`${guestData.checkInDate}T${time}:00`).toISOString();
-    }
-
-    if ('checkOutDate' in guestData && guestData.checkOutDate) {
-      const time = guestData.checkOutTime || '23:59';
-      cleanedData.checkOutDate = new Date(`${guestData.checkOutDate}T${time}:00`).toISOString();
-    }
-
-    return cleanedData;
-  }
-
-  /**
    * Make authenticated API request
    */
   private static async apiRequest(endpoint: string, options: RequestInit = {}) {
     const token = this.getAuthToken();
     const url = `${this.baseUrl}${endpoint}`;
-
+    
     const config: RequestInit = {
       ...options,
       headers: {
@@ -122,7 +69,7 @@ export class GuestsService {
     };
 
     const response = await fetch(url, config);
-
+    
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Request failed' }));
       throw new Error(error.message || `Request failed with status ${response.status}`);
@@ -176,10 +123,9 @@ export class GuestsService {
    * POST /guests - Create new guest in database
    */
   static async create(guestData: Omit<Guest, 'id' | 'createdAt' | 'updatedAt'>): Promise<Guest> {
-    const cleanedData = this.cleanGuestData(guestData);
     const response = await this.apiRequest('', {
       method: 'POST',
-      body: JSON.stringify(cleanedData),
+      body: JSON.stringify(guestData),
     });
     return response.data;
   }
@@ -188,10 +134,9 @@ export class GuestsService {
    * PUT /guests/:id - Update guest in database
    */
   static async update(id: string, data: Partial<Guest>): Promise<Guest> {
-    const cleanedData = this.cleanGuestData(data);
     const response = await this.apiRequest(`/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(cleanedData),
+      body: JSON.stringify(data),
     });
     return response.data;
   }

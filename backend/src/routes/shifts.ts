@@ -7,7 +7,7 @@ import { Router } from 'express';
 import { prisma } from '../services/db';
 import { asyncHandler, validate } from '../middleware/error-handler';
 import { CreateShiftSchema, UpdateShiftSchema } from '../validators/schemas';
-import { authMiddleware, requirePermission } from '../middleware/auth';
+import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
 
@@ -18,7 +18,7 @@ router.use(authMiddleware);
  * GET /api/shifts
  * Get all shifts, ordered by order field
  */
-router.get('/', requirePermission('shifts.view'), asyncHandler(async (_, res) => {
+router.get('/', asyncHandler(async (_, res) => {
   const shifts = await prisma.shift.findMany({
     orderBy: { order: 'asc' },
     include: {
@@ -39,7 +39,7 @@ router.get('/', requirePermission('shifts.view'), asyncHandler(async (_, res) =>
  * GET /api/shifts/active
  * Get only active shifts
  */
-router.get('/active', requirePermission('shifts.view'), asyncHandler(async (_, res) => {
+router.get('/active', asyncHandler(async (_, res) => {
   const shifts = await prisma.shift.findMany({
     where: { isActive: true },
     orderBy: { order: 'asc' },
@@ -61,7 +61,7 @@ router.get('/active', requirePermission('shifts.view'), asyncHandler(async (_, r
  * GET /api/shifts/:id
  * Get a single shift by ID
  */
-router.get('/:id', requirePermission('shifts.view'), asyncHandler(async (req, res) => {
+router.get('/:id', asyncHandler(async (req, res) => {
   const shift = await prisma.shift.findUnique({
     where: { id: req.params.id },
     include: {
@@ -89,7 +89,7 @@ router.get('/:id', requirePermission('shifts.view'), asyncHandler(async (req, re
  * POST /api/shifts
  * Create a new shift
  */
-router.post('/', requirePermission('shifts.create'), validate(CreateShiftSchema), asyncHandler(async (req, res) => {
+router.post('/', validate(CreateShiftSchema), asyncHandler(async (req, res) => {
   const shift = await prisma.shift.create({
     data: req.body
   });
@@ -105,7 +105,7 @@ router.post('/', requirePermission('shifts.create'), validate(CreateShiftSchema)
  * PUT /api/shifts/:id
  * Update an existing shift
  */
-router.put('/:id', requirePermission('shifts.edit'), validate(UpdateShiftSchema), asyncHandler(async (req, res) => {
+router.put('/:id', validate(UpdateShiftSchema), asyncHandler(async (req, res) => {
   const shift = await prisma.shift.update({
     where: { id: req.params.id },
     data: req.body
@@ -122,7 +122,7 @@ router.put('/:id', requirePermission('shifts.edit'), validate(UpdateShiftSchema)
  * DELETE /api/shifts/:id
  * Delete a shift (cascades to assignments)
  */
-router.delete('/:id', requirePermission('shifts.delete'), asyncHandler(async (req, res) => {
+router.delete('/:id', asyncHandler(async (req, res) => {
   await prisma.shift.delete({
     where: { id: req.params.id }
   });
@@ -137,7 +137,7 @@ router.delete('/:id', requirePermission('shifts.delete'), asyncHandler(async (re
  * POST /api/shifts/:id/toggle-active
  * Toggle shift active status
  */
-router.post('/:id/toggle-active', requirePermission('shifts.edit'), asyncHandler(async (req, res) => {
+router.post('/:id/toggle-active', asyncHandler(async (req, res) => {
   const { isActive } = req.body;
 
   const shift = await prisma.shift.update({
@@ -156,7 +156,7 @@ router.post('/:id/toggle-active', requirePermission('shifts.edit'), asyncHandler
  * POST /api/shifts/reorder
  * Update order of multiple shifts
  */
-router.post('/reorder', requirePermission('shifts.edit'), asyncHandler(async (req, res) => {
+router.post('/reorder', asyncHandler(async (req, res) => {
   const { shifts } = req.body; // Array of { id, order }
 
   if (!Array.isArray(shifts)) {

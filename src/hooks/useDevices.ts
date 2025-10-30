@@ -167,12 +167,6 @@ export function useDeviceMutations() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['devices'] });
       queryClient.invalidateQueries({ queryKey: ['devices', variables.id] });
-
-      // ✅ CRITICAL: Invalidate crew members when device assignment changes
-      // This ensures Crew page shows updated device info when assigned from Device Manager
-      if (variables.data.crewMemberId !== undefined) {
-        queryClient.invalidateQueries({ queryKey: ['crew-members'] });
-      }
     }
   });
 

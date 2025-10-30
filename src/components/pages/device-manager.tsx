@@ -27,12 +27,9 @@ import {
   ShieldCheck,
   XCircle,
   User,
-  Trash2,
-  Bell,
-  UserMinus,
-  Link
+  Trash2
 } from "lucide-react";
-import { useDevices, type Device } from "../../hooks/useDevices";
+import { useDevices } from "../../hooks/useDevices";
 import { Progress } from "../ui/progress";
 import {
   Dialog,
@@ -52,8 +49,8 @@ import { useAppData } from "../../contexts/AppDataContext";
 import type { Location } from "../../domain/locations";
 
 // Device types
-type DeviceType = Device['type'];
-type DeviceStatus = Device['status'];
+type DeviceType = "smart_button" | "watch" | "repeater" | "mobile_app";
+type DeviceStatus = "online" | "offline" | "low_battery" | "error";
 
 // Discovered device interface
 interface DiscoveredDevice {
@@ -64,6 +61,28 @@ interface DiscoveredDevice {
   firmwareVersion: string;
   hardwareVersion: string;
   batteryLevel?: number;
+}
+
+interface Device {
+  id: string;
+  deviceId: string;
+  name: string;
+  type: DeviceType;
+  status: DeviceStatus;
+  location?: { id: string; name: string };
+  crewMember?: { id: string; name: string };
+  batteryLevel?: number;
+  signalStrength?: number;
+  lastSeen?: string;
+  firmwareVersion?: string;
+  hardwareVersion?: string;
+  config?: {
+    ledEnabled?: boolean;
+    soundEnabled?: boolean;
+    vibrationEnabled?: boolean;
+    shakeThreshold?: number;
+    buttonActions?: Record<string, string>;
+  };
 }
 
 const deviceTypeInfo: Record<DeviceType, { label: string; icon: any; color: string }> = {
@@ -236,7 +255,7 @@ export function DeviceManagerPage() {
 
   const handleTestDevice = async (device: Device) => {
     const token = localStorage.getItem('token');
-
+    
     toast.promise(
       fetch(`/api/devices/${device.id}/test`, {
         method: 'POST',
@@ -248,58 +267,6 @@ export function DeviceManagerPage() {
         error: `Failed to test ${device.name}`
       }
     );
-  };
-
-  const handleSendNotification = async (device: Device) => {
-    const token = localStorage.getItem('token');
-
-    toast.promise(
-      fetch(`/api/devices/${device.id}/notify`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          title: 'Test Notification',
-          message: 'This is a test notification from Obedio Device Manager',
-          priority: 'normal'
-        })
-      }),
-      {
-        loading: `Sending notification to ${device.name}...`,
-        success: `Notification sent to ${device.name}`,
-        error: `Failed to send notification to ${device.name}`
-      }
-    );
-  };
-
-  const handleUnbindDevice = async (device: Device) => {
-    const token = localStorage.getItem('token');
-
-    try {
-      const response = await fetch(`/api/devices/${device.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          locationId: null,
-          crewMemberId: null
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to unbind device');
-      }
-
-      toast.success(`${device.name} has been unbound`);
-      refetch(); // Refresh devices list
-    } catch (error) {
-      toast.error('Failed to unbind device');
-      console.error('Error unbinding device:', error);
-    }
   };
 
   const handleSaveConfig = async () => {
@@ -424,13 +391,7 @@ export function DeviceManagerPage() {
           </>
         ) : (
           <>
-            <Card
-              className="cursor-pointer hover:bg-muted/50 transition-colors"
-              onClick={() => {
-                setSelectedStatus("all");
-                setSearchQuery("");
-              }}
-            >
+            <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">Total Devices</CardTitle>
               </CardHeader>
@@ -438,10 +399,7 @@ export function DeviceManagerPage() {
                 <div className="text-2xl font-bold">{devices.length}</div>
               </CardContent>
             </Card>
-            <Card
-              className="cursor-pointer hover:bg-muted/50 transition-colors"
-              onClick={() => setSelectedStatus("online")}
-            >
+            <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">Online</CardTitle>
               </CardHeader>
@@ -451,10 +409,7 @@ export function DeviceManagerPage() {
                 </div>
               </CardContent>
             </Card>
-            <Card
-              className="cursor-pointer hover:bg-muted/50 transition-colors"
-              onClick={() => setSelectedStatus("low_battery")}
-            >
+            <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">Low Battery</CardTitle>
               </CardHeader>
@@ -464,10 +419,7 @@ export function DeviceManagerPage() {
                 </div>
               </CardContent>
             </Card>
-            <Card
-              className="cursor-pointer hover:bg-muted/50 transition-colors"
-              onClick={() => setSelectedStatus("offline")}
-            >
+            <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">Offline</CardTitle>
               </CardHeader>
@@ -575,8 +527,6 @@ export function DeviceManagerPage() {
                  onConfigure={() => setConfigDevice(device)}
                  onAssign={() => setAssignDevice(device)}
                  onDelete={() => setDeleteDevice(device)}
-                 onSendNotification={handleSendNotification}
-                 onUnbind={handleUnbindDevice}
                />
               ))}
             </div>
@@ -636,8 +586,6 @@ export function DeviceManagerPage() {
                 onConfigure={() => setConfigDevice(device)}
                 onAssign={() => setAssignDevice(device)}
                 onDelete={() => setDeleteDevice(device)}
-                onSendNotification={handleSendNotification}
-                onUnbind={handleUnbindDevice}
               />
             ))}
             </div>
@@ -654,9 +602,9 @@ export function DeviceManagerPage() {
         <TabsContent value="watches" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Wear OS Smart Watches</CardTitle>
+              <CardTitle>Smart Watch Features</CardTitle>
               <CardDescription>
-                Personal wearable devices for crew members running Obedio Wear OS app
+                Wearable devices for crew members with real-time notifications and status updates
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -664,37 +612,29 @@ export function DeviceManagerPage() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Watch className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">Wear OS compatible devices</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Bell className="h-4 w-4 text-blue-500" />
                     <span className="text-sm">Real-time service request notifications</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-yellow-500" />
-                    <span className="text-sm">Quick accept/decline actions</span>
+                    <Activity className="h-4 w-4 text-blue-500" />
+                    <span className="text-sm">Health monitoring and activity tracking</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Link className="h-4 w-4 text-cyan-500" />
-                    <span className="text-sm">Bluetooth connectivity via mobile app</span>
+                    <Zap className="h-4 w-4 text-yellow-500" />
+                    <span className="text-sm">Quick response buttons</span>
                   </div>
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4 text-purple-500" />
-                    <span className="text-sm">One watch per crew member</span>
+                    <span className="text-sm">Personal device assignment</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Battery className="h-4 w-4 text-orange-500" />
-                    <span className="text-sm">Battery monitoring and alerts</span>
+                    <span className="text-sm">Multi-day battery life</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-red-500" />
-                    <span className="text-sm">Connection status tracking</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Signal className="h-4 w-4 text-indigo-500" />
-                    <span className="text-sm">Signal strength monitoring</span>
+                    <Wifi className="h-4 w-4 text-cyan-500" />
+                    <span className="text-sm">Bluetooth & LoRa connectivity</span>
                   </div>
                 </div>
               </div>
@@ -711,8 +651,6 @@ export function DeviceManagerPage() {
                   onConfigure={() => setConfigDevice(device)}
                   onAssign={() => setAssignDevice(device)}
                   onDelete={() => setDeleteDevice(device)}
-                  onSendNotification={handleSendNotification}
-                  onUnbind={handleUnbindDevice}
                 />
               ))}
             </div>
@@ -778,8 +716,6 @@ export function DeviceManagerPage() {
                   onConfigure={() => setConfigDevice(device)}
                   onAssign={() => setAssignDevice(device)}
                   onDelete={() => setDeleteDevice(device)}
-                  onSendNotification={handleSendNotification}
-                  onUnbind={handleUnbindDevice}
                 />
               ))}
             </div>
@@ -1209,24 +1145,19 @@ function DeviceCard({
   onTest,
   onConfigure,
   onAssign,
-  onDelete,
-  onSendNotification,
-  onUnbind
+  onDelete
 }: {
   device: Device;
   onTest: (device: Device) => void;
   onConfigure: (device: Device) => void;
   onAssign: (device: Device) => void;
   onDelete?: (device: Device) => void;
-  onSendNotification?: (device: Device) => void;
-  onUnbind?: (device: Device) => void;
 }) {
   const typeInfo = deviceTypeInfo[device.type];
   const Icon = typeInfo.icon;
-  const isWatch = device.type === 'watch';
-
+  
   return (
-    <Card className={isWatch && device.crewMember ? 'border-green-500/30' : ''}>
+    <Card>
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
@@ -1243,39 +1174,15 @@ function DeviceCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Assignment Info - Prominent for watches */}
-        {isWatch && device.crewMember && (
-          <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <User className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Assigned Crew Member</span>
-            </div>
-            <p className="text-base font-semibold text-primary">{device.crewMember.name}</p>
-            <p className="text-xs text-muted-foreground">{device.crewMember.position || 'Crew'}</p>
-          </div>
-        )}
-
-        {/* Location/Assignment - Regular display for non-watches */}
-        {!isWatch && (
-          <div className="text-sm">
-            {device.location && (
-              <p>Location: <span className="font-medium">{device.location.name}</span></p>
-            )}
-            {device.crewMember && (
-              <p>Assigned to: <span className="font-medium">{device.crewMember.name}</span></p>
-            )}
-          </div>
-        )}
-
-        {/* Not assigned message for watches */}
-        {isWatch && !device.crewMember && (
-          <div className="bg-muted/50 border border-border rounded-lg p-3">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <UserMinus className="h-4 w-4" />
-              <span className="text-sm">Not assigned to crew member</span>
-            </div>
-          </div>
-        )}
+        {/* Location/Assignment */}
+        <div className="text-sm">
+          {device.location && (
+            <p>Location: <span className="font-medium">{device.location.name}</span></p>
+          )}
+          {device.crewMember && (
+            <p>Assigned to: <span className="font-medium">{device.crewMember.name}</span></p>
+          )}
+        </div>
 
         {/* Battery & Signal */}
         <div className="space-y-2">
@@ -1319,100 +1226,44 @@ function DeviceCard({
           </p>
         )}
 
-        {/* Actions - Watch specific */}
-        {isWatch ? (
-          <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              {onSendNotification && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onSendNotification(device)}
-                  title="Send Test Notification"
-                  className="w-full"
-                >
-                  <Bell className="h-4 w-4 mr-1" />
-                  Notify
-                </Button>
-              )}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onAssign(device)}
-                title={device.crewMember ? "Reassign Watch" : "Assign Watch"}
-                className="w-full"
-              >
-                <User className="h-4 w-4 mr-1" />
-                {device.crewMember ? 'Reassign' : 'Assign'}
-              </Button>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {device.crewMember && onUnbind && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onUnbind(device)}
-                  title="Unbind Watch"
-                  className="w-full text-warning hover:bg-warning/10"
-                >
-                  <UserMinus className="h-4 w-4 mr-1" />
-                  Unbind
-                </Button>
-              )}
-              {onDelete && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onDelete(device)}
-                  title="Remove Watch"
-                  className={`w-full text-destructive hover:bg-destructive/10 ${device.crewMember ? '' : 'col-span-2'}`}
-                >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Remove
-                </Button>
-              )}
-            </div>
-          </div>
-        ) : (
-          /* Actions - Regular devices */
-          <div className="grid grid-cols-4 gap-2">
+        {/* Actions */}
+        <div className="grid grid-cols-4 gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onTest(device)}
+            title="Test Device"
+          >
+            <Zap className="h-4 w-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onAssign(device)}
+            title="Assign Device"
+          >
+            <User className="h-4 w-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onConfigure(device)}
+            title="Configure Device"
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+          {onDelete && (
             <Button
               size="sm"
               variant="outline"
-              onClick={() => onTest(device)}
-              title="Test Device"
+              onClick={() => onDelete(device)}
+              title="Delete Device"
+              className="text-destructive hover:bg-destructive/10"
             >
-              <Zap className="h-4 w-4" />
+              <Trash2 className="h-4 w-4" />
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onAssign(device)}
-              title="Assign Device"
-            >
-              <User className="h-4 w-4" />
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onConfigure(device)}
-              title="Configure Device"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-            {onDelete && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onDelete(device)}
-                title="Delete Device"
-                className="text-destructive hover:bg-destructive/10"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </CardContent>
     </Card>
   );
