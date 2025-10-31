@@ -6,6 +6,7 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { CameraDialog } from "../camera-dialog";
 import { useAppData } from "../../contexts/AppDataContext";
+import { useCreateCrewMember, useUpdateCrewMember, useDeleteCrewMember } from "../../hooks/useCrewMembers";
 import { DutyTimerCard } from "../duty-timer-card";
 import {
   Table,
@@ -78,9 +79,9 @@ interface CrewListPageProps {
 }
 
 export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewListPageProps) {
-  const { 
-    crewMembers: contextCrewMembers, 
-    getCurrentDutyStatus, 
+  const {
+    crewMembers: contextCrewMembers,
+    getCurrentDutyStatus,
     setCrewMembers: setContextCrewMembers,
     assignments: contextAssignments,
     setAssignments: setContextAssignments,
@@ -88,6 +89,12 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
     notificationSettings,
     updateNotificationSettings
   } = useAppData();
+
+  // React Query mutation hooks for crew operations
+  const createCrewMutation = useCreateCrewMember();
+  const updateCrewMutation = useUpdateCrewMember();
+  const deleteCrewMutation = useDeleteCrewMember();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState<string>("All");
   const [sortConfig, setSortConfig] = useState<{ key: keyof CrewMember; direction: "asc" | "desc" } | null>(null);
@@ -201,130 +208,96 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
     });
   };
 
-  const handleAddCrew = async () => {
-    if (!formData.name || !formData.position || !formData.email || !formData.role) {
-      toast.error("Please fill in all required fields (Name, Position, Email, Role)");
+  const handleAddCrew = () => {
+    if (!formData.name || !formData.position || !formData.role) {
+      toast.error("Please fill in all required fields (Name, Position, Role)");
       return;
     }
 
-    try {
-      // Call backend API to create crew member + user account
-      const response = await fetch('http://localhost:3001/api/crew', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          position: formData.position,
-          department: formData.department,
-          role: formData.role,
-          status: formData.status,
-          contact: formData.phone || formData.contact || null,
-          email: formData.email,
-          joinDate: new Date().toISOString(),
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create crew member');
-      }
-
-      const data = await response.json();
-
-      if (data.success && data.data) {
-        // Update local state
-        const newCrew: CrewMember = {
-          id: data.data.id,
-          name: data.data.name,
-          nickname: formData.nickname || undefined,
-          position: data.data.position,
-          department: data.data.department,
-          color: formData.color,
-          email: data.data.email || undefined,
-          phone: formData.phone || formData.contact || undefined,
-          onBoardContact: formData.onBoardContact || formData.contact || undefined,
-          status: data.data.status,
-          avatar: formData.avatar || undefined,
-          languages: formData.languages.length > 0 ? formData.languages : undefined,
-          skills: formData.skills.length > 0 ? formData.skills : undefined,
-          notes: formData.notes || undefined,
-          leaveStart: formData.leaveStart || undefined,
-          leaveEnd: formData.leaveEnd || undefined
-        };
-
-        setContextCrewMembers([...contextCrewMembers, newCrew]);
-        
+    // Use React Query mutation hook (auto-handles API call, errors, cache invalidation)
+    createCrewMutation.mutate({
+      name: formData.name,
+      nickname: formData.nickname || null,
+      position: formData.position,
+      department: formData.department,
+      role: formData.role,
+      status: formData.status,
+      contact: formData.phone || formData.contact || null,
+      email: formData.email || null,
+      joinDate: new Date().toISOString(),
+      leaveStart: formData.leaveStart || null,
+      leaveEnd: formData.leaveEnd || null,
+      languages: formData.languages.length > 0 ? formData.languages : [],
+      skills: formData.skills.length > 0 ? formData.skills : [],
+    }, {
+      onSuccess: (data) => {
         // Show credentials dialog if credentials were generated
-        if (data.data.credentials) {
+        // Note: fetchApi extracts .data, so response is already the crew member object
+        if (data.credentials) {
           setNewCredentials({
-            username: data.data.credentials.username,
-            password: data.data.credentials.password,
-            crewMemberName: data.data.name
+            username: data.credentials.username,
+            password: data.credentials.password,
+            crewMemberName: data.name
           });
           setShowCredentialsDialog(true);
         }
-        
+
         setIsAddDialogOpen(false);
         setNewlyAddedCrewName(formData.name);
         resetForm();
-        toast.success(`${formData.name} has been added to the crew`);
+        // Success toast is handled by the mutation hook
       }
-    } catch (error: any) {
-      console.error('Error creating crew member:', error);
-      toast.error(error.message || 'Failed to create crew member');
-    }
+    });
   };
 
   const handleEditCrew = () => {
     if (!selectedCrew) return;
 
-    // Check if status changed to "on-leave"
+    // Check if status changed to "on-leave" (for side-effect logic)
     const wasOnLeave = selectedCrew.status === 'on-leave';
     const isNowOnLeave = formData.status === 'on-leave';
-    
-    // If status changed TO "on-leave", remove all duty assignments
-    if (!wasOnLeave && isNowOnLeave) {
-      // Remove all assignments for this crew member
-      const updatedAssignments = contextAssignments.filter(
-        assignment => assignment.crewId !== selectedCrew.id
-      );
-      setContextAssignments(updatedAssignments);
-      
-      toast.info(`${formData.name} removed from all duty assignments`);
-    }
 
-    // Update context crew members
-    const updatedContextCrew = contextCrewMembers.map(c =>
-      c.id === selectedCrew.id ? { 
-        ...c, 
+    // Use React Query mutation hook (auto-handles API call, errors, cache invalidation)
+    updateCrewMutation.mutate({
+      id: selectedCrew.id,
+      data: {
         name: formData.name,
-        nickname: formData.nickname || undefined,
+        nickname: formData.nickname || null,
         position: formData.position,
         department: formData.department,
-        email: formData.email || undefined,
-        phone: formData.phone || formData.contact || undefined,
-        onBoardContact: formData.onBoardContact || formData.contact || undefined,
         status: formData.status,
-        avatar: formData.avatar || undefined,
-        languages: formData.languages.length > 0 ? formData.languages : undefined,
-        skills: formData.skills.length > 0 ? formData.skills : undefined,
-        notes: formData.notes || undefined,
-        leaveStart: formData.leaveStart || undefined,
-        leaveEnd: formData.leaveEnd || undefined
-      } : c
-    );
-    setContextCrewMembers(updatedContextCrew);
+        contact: formData.phone || formData.contact || null,
+        email: formData.email,
+        leaveStart: formData.leaveStart || null,
+        leaveEnd: formData.leaveEnd || null,
+        languages: formData.languages.length > 0 ? formData.languages : [],
+        skills: formData.skills.length > 0 ? formData.skills : [],
+      }
+    }, {
+      onSuccess: () => {
+        // If status changed TO "on-leave", remove all duty assignments
+        if (!wasOnLeave && isNowOnLeave) {
+          const updatedAssignments = contextAssignments.filter(
+            assignment => assignment.crewId !== selectedCrew.id
+          );
+          setContextAssignments(updatedAssignments);
+          toast.info(`${formData.name} removed from all duty assignments`);
+        }
 
-    setIsCrewSheetOpen(false);
-    toast.success(`${formData.name}'s details have been updated`);
+        setIsCrewSheetOpen(false);
+        // Success toast is handled by the mutation hook
+      }
+    });
   };
 
   const handleDeleteCrew = (crew: CrewMember) => {
-    setContextCrewMembers(contextCrewMembers.filter(c => c.id !== crew.id));
-    setIsDetailsDialogOpen(false);
-    toast.success(`${crew.name} has been removed from the crew`);
+    // Use React Query mutation hook (auto-handles API call, errors, cache invalidation)
+    deleteCrewMutation.mutate(crew.id, {
+      onSuccess: () => {
+        setIsDetailsDialogOpen(false);
+        // Success toast is handled by the mutation hook
+      }
+    });
   };
 
   // Handler for confirming removal of crew from duty
@@ -512,7 +485,7 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
   const handleFileUpload = () => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*';
+    input.accept = '.jpg,.jpeg,.png,.gif,.webp,.bmp';
     // On mobile, this will allow choosing from gallery
     input.onchange = (e: Event) => {
       const file = (e.target as HTMLInputElement)?.files?.[0];
@@ -859,24 +832,7 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
                             </TooltipContent>
                           </Tooltip>
 
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openEdit(crew);
-                                }}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Edit</p>
-                            </TooltipContent>
-                          </Tooltip>
+                          {/* Edit button removed - click on crew name opens Details Dialog with edit functionality */}
 
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -1053,22 +1009,7 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
                 </p>
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="status">Status</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(value: "on-duty" | "off-duty" | "on-leave") => setFormData({ ...formData, status: value })}
-                >
-                  <SelectTrigger id="status">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="on-duty">On Duty</SelectItem>
-                    <SelectItem value="off-duty">Off Duty</SelectItem>
-                    <SelectItem value="on-leave">On Leave</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Status dropdown removed - status is controlled via Toggle button in crew list */}
 
               <div className="grid gap-2">
                 <Label htmlFor="phone">Phone</Label>
@@ -1081,7 +1022,7 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
               </div>
 
               <div className="col-span-2 grid gap-2">
-                <Label htmlFor="email">Email *</Label>
+                <Label htmlFor="email">Email (Optional)</Label>
                 <Input
                   id="email"
                   type="email"
@@ -1357,22 +1298,7 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
                     </Select>
                   </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="edit-status">Status</Label>
-                    <Select
-                      value={formData.status}
-                      onValueChange={(value: "on-duty" | "off-duty" | "on-leave") => setFormData({ ...formData, status: value })}
-                    >
-                      <SelectTrigger id="edit-status">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="on-duty">On Duty</SelectItem>
-                        <SelectItem value="off-duty">Off Duty</SelectItem>
-                        <SelectItem value="on-leave">On Leave</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {/* Status dropdown removed - status is controlled via Toggle button in crew list */}
 
                   <div className="grid gap-2">
                     <Label htmlFor="edit-phone">Phone</Label>
@@ -1385,7 +1311,7 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="edit-email">Email *</Label>
+                    <Label htmlFor="edit-email">Email (Optional)</Label>
                     <Input
                       id="edit-email"
                       type="email"

@@ -19,19 +19,21 @@ router.use(authMiddleware);
  * Get all shifts, ordered by order field
  */
 router.get('/', asyncHandler(async (_, res) => {
-  const shifts = await prisma.shift.findMany({
-    orderBy: { order: 'asc' },
-    include: {
-      _count: {
-        select: { assignments: true }
-      }
-    }
-  });
+  // Using raw SQL to include primaryCount and backupCount fields
+  const shifts = await prisma.$queryRaw`
+    SELECT
+      s.*,
+      COUNT(a.id)::int as "assignmentCount"
+    FROM "Shift" s
+    LEFT JOIN "Assignment" a ON a."shiftId" = s.id
+    GROUP BY s.id
+    ORDER BY s."order" ASC
+  `;
 
   res.json({
     success: true,
     data: shifts,
-    count: shifts.length
+    count: (shifts as any[]).length
   });
 }));
 
@@ -106,14 +108,28 @@ router.post('/', validate(CreateShiftSchema), asyncHandler(async (req, res) => {
  * Update an existing shift
  */
 router.put('/:id', validate(UpdateShiftSchema), asyncHandler(async (req, res) => {
-  const shift = await prisma.shift.update({
-    where: { id: req.params.id },
-    data: req.body
-  });
+  const { id } = req.params;
+  const data = req.body;
+
+  // Build dynamic UPDATE query
+  const fields = Object.keys(data);
+  const values = Object.values(data);
+
+  if (fields.length === 0) {
+    return res.status(400).json({ success: false, error: 'No fields to update' });
+  }
+
+  const setClause = fields.map((f, i) => `"${f}" = $${i + 2}`).join(', ');
+
+  const shift = await prisma.$queryRawUnsafe(
+    `UPDATE "Shift" SET ${setClause}, "updatedAt" = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *`,
+    id,
+    ...values
+  );
 
   res.json({
     success: true,
-    data: shift,
+    data: (shift as any[])[0],
     message: 'Shift updated successfully'
   });
 }));

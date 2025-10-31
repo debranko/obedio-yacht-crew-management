@@ -23,12 +23,17 @@ r.get('/', asyncHandler(async (_, res) => {
 r.post('/', validate(CreateCrewMemberSchema), asyncHandler(async (req, res) => {
   const {
     name,
+    nickname,
     position,
     department,
     status,
     contact,
     email,
     joinDate,
+    leaveStart,
+    leaveEnd,
+    languages,
+    skills,
     role // Role from frontend (e.g., "chief-stewardess", "stewardess", "crew", "eto")
   } = req.body;
 
@@ -37,54 +42,79 @@ r.post('/', validate(CreateCrewMemberSchema), asyncHandler(async (req, res) => {
   const firstName = nameParts[0];
   const lastName = nameParts.slice(1).join(' ') || nameParts[0]; // If no last name, use first name
 
-  // Generate unique username
-  const username = await generateUniqueUsername(firstName, lastName, prisma);
+  let user = null;
+  let username = null;
+  let temporaryPassword = null;
 
-  // Generate temporary password
-  const temporaryPassword = generatePassword();
-  const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
+  // Only create User account if email is provided
+  if (email) {
+    // Generate unique username using nickname if provided, otherwise use firstName
+    const usernameBase = nickname || firstName;
+    username = await generateUniqueUsername(usernameBase, lastName, prisma);
 
-  // Create User account first
-  const user = await prisma.user.create({
-    data: {
+    // Generate temporary password
+    temporaryPassword = generatePassword();
+    const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
+
+    // Create User account
+    user = await prisma.user.create({
+      data: {
+        username,
+        email: email,
+        password: hashedPassword,
+        role: role!, // Use role from request (chief-stewardess, stewardess, crew, eto)
+        firstName,
+        lastName,
+      }
+    });
+  }
+
+  // Create CrewMember (with or without User account link) using raw SQL
+  const crewMemberResult = await prisma.$queryRaw`
+    INSERT INTO "CrewMember" (
+      id, name, nickname, position, department, status, contact, email,
+      "joinDate", "leaveStart", "leaveEnd", languages, skills, role, "userId",
+      "createdAt", "updatedAt"
+    ) VALUES (
+      gen_random_uuid()::text,
+      ${name},
+      ${nickname || null},
+      ${position},
+      ${department},
+      ${status ?? 'active'},
+      ${contact ?? null},
+      ${email || null},
+      ${joinDate ? new Date(joinDate) : null},
+      ${leaveStart ? new Date(leaveStart) : null},
+      ${leaveEnd ? new Date(leaveEnd) : null},
+      ${languages || []}::text[],
+      ${skills || []}::text[],
+      ${role},
+      ${user?.id || null},
+      CURRENT_TIMESTAMP,
+      CURRENT_TIMESTAMP
+    )
+    RETURNING *
+  `;
+
+  const crewMember: any = (crewMemberResult as any[])[0];
+
+  // Return crew member data WITH credentials (only if user account was created)
+  const responseData: any = {
+    ...crewMember,
+  };
+
+  if (user && username && temporaryPassword) {
+    responseData.credentials = {
       username,
-      email: email!,
-      password: hashedPassword,
-      role: role!, // Use role from request (chief-stewardess, stewardess, crew, eto)
-      firstName,
-      lastName,
-    }
-  });
+      password: temporaryPassword, // Send plain password (only shown once!)
+      message: 'Save these credentials! Password will not be shown again.'
+    };
+  }
 
-  // Create CrewMember linked to User
-  const crewMember = await prisma.crewMember.create({
-    data: {
-      name,
-      position,
-      department,
-      status: status ?? 'active',
-      contact: contact ?? null,
-      email: email!,
-      joinDate: joinDate ? new Date(joinDate) : null,
-      role, // Store role in crew member too for quick access
-      userId: user.id, // Link to user account
-    },
-    include: {
-      user: true, // Include user in response
-    }
-  });
-
-  // Return crew member data WITH credentials
   res.json({
     success: true,
-    data: {
-      ...crewMember,
-      credentials: {
-        username,
-        password: temporaryPassword, // Send plain password (only shown once!)
-        message: 'Save these credentials! Password will not be shown again.'
-      }
-    }
+    data: responseData
   });
 }));
 

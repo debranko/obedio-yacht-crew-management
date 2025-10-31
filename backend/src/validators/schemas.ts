@@ -53,12 +53,17 @@ export const UpdateGuestSchema = CreateGuestSchema.partial();
 
 export const CreateCrewMemberSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
+  nickname: z.string().max(100).optional().nullable(),
   position: z.string().min(1, 'Position is required').max(100, 'Position too long'),
   department: z.string().min(1, 'Department is required').max(100, 'Department too long'),
   status: z.enum(['active', 'on-duty', 'off-duty', 'on-leave']).default('active'),
   contact: z.string().max(50).optional().nullable(),
   email: z.string().email('Invalid email').max(100).optional().nullable(),
   joinDate: z.string().datetime().optional().nullable(),
+  leaveStart: z.string().datetime().optional().nullable(),
+  leaveEnd: z.string().datetime().optional().nullable(),
+  languages: z.array(z.string()).optional().default([]),
+  skills: z.array(z.string()).optional().default([]),
   role: z.string().max(50).optional().nullable(),
   userId: z.string().optional().nullable(),
 });
@@ -115,6 +120,8 @@ export const CreateShiftSchema = z.object({
   description: z.string().max(500).optional().nullable(),
   isActive: z.boolean().optional().default(true),
   order: z.number().int().min(0).optional().default(0),
+  primaryCount: z.number().int().min(0).optional().default(2),
+  backupCount: z.number().int().min(0).optional().default(1),
 });
 
 export const UpdateShiftSchema = CreateShiftSchema.partial();

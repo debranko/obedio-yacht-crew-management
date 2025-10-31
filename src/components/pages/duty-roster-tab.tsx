@@ -6,6 +6,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { useAppData } from '../../contexts/AppDataContext';
+import { useUpdateShift, useCreateShift, useDeleteShift } from '../../hooks/useShifts';
 import {
   Select,
   SelectContent,
@@ -68,6 +69,11 @@ export function DutyRosterTab() {
     detectRosterChanges,
     markChangesAsNotified,
   } = useAppData();
+
+  // Mutation hooks for shift management
+  const updateShiftMutation = useUpdateShift();
+  const createShiftMutation = useCreateShift();
+  const deleteShiftMutation = useDeleteShift();
 
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -237,18 +243,42 @@ export function DutyRosterTab() {
 
   // Handle autofill
   const handleAutofill = () => {
-    const newAssignments = autoFillAssignments(dates, shifts, contextCrewMembers, true);
-    
+    // Filter dates to only include TODAY and FUTURE dates (exclude past)
+    const futureDates = dates.filter(date => date >= today);
+
+    if (futureDates.length === 0) {
+      toast.error('No future dates available for auto-fill');
+      return;
+    }
+
+    // Filter out dates that already have complete assignments for all shifts
+    const datesToFill = futureDates.filter(date => {
+      // Check if this date already has assignments for all shifts
+      const dateAssignments = assignments.filter(a => a.date === date);
+      const dateShiftIds = new Set(dateAssignments.map(a => a.shiftId));
+
+      // If not all shifts are assigned for this date, include it
+      return dateShiftIds.size < shifts.length;
+    });
+
+    if (datesToFill.length === 0) {
+      toast.info('All future dates are already assigned');
+      return;
+    }
+
+    const newAssignments = autoFillAssignments(datesToFill, shifts, contextCrewMembers, true);
+
     if (newAssignments.length === 0) {
       toast.error('No crew members available for assignment');
       return;
     }
-    
+
     // Save current state to history
     saveToHistory(assignments);
-    
-    setAssignments(newAssignments);
-    toast.success(`Roster auto-filled successfully`);
+
+    // Keep existing assignments and append new ones (don't replace!)
+    setAssignments([...assignments, ...newAssignments]);
+    toast.success(`Auto-filled ${datesToFill.length} days with ${newAssignments.length} assignments`);
   };
 
   // Handle continue pattern
@@ -281,6 +311,56 @@ export function DutyRosterTab() {
 
     setAssignments([...assignments, ...allNewAssignments]);
     toast.success(`Pattern continued - ${allNewAssignments.length} assignments added`);
+  };
+
+  // Handle save shifts to database
+  const handleSaveShifts = async (newShifts: ShiftConfig[]) => {
+    try {
+      // Compare old shifts with new shifts to determine what changed
+      const oldShiftsMap = new Map(shifts.map(s => [s.id, s]));
+      const newShiftsMap = new Map(newShifts.map(s => [s.id, s]));
+
+      // Find shifts to update (exist in both, but values changed)
+      const shiftsToUpdate = newShifts.filter(newShift => {
+        const oldShift = oldShiftsMap.get(newShift.id);
+        if (!oldShift) return false;
+        // Check if any values changed
+        return JSON.stringify(oldShift) !== JSON.stringify(newShift);
+      });
+
+      // Find shifts to create (exist in new but not in old)
+      const shiftsToCreate = newShifts.filter(newShift => !oldShiftsMap.has(newShift.id));
+
+      // Find shifts to delete (exist in old but not in new)
+      const shiftsToDelete = shifts.filter(oldShift => !newShiftsMap.has(oldShift.id));
+
+      // Execute all mutations
+      const promises = [];
+
+      for (const shift of shiftsToUpdate) {
+        promises.push(updateShiftMutation.mutateAsync(shift));
+      }
+
+      for (const shift of shiftsToCreate) {
+        promises.push(createShiftMutation.mutateAsync(shift));
+      }
+
+      for (const shift of shiftsToDelete) {
+        promises.push(deleteShiftMutation.mutateAsync(shift.id));
+      }
+
+      // Wait for all mutations to complete
+      await Promise.all(promises);
+
+      // Update local state
+      setShifts(newShifts);
+      setContextShifts(newShifts);
+
+      toast.success('Shift settings saved successfully');
+    } catch (error) {
+      console.error('Failed to save shift settings:', error);
+      toast.error('Failed to save shift settings');
+    }
   };
 
   // Handle undo
@@ -929,10 +1009,7 @@ export function DutyRosterTab() {
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
         shifts={shifts}
-        onSave={(newShifts) => {
-          setShifts(newShifts);
-          setContextShifts(newShifts);
-        }}
+        onSave={handleSaveShifts}
       />
 
       {/* Notify Crew Dialog */}

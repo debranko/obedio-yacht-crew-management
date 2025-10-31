@@ -47,12 +47,17 @@ model UserPreferences {
 model CrewMember {
   id         String   @id @default(cuid())
   name       String
+  nickname   String?
   position   String
   department String
   status     String   @default("active") // "on-duty","off-duty","on-leave"
   contact    String?
   email      String?
   joinDate   DateTime?
+  leaveStart DateTime?
+  leaveEnd   DateTime?
+  languages  String[]  @default([])
+  skills     String[]  @default([])
   role       String?
   userId     String?  @unique
   createdAt  DateTime @default(now())
@@ -281,14 +286,16 @@ model DeviceAssignment {
 
 // Duty Roster Models - Re-added for database persistence (Phase 4)
 model Shift {
-  id          String   @id @default(cuid())
-  name        String   // "Morning", "Afternoon", "Night"
-  startTime   String   // "08:00"
-  endTime     String   // "20:00"
-  color       String   @default("#3B82F6") // Color for UI display
-  description String?
-  isActive    Boolean  @default(true)
-  order       Int      @default(0) // For sorting
+  id           String   @id @default(cuid())
+  name         String   // "Morning", "Afternoon", "Night"
+  startTime    String   // "08:00"
+  endTime      String   // "20:00"
+  color        String   @default("#3B82F6") // Color for UI display
+  description  String?
+  isActive     Boolean  @default(true)
+  order        Int      @default(0) // For sorting
+  primaryCount Int      @default(2) // Number of primary crew needed
+  backupCount  Int      @default(1) // Number of backup crew needed
 
   assignments Assignment[]
 
