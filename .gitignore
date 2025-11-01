@@ -62,3 +62,4 @@ backend/test-postgres-connection.js
 *.tmp
 *.tempnul
 backend/nul src/nul
+nul

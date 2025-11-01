@@ -21,6 +21,7 @@ import { Badge } from "./ui/badge";
 import { Send, Wifi, WifiOff, Battery, BatteryLow } from "lucide-react";
 import { toast } from "sonner";
 import { useAppData } from "../contexts/AppDataContext";
+import { useDevices } from "../hooks/useDevices";
 
 interface SendMessageDialogProps {
   open: boolean;
@@ -53,13 +54,14 @@ export function SendMessageDialog({
   recipientName,
   recipientId,
 }: SendMessageDialogProps) {
-  const { sendMessage, getCrewDevice } = useAppData();
+  const { sendMessage } = useAppData();
+  const { data: allDevices = [] } = useDevices();
   const [message, setMessage] = useState("");
   const [location, setLocation] = useState<string>("none");
   const [priority, setPriority] = useState<"normal" | "urgent" | "emergency">("normal");
 
-  // Get device info for recipient
-  const deviceAssignment = getCrewDevice(recipientId);
+  // Get device info for recipient from database
+  const deviceAssignment = allDevices.find(device => device.crewMemberId === recipientId);
 
   const handleSend = () => {
     if (!message.trim()) {
@@ -80,8 +82,8 @@ export function SendMessageDialog({
     // Show success toast
     const priorityIcon = priority === "emergency" ? "🚨" : priority === "urgent" ? "⚠️" : "✓";
     toast.success(`${priorityIcon} Message sent to ${recipientName}`, {
-      description: deviceAssignment 
-        ? `Delivered to ${deviceAssignment.deviceName}`
+      description: deviceAssignment
+        ? `Delivered to ${deviceAssignment.name}`
         : "Crew member will receive notification",
     });
 
@@ -103,19 +105,20 @@ export function SendMessageDialog({
     }
 
     const statusConfig = {
-      connected: { icon: Wifi, text: "Connected", color: "text-success" },
-      disconnected: { icon: WifiOff, text: "Disconnected", color: "text-muted-foreground" },
-      "low-battery": { icon: BatteryLow, text: "Low Battery", color: "text-warning" },
+      online: { icon: Wifi, text: "Connected", color: "text-success" },
+      offline: { icon: WifiOff, text: "Disconnected", color: "text-muted-foreground" },
+      low_battery: { icon: BatteryLow, text: "Low Battery", color: "text-warning" },
+      error: { icon: WifiOff, text: "Error", color: "text-destructive" },
     };
 
-    const config = statusConfig[deviceAssignment.status];
+    const config = statusConfig[deviceAssignment.status] || statusConfig.offline;
     const StatusIcon = config.icon;
 
     return (
       <div className={`flex items-center gap-2 ${config.color}`}>
         <StatusIcon className="h-4 w-4" />
         <span className="text-sm">
-          {config.text} - {deviceAssignment.deviceName}
+          {config.text} - {deviceAssignment.name}
         </span>
       </div>
     );

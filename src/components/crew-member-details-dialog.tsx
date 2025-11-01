@@ -71,7 +71,6 @@ export function CrewMemberDetailsDialog({
   onUpdate,
   onAssignToShift,
 }: CrewMemberDetailsDialogProps) {
-  const { assignDeviceToCrew, removeDeviceFromCrew } = useAppData();
   const [isEditing, setIsEditing] = useState(false);
   const [editedCrew, setEditedCrew] = useState<CrewMember>(crewMember);
   const [showLeaveCalendar, setShowLeaveCalendar] = useState(false);
@@ -131,24 +130,6 @@ export function CrewMemberDetailsDialog({
         }
       });
 
-      // Also update local context for backward compatibility
-      const mapDeviceType = (type: string): 'watch' | 'tablet' | 'phone' | 'other' => {
-        if (type === 'watch') return 'watch';
-        if (type === 'mobile_app') return 'phone';
-        if (type === 'smart_button') return 'other';
-        if (type === 'repeater') return 'other';
-        return 'other';
-      };
-
-      assignDeviceToCrew({
-        crewMemberId: crewMember.id,
-        crewMemberName: crewMember.name,
-        deviceId: device.deviceId,
-        deviceName: device.name,
-        deviceType: mapDeviceType(device.type),
-        status: 'connected',
-      });
-
       toast.success(`${device.name} assigned to ${crewMember.name.split(' ')[0]}`);
       setSelectedDeviceId('');
 
@@ -179,9 +160,6 @@ export function CrewMemberDetailsDialog({
           crewMemberId: null
         }
       });
-
-      // Also update local context for backward compatibility
-      removeDeviceFromCrew(crewMember.id);
 
       toast.success(`${currentDevice.deviceName} removed from ${crewMember.name.split(' ')[0]}`);
 
