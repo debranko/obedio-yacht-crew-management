@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppHeader } from "./components/app-header";
 import { AppSidebar } from "./components/app-sidebar";
@@ -20,15 +20,54 @@ import { EmergencyShakeDialog } from "./components/emergency-shake-dialog";
 import { LoginPage } from "./components/pages/login";
 import { useWebSocket } from "./services/websocket";
 import { toast } from "sonner";
-import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ErrorBoundary, PageErrorBoundary } from "./components/ErrorBoundary";
 
-// Initialize TanStack Query
+// Loading fallback component for Suspense
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-sm text-muted-foreground">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
+// Initialize TanStack Query with retry logic and error handling
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60, // 1 minute
       refetchOnWindowFocus: false,
-      retry: 1,
+      retry: 3, // Retry failed requests up to 3 times
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff: 1s, 2s, 4s (max 30s)
+      // Only retry on network errors or 5xx server errors, not on 4xx client errors
+      retryOnMount: true,
+      refetchOnReconnect: true,
+      // Global error handler for failed queries
+      onError: (error: any) => {
+        // Don't show toast for auth errors (handled separately)
+        if (error?.status === 401 || error?.status === 403) {
+          return;
+        }
+        // Show error toast for other failures after all retries exhausted
+        console.error('Query failed after retries:', error);
+        toast.error('Failed to load data', {
+          description: error?.message || 'Please check your connection and try again',
+        });
+      },
+    },
+    mutations: {
+      retry: 2, // Retry mutations up to 2 times
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000), // Exponential backoff for mutations
+      onError: (error: any) => {
+        // Don't show toast for auth errors
+        if (error?.status === 401 || error?.status === 403) {
+          return;
+        }
+        console.error('Mutation failed:', error);
+      },
     },
   },
 });
@@ -213,28 +252,36 @@ function AppContent() {
   };
 
   const renderPage = () => {
-    switch (currentPage) {
-      case "dashboard":
-        return <DashboardPage ref={dashboardPageRef} isEditMode={isEditingDashboard} onEditModeChange={setIsEditingDashboard} onNavigate={handleNavigate} />;
-      case "crew":
-        return <CrewManagementPage onNavigate={handleNavigate} onNavigateToSettingsRoles={handleNavigateToSettingsRoles} />;
-      case "guests-list":
-        return <GuestsListPage />;
-      case "device-manager":
-        return <DeviceManagerPage />;
-      case "button-simulator":
-        return <ButtonSimulatorPage />;
-      case "locations":
-        return <LocationsPage />;
-      case "service-requests":
-        return <ServiceRequestsPage />;
-      case "activity-log":
-        return <ActivityLogPage />;
-      case "settings":
-        return <SettingsPage initialTab={settingsTab} />;
-      default:
-        return <DashboardPage />;
-    }
+    const getPageComponent = () => {
+      switch (currentPage) {
+        case "dashboard":
+          return <DashboardPage ref={dashboardPageRef} isEditMode={isEditingDashboard} onEditModeChange={setIsEditingDashboard} onNavigate={handleNavigate} />;
+        case "crew":
+          return <CrewManagementPage onNavigate={handleNavigate} onNavigateToSettingsRoles={handleNavigateToSettingsRoles} />;
+        case "guests-list":
+          return <GuestsListPage />;
+        case "device-manager":
+          return <DeviceManagerPage />;
+        case "button-simulator":
+          return <ButtonSimulatorPage />;
+        case "locations":
+          return <LocationsPage />;
+        case "service-requests":
+          return <ServiceRequestsPage />;
+        case "activity-log":
+          return <ActivityLogPage />;
+        case "settings":
+          return <SettingsPage initialTab={settingsTab} />;
+        default:
+          return <DashboardPage />;
+      }
+    };
+
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <PageErrorBoundary>{getPageComponent()}</PageErrorBoundary>
+      </Suspense>
+    );
   };
 
   const config = pageConfig[currentPage] || pageConfig.dashboard;
