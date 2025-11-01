@@ -6,8 +6,10 @@
 import { useState } from 'react';
 import { useDevices, useDeviceMutations, Device } from '../../hooks/useDevices';
 import { useLocations } from '../../hooks/useLocations';
+import { useAppData } from '../../contexts/AppDataContext';
 import { SmartButtonConfigDialog } from '../devices/SmartButtonConfigDialog';
 import { WatchConfigDialog } from '../devices/WatchConfigDialog';
+import { AddDeviceDialog } from '../devices/AddDeviceDialog';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -52,7 +54,8 @@ export function DeviceManagerPage() {
   // Fetch data
   const { data: allDevices = [], refetch } = useDevices();
   const { locations } = useLocations();
-  const { updateDevice, deleteDevice, testDevice } = useDeviceMutations();
+  const { crewMembers } = useAppData();
+  const { createDevice, updateDevice, deleteDevice, testDevice } = useDeviceMutations();
 
   // Filter devices by tab
   const filterByType = (type: string) => {
@@ -126,12 +129,28 @@ export function DeviceManagerPage() {
   // Handle delete
   const handleDelete = async (device: Device) => {
     if (!confirm(`Delete ${device.name}?`)) return;
-    
+
     try {
       await deleteDevice(device.id);
       toast.success('Device deleted');
     } catch (error) {
       toast.error('Failed to delete device');
+    }
+  };
+
+  // Handle add new device
+  const handleAdd = async (deviceData: any) => {
+    try {
+      await createDevice({
+        ...deviceData,
+        status: 'offline', // New devices start as offline until they connect
+      });
+      toast.success(`Device ${deviceData.name} added successfully!`);
+      refetch(); // Refresh device list
+    } catch (error) {
+      console.error('Failed to add device:', error);
+      toast.error('Failed to add device');
+      throw error; // Re-throw to let dialog handle it
     }
   };
 
@@ -652,6 +671,16 @@ export function DeviceManagerPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Add Device Dialog */}
+      <AddDeviceDialog
+        open={isAddDialogOpen}
+        onClose={() => setIsAddDialogOpen(false)}
+        onAdd={handleAdd}
+        locations={locations || []}
+        crewMembers={crewMembers}
+        defaultType={activeTab === 'buttons' ? 'smart_button' : activeTab === 'watches' ? 'watch' : 'repeater'}
+      />
     </div>
   );
 }
