@@ -543,6 +543,113 @@ export const assignmentsApi = {
 };
 
 // =====================
+// MESSAGES API
+// =====================
+
+export interface MessageDTO {
+  id: string;
+  senderId: string;
+  receiverId?: string | null; // null for broadcast messages
+  content: string;
+  type: 'text' | 'system' | 'alert' | 'notification';
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  isRead: boolean;
+  readAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Populated sender/receiver info
+  sender?: {
+    id: string;
+    username: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    role?: string | null;
+  };
+  receiver?: {
+    id: string;
+    username: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    role?: string | null;
+  };
+}
+
+export interface MessagesResponse {
+  messages: MessageDTO[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+  };
+}
+
+export const messagesApi = {
+  /**
+   * Get all messages for authenticated user
+   */
+  getAll: (params?: {
+    type?: string;
+    unreadOnly?: boolean;
+    limit?: number;
+    offset?: number;
+  }) => {
+    const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+    return fetchApi<MessagesResponse>(`/messages${query}`);
+  },
+
+  /**
+   * Get conversation with specific user
+   */
+  getConversation: (otherUserId: string, params?: { limit?: number; offset?: number }) => {
+    const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+    return fetchApi<MessageDTO[]>(`/messages/conversation/${otherUserId}${query}`);
+  },
+
+  /**
+   * Send a message
+   */
+  send: (data: {
+    receiverId?: string | null;
+    content: string;
+    type?: 'text' | 'system' | 'alert' | 'notification';
+    priority?: 'low' | 'normal' | 'high' | 'urgent';
+  }) =>
+    fetchApi<MessageDTO>('/messages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Mark message as read
+   */
+  markAsRead: (messageId: string) =>
+    fetchApi<MessageDTO>(`/messages/${messageId}/read`, {
+      method: 'PUT',
+    }),
+
+  /**
+   * Mark all messages as read
+   */
+  markAllAsRead: () =>
+    fetchApi<{ success: boolean; count: number }>('/messages/mark-all-read', {
+      method: 'PUT',
+    }),
+
+  /**
+   * Delete message
+   */
+  delete: (messageId: string) =>
+    fetchApi<{ success: boolean }>(`/messages/${messageId}`, {
+      method: 'DELETE',
+    }),
+
+  /**
+   * Get unread message count
+   */
+  getUnreadCount: () => fetchApi<{ count: number }>('/messages/unread-count'),
+};
+
+// =====================
 // EXPORT ALL
 // =====================
 
@@ -553,6 +660,7 @@ export const api = {
   devices: devicesApi,
   shifts: shiftsApi,
   assignments: assignmentsApi,
+  messages: messagesApi,
 
   // Direct methods for convenience
   get: (endpoint: string) => fetchApi<any>(endpoint),

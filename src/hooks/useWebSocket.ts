@@ -41,6 +41,10 @@ export interface WebSocketEvents {
   'assignment:updated': (data: any) => void;
   'assignment:deleted': (data: any) => void;
 
+  // Message Events
+  'new_message': (data: any) => void;
+  'broadcast_message': (data: any) => void;
+
   // Emergency Events
   'emergency:alert': (data: any) => void;
 }
