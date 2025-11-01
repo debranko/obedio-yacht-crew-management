@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Card } from '../ui/card';
@@ -89,17 +89,26 @@ export function DutyRosterTab() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [assignmentHistory, setAssignmentHistory] = useState<Assignment[][]>([]);
 
-  // Sync with context whenever it changes (e.g., after API refetch following a save)
+  // Sync with context on mount only to initialize working copy
+  // DO NOT sync on every context change - that would overwrite local edits!
   useEffect(() => {
     setAssignments(contextAssignments);
     setShifts(contextShifts);
-  }, [contextAssignments, contextShifts]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track unsaved changes
+  const prevHasUnsavedChanges = useRef(hasUnsavedChanges);
   useEffect(() => {
     const isDifferent = JSON.stringify(assignments) !== JSON.stringify(contextAssignments);
     setHasUnsavedChanges(isDifferent);
-  }, [assignments, contextAssignments]);
+
+    // Sync with context after successful save (when hasUnsavedChanges goes from true to false)
+    if (prevHasUnsavedChanges.current && !isDifferent) {
+      setAssignments(contextAssignments);
+      setShifts(contextShifts);
+    }
+    prevHasUnsavedChanges.current = isDifferent;
+  }, [assignments, contextAssignments, contextShifts]);
 
   const today = getTodayDate();
 
