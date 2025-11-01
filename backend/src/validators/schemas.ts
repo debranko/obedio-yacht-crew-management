@@ -13,7 +13,7 @@ export const CreateGuestSchema = z.object({
   firstName: z.string().min(1, 'First name is required').max(50, 'First name too long'),
   lastName: z.string().min(1, 'Last name is required').max(50, 'Last name too long'),
   preferredName: z.string().max(50).optional().nullable(),
-  photo: z.string().url('Invalid photo URL').optional().nullable(),
+  photo: z.string().optional().nullable(), // Base64 or URL
   type: z.enum(['owner', 'vip', 'guest', 'partner', 'family'], {
     errorMap: () => ({ message: 'Invalid guest type' })
   }).default('guest'),
@@ -24,25 +24,53 @@ export const CreateGuestSchema = z.object({
   languages: z.array(z.string()).optional().default([]),
   passportNumber: z.string().max(50).optional().nullable(),
   locationId: z.string().optional().nullable(),
+  cabin: z.string().max(50).optional().nullable(), // Legacy field
   doNotDisturb: z.boolean().optional().default(false),
 
-  // Dates
+  // Accommodation & Check-in Info
   checkInDate: z.string().datetime().optional().nullable(),
+  checkInTime: z.string().max(5).optional().nullable(), // HH:mm format
   checkOutDate: z.string().datetime().optional().nullable(),
+  checkOutTime: z.string().max(5).optional().nullable(), // HH:mm format
 
-  // Arrays
+  // Special Occasions
+  specialOccasion: z.string().max(100).optional().nullable(),
+  specialOccasionDate: z.string().datetime().optional().nullable(),
+
+  // Dietary & Medical Arrays
   allergies: z.array(z.string()).optional().default([]),
   dietaryRestrictions: z.array(z.string()).optional().default([]),
   medicalConditions: z.array(z.string()).optional().default([]),
+  foodDislikes: z.array(z.string()).optional().default([]),
+  favoriteFoods: z.array(z.string()).optional().default([]),
+  favoriteDrinks: z.array(z.string()).optional().default([]),
 
-  // Text fields
+  // Notes & Preferences (categorized)
   preferences: z.string().max(2000).optional().nullable(),
   notes: z.string().max(2000).optional().nullable(),
+  specialRequests: z.string().max(2000).optional().nullable(),
+  vipNotes: z.string().max(2000).optional().nullable(),
+  crewNotes: z.string().max(2000).optional().nullable(),
 
-  // Emergency contact
+  // Contact Person (Family Office, Manager, Agent)
+  contactPerson: z.object({
+    name: z.string(),
+    phone: z.string(),
+    email: z.string().email().optional().nullable(),
+    role: z.string(), // e.g., "Family Office", "Manager", "Agent"
+  }).optional().nullable(),
+
+  // Emergency Contact
   emergencyContactName: z.string().max(100).optional().nullable(),
   emergencyContactPhone: z.string().max(50).optional().nullable(),
   emergencyContactRelation: z.string().max(50).optional().nullable(),
+
+  // Guest Contact Info
+  email: z.string().email().max(100).optional().nullable(),
+  phone: z.string().max(50).optional().nullable(),
+
+  // Metadata
+  createdBy: z.string().optional().nullable(), // User ID
 });
 
 export const UpdateGuestSchema = CreateGuestSchema.partial();
@@ -60,12 +88,13 @@ export const CreateCrewMemberSchema = z.object({
   contact: z.string().max(50).optional().nullable(),
   email: z.string().email('Invalid email').max(100).optional().nullable(),
   joinDate: z.string().datetime().optional().nullable(),
-  leaveStart: z.string().datetime().optional().nullable(),
-  leaveEnd: z.string().datetime().optional().nullable(),
+  leaveStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional().nullable(),
+  leaveEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional().nullable(),
   languages: z.array(z.string()).optional().default([]),
   skills: z.array(z.string()).optional().default([]),
   role: z.string().max(50).optional().nullable(),
   userId: z.string().optional().nullable(),
+  avatar: z.string().optional().nullable(),
 });
 
 export const UpdateCrewMemberSchema = CreateCrewMemberSchema.partial();

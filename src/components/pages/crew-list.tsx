@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Search, Download, UserPlus, ArrowUpDown, Edit, Trash2, MessageSquare, AlertTriangle, Power, Users, Shield, X, Plus, Camera, Upload, Bell } from "lucide-react";
+import { Search, Download, UserPlus, ArrowUpDown, Edit, Trash2, MessageSquare, AlertTriangle, Power, Users, Shield, X, Plus, Camera, Upload, Bell, Watch, Smartphone, Tablet } from "lucide-react";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { Button } from "../ui/button";
@@ -7,6 +7,7 @@ import { Card } from "../ui/card";
 import { CameraDialog } from "../camera-dialog";
 import { useAppData } from "../../contexts/AppDataContext";
 import { useCreateCrewMember, useUpdateCrewMember, useDeleteCrewMember } from "../../hooks/useCrewMembers";
+import { useDevices } from "../../hooks/useDevices";
 import { DutyTimerCard } from "../duty-timer-card";
 import {
   Table,
@@ -87,13 +88,16 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
     setAssignments: setContextAssignments,
     shifts: contextShifts,
     notificationSettings,
-    updateNotificationSettings
+    updateNotificationSettings,
   } = useAppData();
 
   // React Query mutation hooks for crew operations
   const createCrewMutation = useCreateCrewMember();
   const updateCrewMutation = useUpdateCrewMember();
   const deleteCrewMutation = useDeleteCrewMember();
+
+  // Fetch devices from database to show assigned devices
+  const { data: allDevices = [] } = useDevices();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState<string>("All");
@@ -229,6 +233,7 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
       leaveEnd: formData.leaveEnd || null,
       languages: formData.languages.length > 0 ? formData.languages : [],
       skills: formData.skills.length > 0 ? formData.skills : [],
+      avatar: formData.avatar || null,
     }, {
       onSuccess: (data) => {
         // Show credentials dialog if credentials were generated
@@ -272,6 +277,7 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
         leaveEnd: formData.leaveEnd || null,
         languages: formData.languages.length > 0 ? formData.languages : [],
         skills: formData.skills.length > 0 ? formData.skills : [],
+        avatar: formData.avatar || null,
       }
     }, {
       onSuccess: () => {
@@ -347,17 +353,21 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
       setContextAssignments(updatedAssignments);
     }
     
-    // Update context crew status to off-duty
-    const updatedContextCrew = contextCrewMembers.map(c =>
-      c.id === crew.id ? { ...c, status: 'off-duty' } : c
-    );
-    setContextCrewMembers(updatedContextCrew);
-    
-    // Show success toast
-    toast.success(`${crew.name} removed from duty`, {
-      description: shouldNotify 
-        ? `Notification sent (${isEmergencyOverride ? 'Emergency' : dutyInfo.shift})`
-        : `Removed without notification (${isEmergencyOverride ? 'Emergency' : dutyInfo.shift})`
+    // Update crew status in database via backend API
+    updateCrewMutation.mutate({
+      id: crew.id,
+      data: {
+        status: 'off-duty'
+      }
+    }, {
+      onSuccess: () => {
+        // Show success toast
+        toast.success(`${crew.name} removed from duty`, {
+          description: shouldNotify
+            ? `Notification sent (${isEmergencyOverride ? 'Emergency' : dutyInfo.shift})`
+            : `Removed without notification (${isEmergencyOverride ? 'Emergency' : dutyInfo.shift})`
+        });
+      }
     });
     
     // Reset state
@@ -414,17 +424,21 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
       ? `${activeShift.name} (${activeShift.startTime} - ${activeShift.endTime})`
       : 'Emergency';
     
-    // Update context state to on-duty
-    const updatedContextCrew = contextCrewMembers.map(c =>
-      c.id === crewToActivate.id ? { ...c, status: 'on-duty' } : c
-    );
-    setContextCrewMembers(updatedContextCrew);
-    
-    // Show success toast with notification status
-    toast.success(`${crewToActivate.name} activated for duty`, {
-      description: shouldNotifyActivate 
-        ? `App notification sent (${shiftDisplay})`
-        : `Activated without notification (${shiftDisplay})`
+    // Update crew status in database via backend API
+    updateCrewMutation.mutate({
+      id: crewToActivate.id,
+      data: {
+        status: 'on-duty'
+      }
+    }, {
+      onSuccess: () => {
+        // Show success toast with notification status
+        toast.success(`${crewToActivate.name} activated for duty`, {
+          description: shouldNotifyActivate
+            ? `App notification sent (${shiftDisplay})`
+            : `Activated without notification (${shiftDisplay})`
+        });
+      }
     });
     
     // Reset state
@@ -485,7 +499,8 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
   const handleFileUpload = () => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.jpg,.jpeg,.png,.gif,.webp,.bmp';
+    // Accept common image formats using both MIME types and extensions for better compatibility
+    input.accept = 'image/png,image/jpeg,image/jpg,image/bmp,.png,.jpg,.jpeg,.bmp';
     // On mobile, this will allow choosing from gallery
     input.onchange = (e: Event) => {
       const file = (e.target as HTMLInputElement)?.files?.[0];
@@ -534,12 +549,33 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
   };
 
   const handleUpdateCrewMember = (updatedCrew: CrewMember) => {
-    // Update in context
-    const updatedContextCrew = contextCrewMembers.map(cm => 
-      cm.id === updatedCrew.id ? updatedCrew : cm
-    );
-    setContextCrewMembers(updatedContextCrew);
-    toast.success('Crew member updated successfully');
+    // Use React Query mutation to save to database
+    updateCrewMutation.mutate({
+      id: updatedCrew.id,
+      data: {
+        name: updatedCrew.name,
+        nickname: updatedCrew.nickname || null,
+        position: updatedCrew.position,
+        department: updatedCrew.department,
+        status: updatedCrew.status,
+        contact: updatedCrew.contact || null,
+        email: updatedCrew.email || null,
+        leaveStart: updatedCrew.leaveStart || null,
+        leaveEnd: updatedCrew.leaveEnd || null,
+        languages: updatedCrew.languages || [],
+        skills: updatedCrew.skills || [],
+        avatar: updatedCrew.avatar || null,
+      }
+    }, {
+      onSuccess: () => {
+        // Update local context after successful API call
+        const updatedContextCrew = contextCrewMembers.map(cm =>
+          cm.id === updatedCrew.id ? updatedCrew : cm
+        );
+        setContextCrewMembers(updatedContextCrew);
+        // Success toast is handled by the mutation hook
+      }
+    });
   };
 
   // Get current on-duty crew members from duty roster
@@ -696,13 +732,14 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
                   </div>
                 </TableHead>
                 <TableHead>Shift Schedule</TableHead>
+                <TableHead>Assigned Device</TableHead>
                 <TableHead className="text-center">Quick Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedCrewMembers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center">
+                  <TableCell colSpan={6} className="h-32 text-center">
                     <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
                       <Users className="h-8 w-8" />
                       <p>No crew members found</p>
@@ -805,6 +842,26 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
                       ) : (
                         <span className="text-sm text-muted-foreground">-</span>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        // Find device from database by crewMemberId
+                        const device = allDevices.find(d => d.crewMemberId === crew.id);
+                        if (!device) {
+                          return <span className="text-sm text-muted-foreground">-</span>;
+                        }
+
+                        const DeviceIcon = device.type === 'watch' ? Watch :
+                                          device.type === 'mobile_app' ? Smartphone :
+                                          Tablet;
+
+                        return (
+                          <div className="flex items-center gap-2">
+                            <DeviceIcon className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm">{device.name}</span>
+                          </div>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>
                       <TooltipProvider>

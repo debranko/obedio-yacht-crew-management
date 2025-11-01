@@ -35,16 +35,15 @@ export function getMonthDates(year: number, month: number): string[] {
 
 /**
  * Generate dates for a 7-day week view starting from a given date
+ * Shows the next 7 days from startDate (not Monday-Sunday week)
  */
 export function getWeekDates(startDate: Date = new Date()): string[] {
   const dates: string[] = [];
-  
-  // Start from Monday of the week containing startDate
-  const date = new Date(startDate);
-  const dayOfWeek = date.getDay(); // 0 = Sunday
-  const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Adjust to Monday
-  date.setDate(date.getDate() + diff);
 
+  // Start from the given date (today or specified date)
+  const date = new Date(startDate);
+
+  // Generate next 7 days from startDate
   for (let i = 0; i < 7; i++) {
     const currentDate = new Date(date);
     currentDate.setDate(date.getDate() + i);
@@ -113,10 +112,10 @@ export function detectAndContinuePattern(
   crewMembers: CrewMember[],
   filterByInterior: boolean = true
 ): Assignment[] {
-  // Filter crew members by department AND exclude on-leave crew
+  // Filter crew members by department AND exclude on-leave and off-duty crew
   const filteredCrew = filterByInterior
-    ? crewMembers.filter((c) => c.department === 'Interior' && c.status !== 'on-leave')
-    : crewMembers.filter((c) => c.status !== 'on-leave');
+    ? crewMembers.filter((c) => c.department === 'Interior' && c.status !== 'on-leave' && c.status !== 'off-duty')
+    : crewMembers.filter((c) => c.status !== 'on-leave' && c.status !== 'off-duty');
   // Get all assignments for this shift, sorted by date
   const shiftAssignments = assignments
     .filter((a) => a.shiftId === shiftId)
@@ -180,10 +179,10 @@ export function autoFillAssignments(
   crewMembers: CrewMember[],
   filterByInterior: boolean = true
 ): Assignment[] {
-  // Filter crew members by department AND exclude on-leave crew
+  // Filter crew members by department AND exclude on-leave and off-duty crew
   const filteredCrew = filterByInterior
-    ? crewMembers.filter((c) => c.department === 'Interior' && c.status !== 'on-leave')
-    : crewMembers.filter((c) => c.status !== 'on-leave');
+    ? crewMembers.filter((c) => c.department === 'Interior' && c.status !== 'on-leave' && c.status !== 'off-duty')
+    : crewMembers.filter((c) => c.status !== 'on-leave' && c.status !== 'off-duty');
 
   if (filteredCrew.length === 0) {
     return [];
