@@ -1,71 +1,72 @@
 generator client {
   provider = "prisma-client-js"
 }
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id           String        @id @default(cuid())
-  username     String        @unique
-  email        String        @unique
-  password     String
-  role         String        // "admin","chief-stewardess","stewardess","crew","eto"
-  firstName    String?
-  lastName     String?
-  isActive     Boolean       @default(true)
-  lastLogin    DateTime?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  
-  crewMember   CrewMember?
-  activityLogs ActivityLog[]
-  preferences  UserPreferences?
-  messages     Message[]        @relation("MessageSender")
-  receivedMessages Message[]    @relation("MessageReceiver")
-  notifications NotificationSettings?
+  id               String                @id @default(cuid())
+  username         String                @unique
+  email            String                @unique
+  password         String
+  firstName        String?
+  lastName         String?
+  isActive         Boolean               @default(true)
+  lastLogin        DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  role             String?               @default("crew")
+  activityLogs     ActivityLog[]
+  crewMember       CrewMember?
+  receivedMessages Message[]             @relation("MessageReceiver")
+  messages         Message[]             @relation("MessageSender")
+  notifications    NotificationSettings?
+  preferences      UserPreferences?
 }
 
 model UserPreferences {
-  id                String   @id @default(cuid())
-  userId            String   @unique
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // Dashboard Layout & Widgets
-  dashboardLayout   Json?    // Widget positions and sizes
-  activeWidgets     Json?    // Array of active widget IDs
-  
-  // UI Preferences
-  theme             String   @default("light") // "light", "dark", "auto"
-  language          String   @default("en")
-  
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  dashboardLayout Json?
+  activeWidgets   Json?
+  theme           String   @default("light")
+  language        String   @default("en")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model CrewMember {
-  id         String   @id @default(cuid())
-  name       String
-  nickname   String?
-  position   String
-  department String
-  status     String   @default("active") // "on-duty","off-duty","on-leave"
-  contact    String?
-  email      String?
-  joinDate   DateTime?
-  leaveStart DateTime?
-  leaveEnd   DateTime?
-  languages  String[]  @default([])
-  skills     String[]  @default([])
-  role       String?
-  userId     String?  @unique
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  user              User?               @relation(fields: [userId], references: [id])
-  deviceAssignments DeviceAssignment[]
+  id                String             @id @default(cuid())
+  name              String
+  position          String
+  department        String
+  status            String
+  contact           String?
+  email             String?
+  joinDate          DateTime?
+  role              String?
+  userId            String?            @unique
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  avatar            String?
+  color             String             @default("#C8A96B")
+  languages         String[]           @default([])
+  leaveEnd          String?
+  leaveStart        String?
+  nickname          String?
+  notes             String?
+  onBoardContact    String?
+  phone             String?
+  skills            String[]           @default([])
+  Assignment        Assignment[]
+  user              User?              @relation(fields: [userId], references: [id])
   devices           Device[]
+  deviceAssignments DeviceAssignment[]
+  ServiceRequest    ServiceRequest[]
 
   @@index([userId])
   @@index([department])
@@ -73,61 +74,82 @@ model CrewMember {
 }
 
 model Location {
-  id             String   @id @default(cuid())
-  name           String   @unique
-  type           String
-  floor          String?  // Yacht deck or building floor: Sun Deck, Main Deck, etc.
-  description    String?
-  image          String?  // URL to location image/photo
-  smartButtonId  String?  // ESP32 smart button device ID assigned to this location
-  doNotDisturb   Boolean  @default(false) // Do Not Disturb status
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  
+  id              String           @id @default(cuid())
+  name            String           @unique
+  type            String
+  floor           String?
+  description     String?
+  image           String?
+  smartButtonId   String?          @unique
+  doNotDisturb    Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  activityLogs    ActivityLog[]
+  devices         Device[]
   guests          Guest[]
   serviceRequests ServiceRequest[]
-  devices         Device[]
-  activityLogs    ActivityLog[]
 }
 
 model Guest {
-  id             String   @id @default(cuid())
-  firstName      String
-  lastName       String
-  preferredName  String?
-  photo          String?
-  type           String   @default("guest")
-  status         String   @default("onboard")
-  nationality    String?
-  languages      String[] @default([])
-  passportNumber String?
-  locationId     String?
-  doNotDisturb   Boolean  @default(false) // Guest DND status
-  
+  id                       String           @id @default(cuid())
+  firstName                String
+  lastName                 String
+  preferredName            String?
+  photo                    String?
+  type                     GuestType        @default(guest)
+  status                   GuestStatus      @default(onboard)
+  nationality              String?
+  languages                String[]         @default([])
+  passportNumber           String?
+  locationId               String?
+  cabin                    String?          // Legacy cabin field (deprecated, use locationId)
+  doNotDisturb             Boolean          @default(false)
+
   // Accommodation & Check-in Info
-  checkInDate    DateTime?
-  checkOutDate   DateTime?
-  
+  checkInDate              DateTime?
+  checkInTime              String?          // HH:mm format
+  checkOutDate             DateTime?
+  checkOutTime             String?          // HH:mm format
+
+  // Special Occasions
+  specialOccasion          String?          // Birthday, Anniversary, etc.
+  specialOccasionDate      DateTime?        // Date of the occasion
+
   // Dietary & Medical
-  allergies              String[] @default([])
-  dietaryRestrictions    String[] @default([])
-  medicalConditions      String[] @default([])
-  
-  // Preferences & Notes
-  preferences            String?  // General preferences
-  notes                  String?  // Staff notes
-  
+  allergies                String[]         @default([])
+  dietaryRestrictions      String[]         @default([])
+  medicalConditions        String[]         @default([])
+  foodDislikes             String[]         @default([])
+  favoriteFoods            String[]         @default([])
+  favoriteDrinks           String[]         @default([])
+
+  // Preferences & Notes (categorized)
+  preferences              String?          // General preferences
+  notes                    String?          // Staff notes
+  specialRequests          String?          // Special requests from guest
+  vipNotes                 String?          // VIP-specific notes
+  crewNotes                String?          // Internal crew notes
+
+  // Contact Person (Family Office, Manager, Agent)
+  contactPerson            Json?            // {name, phone, email, role}
+
   // Emergency Contact
-  emergencyContactName   String?
-  emergencyContactPhone  String?
+  emergencyContactName     String?
+  emergencyContactPhone    String?
   emergencyContactRelation String?
-  
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  
-  location        Location?        @relation(fields: [locationId], references: [id])
-  serviceRequests ServiceRequest[]
-  activityLogs    ActivityLog[]
+
+  // Guest Contact Info
+  email                    String?
+  phone                    String?
+
+  // Metadata
+  createdBy                String?          // User ID who created this guest
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
+
+  activityLogs             ActivityLog[]
+  location                 Location?        @relation(fields: [locationId], references: [id])
+  serviceRequests          ServiceRequest[]
 
   @@index([locationId])
   @@index([status])
@@ -137,116 +159,99 @@ model Guest {
 }
 
 model ServiceRequestHistory {
-  id               String   @id @default(cuid())
-  serviceRequestId String?
-  originalRequestId String? // Original request ID
-  action           String   // "created", "accepted", "completed", "cancelled"
-  previousStatus   String?
-  newStatus        String
-  notes            String?
-  userId           String?  // Who performed the action
-  metadata         Json?    // Additional data like response times, etc.
-  
-  // Fields for completed requests
-  completedBy      String?
-  completedAt      DateTime?
-  responseTime     Int?     // Seconds
-  completionTime   Int?     // Seconds
-  guestName        String?
-  location         String?
-  requestType      String?
-  priority         String?
-  
-  createdAt        DateTime @default(now())
-  
+  id                String                  @id @default(cuid())
+  serviceRequestId  String?
+  originalRequestId String?
+  action            String
+  notes             String?
+  userId            String?
+  metadata          Json?
+  completedBy       String?
+  completedAt       DateTime?
+  responseTime      Int?
+  completionTime    Int?
+  guestName         String?
+  location          String?
+  requestType       ServiceRequestType?
+  priority          ServiceRequestPriority?
+  createdAt         DateTime                @default(now())
+  newStatus         String?                 @default("pending")
+
   @@index([serviceRequestId])
   @@index([originalRequestId])
   @@index([createdAt])
 }
 
 model ServiceRequest {
-  id          String   @id @default(cuid())
-  requestType String   @default("call")
-  guestId     String?
-  locationId  String?
-  cabinId     String?
-  categoryId  String?  // Service category
-  priority    String   @default("normal")
-  status      String   @default("open")
-  notes       String?
-  voiceTranscript String? // Voice command transcript
-  assignedTo  String?  // Crew member name assigned
-  assignedToId String? // Crew member ID
-  guestName   String?  // Guest name for display
-  guestCabin  String?  // Cabin/location name for display
-  acceptedAt  DateTime?
-  completedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  guest    Guest?    @relation(fields: [guestId], references: [id])
-  location Location? @relation(fields: [locationId], references: [id])
-  category ServiceCategory? @relation(fields: [categoryId], references: [id])
+  id              String                 @id @default(cuid())
+  requestType     ServiceRequestType     @default(call)
+  guestId         String?
+  locationId      String?
+  cabinId         String?
+  categoryId      String?
+  priority        ServiceRequestPriority @default(normal)
+  notes           String?
+  voiceTranscript String?
+  assignedTo      String?
+  assignedToId    String?
+  guestName       String?
+  guestCabin      String?
+  acceptedAt      DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  status          String?                @default("pending")
+  CrewMember      CrewMember?            @relation(fields: [assignedToId], references: [id])
+  category        ServiceCategory?       @relation(fields: [categoryId], references: [id])
+  guest           Guest?                 @relation(fields: [guestId], references: [id])
+  location        Location?              @relation(fields: [locationId], references: [id])
 
   @@index([guestId])
   @@index([locationId])
   @@index([categoryId])
-  @@index([status])
   @@index([priority])
   @@index([assignedToId])
   @@index([createdAt])
 }
 
 model ServiceCategory {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  icon        String   @default("tag")
-  color       String   @default("gray")
+  id          String           @id @default(cuid())
+  name        String           @unique
+  icon        String           @default("tag")
+  color       String           @default("gray")
   description String?
-  order       Int      @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  order       Int              @default(0)
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
   requests    ServiceRequest[]
 }
 
 model Device {
-  id              String    @id @default(cuid())
-  deviceId        String    @unique  // BTN-001, WCH-001, RPT-001, APP-IOS-001
+  id              String             @id @default(cuid())
+  deviceId        String             @unique
   name            String
-  type            String    // "smart_button", "watch", "repeater", "mobile_app"
-  subType         String?   // "ios", "android", "esp32"
-  status          String    @default("online") // "online", "offline", "low_battery", "error"
-  
-  // Location & Assignment
+  type            String
+  subType         String?
+  status          DeviceStatus       @default(online)
   locationId      String?
-  location        Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
   crewMemberId    String?
-  crewMember      CrewMember? @relation(fields: [crewMemberId], references: [id], onDelete: SetNull)
-  
-  // Status Monitoring
-  batteryLevel    Int?      // 0-100
-  signalStrength  Int?      // RSSI in dBm (-120 to 0)
-  connectionType  String?   // "lora_868", "lora_915", "lora_433", "wifi", "bluetooth"
+  batteryLevel    Int?
+  signalStrength  Int?
+  connectionType  String?
   lastSeen        DateTime?
-  
-  // Configuration (JSON - flexible per device type)
-  config          Json?     // Button actions, LED, audio, repeater settings, etc.
-  
-  // Metadata
+  config          Json?
   firmwareVersion String?
   hardwareVersion String?
   macAddress      String?
   ipAddress       String?
-  
-  // Timestamps
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  activityLogs    ActivityLog[]
+  crewMember      CrewMember?        @relation(fields: [crewMemberId], references: [id])
+  location        Location?          @relation(fields: [locationId], references: [id])
   assignments     DeviceAssignment[]
   logs            DeviceLog[]
-  activityLogs    ActivityLog[]
 
   @@index([locationId])
   @@index([crewMemberId])
@@ -256,78 +261,70 @@ model Device {
 }
 
 model DeviceLog {
-  id         String   @id @default(cuid())
-  deviceId   String
-  device     Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-  
-  eventType  String   // "button_press", "battery_low", "offline", "config_change", "test_signal"
-  eventData  Json?    // Additional event details
-  severity   String   @default("info") // "info", "warning", "error"
-  
-  createdAt  DateTime @default(now())
-  
+  id        String   @id @default(cuid())
+  deviceId  String
+  eventType String
+  eventData Json?
+  severity  String   @default("info")
+  createdAt DateTime @default(now())
+  device    Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
   @@index([deviceId])
   @@index([eventType])
   @@index([createdAt])
 }
 
 model DeviceAssignment {
-  id           String   @id @default(cuid())
+  id           String     @id @default(cuid())
   deviceId     String
   crewMemberId String
-  assignedAt   DateTime @default(now())
+  assignedAt   DateTime   @default(now())
   notes        String?
-  
-  device      Device     @relation(fields: [deviceId], references: [id])
-  crewMember  CrewMember @relation(fields: [crewMemberId], references: [id])
-  
+  crewMember   CrewMember @relation(fields: [crewMemberId], references: [id])
+  device       Device     @relation(fields: [deviceId], references: [id])
+
   @@unique([deviceId, crewMemberId])
 }
 
-// Duty Roster Models - Re-added for database persistence (Phase 4)
 model Shift {
-  id           String   @id @default(cuid())
-  name         String   // "Morning", "Afternoon", "Night"
-  startTime    String   // "08:00"
-  endTime      String   // "20:00"
-  color        String   @default("#3B82F6") // Color for UI display
+  id           String       @id @default(cuid())
+  name         String
+  startTime    String
+  endTime      String
+  color        String       @default("#3B82F6")
   description  String?
-  isActive     Boolean  @default(true)
-  order        Int      @default(0) // For sorting
-  primaryCount Int      @default(2) // Number of primary crew needed
-  backupCount  Int      @default(1) // Number of backup crew needed
-
-  assignments Assignment[]
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive     Boolean      @default(true)
+  order        Int          @default(0)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  backupCount  Int          @default(1)
+  primaryCount Int          @default(2)
+  assignments  Assignment[]
 
   @@index([isActive])
 }
 
 model Assignment {
-  id           String   @id @default(cuid())
-  date         String   // ISO date string "2025-10-23"
+  id           String     @id @default(cuid())
+  date         String
   shiftId      String
   crewMemberId String
-  type         String   // "primary" or "backup"
+  type         String
   notes        String?
-
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  CrewMember   CrewMember @relation(fields: [crewMemberId], references: [id], onDelete: Cascade)
   shift        Shift      @relation(fields: [shiftId], references: [id], onDelete: Cascade)
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
+  @@unique([date, shiftId, crewMemberId, type])
   @@index([date])
   @@index([shiftId])
   @@index([crewMemberId])
   @@index([type])
-  @@unique([date, shiftId, crewMemberId, type])
 }
 
 model ActivityLog {
-  id         String   @id @default(cuid())
-  type       String
+  id         String    @id @default(cuid())
   action     String
   details    String?
   userId     String?
@@ -335,49 +332,50 @@ model ActivityLog {
   guestId    String?
   deviceId   String?
   metadata   String?
-  timestamp  DateTime @default(now())
-  createdAt  DateTime @default(now())
-  
-  user       User?     @relation(fields: [userId], references: [id])
-  location   Location? @relation(fields: [locationId], references: [id])
-  guest      Guest?    @relation(fields: [guestId], references: [id])
+  timestamp  DateTime  @default(now())
+  createdAt  DateTime  @default(now())
+  type       String?   @default("info")
   device     Device?   @relation(fields: [deviceId], references: [id])
+  guest      Guest?    @relation(fields: [guestId], references: [id])
+  location   Location? @relation(fields: [locationId], references: [id])
+  user       User?     @relation(fields: [userId], references: [id])
 }
 
 model YachtSettings {
-  id              String   @id @default(cuid())
-  name            String   @default("Serenity")
-  type            String   @default("motor")  // "motor", "sailing", "catamaran"
-  timezone        String   @default("Europe/Monaco")
-  floors          String[] @default(["Lower Deck", "Main Deck", "Upper Deck", "Sun Deck"])
-  dateFormat      String   @default("DD/MM/YYYY")
-  timeFormat      String   @default("24h")  // "12h" or "24h"
-  weatherUnits    String   @default("metric")  // "metric" or "imperial"
-  windSpeedUnits  String   @default("knots")  // "knots", "km/h", "mph"
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                String    @id @default(cuid())
+  name              String    @default("Serenity")
+  type              String    @default("motor")
+  timezone          String    @default("Europe/Monaco")
+  floors            String[]  @default(["Lower Deck", "Main Deck", "Upper Deck", "Sun Deck"])
+  dateFormat        String    @default("DD/MM/YYYY")
+  timeFormat        String    @default("24h")
+  weatherUnits      String    @default("metric")
+  windSpeedUnits    String    @default("knots")
+
+  // GPS Location fields
+  latitude          Float?
+  longitude         Float?
+  accuracy          Float?
+  locationName      String?
+  locationUpdatedAt DateTime?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
 
 model Message {
-  id         String   @id @default(cuid())
+  id         String          @id @default(cuid())
   senderId   String
-  receiverId String?  // Null for broadcast messages
-  
-  // Message Content
+  receiverId String?
   content    String
-  type       String   @default("text") // "text", "alert", "announcement"
-  priority   String   @default("normal") // "low", "normal", "high", "urgent"
-  
-  // Status
-  isRead     Boolean  @default(false)
+  type       MessageType     @default(text)
+  priority   MessagePriority @default(normal)
+  isRead     Boolean         @default(false)
   readAt     DateTime?
-  
-  // Relations
-  sender     User     @relation("MessageSender", fields: [senderId], references: [id])
-  receiver   User?    @relation("MessageReceiver", fields: [receiverId], references: [id])
-  
-  createdAt  DateTime @default(now())
-  
+  createdAt  DateTime        @default(now())
+  receiver   User?           @relation("MessageReceiver", fields: [receiverId], references: [id])
+  sender     User            @relation("MessageSender", fields: [senderId], references: [id])
+
   @@index([senderId])
   @@index([receiverId])
   @@index([createdAt])
@@ -386,64 +384,89 @@ model Message {
 model NotificationSettings {
   id                String   @id @default(cuid())
   userId            String   @unique
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // Push Notification Settings
   pushEnabled       Boolean  @default(true)
-  pushToken         String?  // FCM/APNS token
-  
-  // Notification Preferences by Type
+  pushToken         String?
   serviceRequests   Boolean  @default(true)
   emergencyAlerts   Boolean  @default(true)
   systemMessages    Boolean  @default(true)
   guestMessages     Boolean  @default(true)
   crewMessages      Boolean  @default(true)
-  
-  // Quiet Hours
   quietHoursEnabled Boolean  @default(false)
-  quietHoursStart   String?  // "22:00"
-  quietHoursEnd     String?  // "08:00"
-  
+  quietHoursStart   String?
+  quietHoursEnd     String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model CrewChangeLog {
   id           String   @id @default(cuid())
   crewMemberId String
-  
-  changeType   String   // "status_change", "position_change", "department_change", "assignment_change"
-  fieldName    String   // Which field was changed
+  changeType   String
+  fieldName    String
   oldValue     String?
   newValue     String
-  
-  changedBy    String?  // User ID who made the change
-  reason       String?  // Optional reason for change
-  
+  changedBy    String?
+  reason       String?
   createdAt    DateTime @default(now())
-  
+
   @@index([crewMemberId])
   @@index([changeType])
   @@index([createdAt])
 }
 
-// RolePermissions stores the permissions for each role
-// Example permissions JSON structure:
-// {
-//   "dashboard": { "view": true, "customize": true },
-//   "serviceRequests": { "view": true, "create": true, "accept": true, "complete": true, "delete": false },
-//   "guests": { "view": true, "create": true, "edit": true, "delete": false },
-//   "crew": { "view": true, "edit": false, "manage": false },
-//   "devices": { "view": true, "manage": false },
-//   "settings": { "view": true, "edit": false }
-// }
 model RolePermissions {
-  id         String   @id @default(cuid())
-  role       String   @unique // "admin", "chief-stewardess", "stewardess", "crew", "eto"
-  
-  // Feature Access
-  permissions Json     // Flexible JSON structure for permissions
-  
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String   @id @default(cuid())
+  role        String   @unique
+  permissions Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum DeviceStatus {
+  online
+  offline
+  low_battery
+  error
+}
+
+enum GuestStatus {
+  expected
+  onboard
+  ashore
+  departed
+}
+
+enum GuestType {
+  owner
+  vip
+  guest
+  partner
+  family
+}
+
+enum MessagePriority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum MessageType {
+  text
+  alert
+  announcement
+}
+
+enum ServiceRequestPriority {
+  low
+  normal
+  urgent
+  emergency
+}
+
+enum ServiceRequestType {
+  call
+  service
+  emergency
 }

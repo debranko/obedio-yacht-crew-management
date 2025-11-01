@@ -33,6 +33,12 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
         timeFormat: settings.timeFormat,
         weatherUnits: settings.weatherUnits,
         windSpeedUnits: settings.windSpeedUnits,
+        // GPS Location fields
+        latitude: settings.latitude,
+        longitude: settings.longitude,
+        accuracy: settings.accuracy,
+        locationName: settings.locationName,
+        locationUpdatedAt: settings.locationUpdatedAt,
       },
     });
   } catch (error) {
@@ -47,7 +53,10 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 // Update yacht settings
 router.put('/', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { name, type, timezone, floors, dateFormat, timeFormat, weatherUnits, windSpeedUnits } = req.body;
+    const {
+      name, type, timezone, floors, dateFormat, timeFormat, weatherUnits, windSpeedUnits,
+      latitude, longitude, accuracy, locationName, locationUpdatedAt
+    } = req.body;
 
     // Validate input
     if (!name || !type || !timezone) {
@@ -73,6 +82,13 @@ router.put('/', authMiddleware, async (req: Request, res: Response) => {
     if (weatherUnits) updateData.weatherUnits = weatherUnits;
     if (windSpeedUnits) updateData.windSpeedUnits = windSpeedUnits;
 
+    // Add GPS location fields if provided
+    if (latitude !== undefined) updateData.latitude = latitude;
+    if (longitude !== undefined) updateData.longitude = longitude;
+    if (accuracy !== undefined) updateData.accuracy = accuracy;
+    if (locationName !== undefined) updateData.locationName = locationName;
+    if (locationUpdatedAt !== undefined) updateData.locationUpdatedAt = locationUpdatedAt;
+
     if (settings) {
       // Update existing settings
       settings = await prisma.yachtSettings.update({
@@ -97,6 +113,12 @@ router.put('/', authMiddleware, async (req: Request, res: Response) => {
         timeFormat: settings.timeFormat,
         weatherUnits: settings.weatherUnits,
         windSpeedUnits: settings.windSpeedUnits,
+        // GPS Location fields
+        latitude: settings.latitude,
+        longitude: settings.longitude,
+        accuracy: settings.accuracy,
+        locationName: settings.locationName,
+        locationUpdatedAt: settings.locationUpdatedAt,
         updatedAt: settings.updatedAt,
       },
     });
