@@ -45,6 +45,9 @@ export interface WebSocketEvents {
   'new_message': (data: any) => void;
   'broadcast_message': (data: any) => void;
 
+  // Activity Log Events
+  'activity-log:created': (data: any) => void;
+
   // Emergency Events
   'emergency:alert': (data: any) => void;
 }

@@ -1,45 +1,18 @@
 /**
  * React Query hook for Activity Logs
- * Fetches comprehensive activity logs from the ActivityLog table
+ * Unified activity feed with WebSocket real-time updates
  */
 
-import { useQuery } from '@tanstack/react-query';
-import { api } from '../services/api';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api, ActivityLogDTO } from '../services/api';
+import { useEffect } from 'react';
+import { useWebSocket } from './useWebSocket';
+import { toast } from 'sonner';
 
-export interface ActivityLog {
-  id: string;
-  type: string;
-  action: string;
-  details?: string;
-  userId?: string;
-  locationId?: string;
-  guestId?: string;
-  deviceId?: string;
-  metadata?: string;
-  timestamp: string;
-  createdAt: string;
-  user?: {
-    id: string;
-    username: string;
-    name?: string;
-  };
-  location?: {
-    id: string;
-    name: string;
-    type: string;
-  };
-  guest?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-  };
-  device?: {
-    id: string;
-    deviceId: string;
-    name: string;
-    type: string;
-  };
-}
+const QUERY_KEY = ['activity-logs'];
+
+// Re-export types for backward compatibility
+export type ActivityLog = ActivityLogDTO;
 
 export interface ActivityLogFilters {
   type?: string;
@@ -50,32 +23,71 @@ export interface ActivityLogFilters {
 }
 
 /**
- * Fetch activity logs with optional filters
+ * Fetch activity logs with optional filters and pagination
  */
 export function useActivityLogs(filters?: ActivityLogFilters) {
-  return useQuery({
-    queryKey: ['activity-logs', filters],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (filters?.type) params.append('type', filters.type);
-      if (filters?.userId) params.append('userId', filters.userId);
-      if (filters?.locationId) params.append('locationId', filters.locationId);
-      if (filters?.page) params.append('page', filters.page.toString());
-      if (filters?.limit) params.append('limit', filters.limit.toString());
-
-      const url = `/activity-logs?${params.toString()}`;
-      console.log('🔍 useActivityLogs: Fetching activity logs...', url);
-
-      const response = await api.get(url);
-      console.log('✅ useActivityLogs: Got response:', response);
-
-      // api.get() already extracts data from { success: true, data: [...] }
-      // So response is already the array!
-      const logs = Array.isArray(response) ? response : [];
-      console.log(`📋 useActivityLogs: Returning ${logs.length} logs`);
-
-      return logs as ActivityLog[];
-    },
-    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+  const query = useQuery({
+    queryKey: [...QUERY_KEY, filters],
+    queryFn: () => api.activityLogs.getAll(filters),
+    staleTime: 1000 * 60, // 1 minute
+    // Removed polling - using WebSocket instead
   });
+
+  return {
+    logs: query.data?.items || [],
+    pagination: query.data?.pagination,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error,
+    refetch: query.refetch,
+  };
+}
+
+/**
+ * Create activity log mutation
+ */
+export function useCreateActivityLog() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: Omit<ActivityLogDTO, 'id' | 'createdAt'>) =>
+      api.activityLogs.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+    },
+    onError: (error: any) => {
+      console.error('Failed to create activity log:', error);
+      toast.error('Failed to create activity log');
+    },
+  });
+}
+
+/**
+ * WebSocket real-time activity log updates
+ * Subscribe to activity-log events for unified feed
+ */
+export function useActivityLogsWebSocket() {
+  const queryClient = useQueryClient();
+  const { on, off, isConnected } = useWebSocket();
+
+  useEffect(() => {
+    if (!on || !off) return;
+
+    // Handle new activity log
+    const handleActivityLog = (log: ActivityLogDTO) => {
+      console.log('📊 New activity log:', log);
+
+      // Invalidate queries to refetch
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+    };
+
+    const unsubscribe = on('activity-log:created', handleActivityLog);
+
+    // Cleanup
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [on, off, queryClient]);
+
+  return { isConnected };
 }

@@ -709,6 +709,81 @@ export const userPreferencesApi = {
 };
 
 // =====================
+// ACTIVITY LOGS API
+// =====================
+
+export interface ActivityLogDTO {
+  id: string;
+  type: string;
+  action: string;
+  details?: string | null;
+  userId?: string | null;
+  locationId?: string | null;
+  guestId?: string | null;
+  deviceId?: string | null;
+  metadata?: any | null;
+  timestamp: string;
+  createdAt: string;
+  // Populated relationships
+  user?: {
+    id: string;
+    username: string;
+    name?: string;
+  };
+  location?: {
+    id: string;
+    name: string;
+    type: string;
+  };
+  guest?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  };
+  device?: {
+    id: string;
+    deviceId: string;
+    name: string;
+    type: string;
+  };
+}
+
+export interface ActivityLogsResponse {
+  items: ActivityLogDTO[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export const activityLogsApi = {
+  /**
+   * Get activity logs with filters and pagination
+   */
+  getAll: (params?: {
+    type?: string;
+    userId?: string;
+    locationId?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+    return fetchApi<ActivityLogsResponse>(`/activity-logs${query}`);
+  },
+
+  /**
+   * Create activity log
+   */
+  create: (data: Omit<ActivityLogDTO, 'id' | 'createdAt'>) =>
+    fetchApi<ActivityLogDTO>('/activity-logs', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
+// =====================
 // EXPORT ALL
 // =====================
 
@@ -721,6 +796,7 @@ export const api = {
   assignments: assignmentsApi,
   messages: messagesApi,
   userPreferences: userPreferencesApi,
+  activityLogs: activityLogsApi,
 
   // Direct methods for convenience
   get: (endpoint: string) => fetchApi<any>(endpoint),
