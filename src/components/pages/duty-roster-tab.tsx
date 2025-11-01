@@ -89,11 +89,11 @@ export function DutyRosterTab() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [assignmentHistory, setAssignmentHistory] = useState<Assignment[][]>([]);
 
-  // Sync with context on mount only
+  // Sync with context whenever it changes (e.g., after API refetch following a save)
   useEffect(() => {
     setAssignments(contextAssignments);
     setShifts(contextShifts);
-  }, []);
+  }, [contextAssignments, contextShifts]);
 
   // Track unsaved changes
   useEffect(() => {
@@ -207,12 +207,10 @@ export function DutyRosterTab() {
       const primaryCount = currentAssignments.filter((a) => a.type === 'primary').length;
       const backupCount = currentAssignments.filter((a) => a.type === 'backup').length;
 
+      // Determine type based on current counts, but allow manual override
+      // Settings guide the assignment but don't enforce hard limits
       let type: 'primary' | 'backup' = 'primary';
       if (primaryCount >= shift.primaryCount) {
-        if (backupCount >= shift.backupCount) {
-          toast.error('Shift is at full capacity');
-          return prevAssignments; // Return unchanged state
-        }
         type = 'backup';
       }
 
@@ -603,11 +601,11 @@ export function DutyRosterTab() {
               </div>
 
               <div className="flex items-center gap-2">
-                <Button 
-                  size="sm" 
+                <Button
+                  size="sm"
                   onClick={async () => {
-                    setContextAssignments(assignments);
-                    await saveAssignments();
+                    // Pass assignments directly to avoid race condition
+                    await saveAssignments(assignments);
                     setAssignmentHistory([]); // Clear history after save
                     toast.success('Duty roster saved successfully');
                   }}

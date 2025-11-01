@@ -1,5 +1,5 @@
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Assignment, CrewMember, ShiftConfig } from '../components/duty-roster/types';
 // Removed defaultShiftConfig import - will use API data
@@ -77,7 +77,7 @@ interface AppDataContextType {
   setShifts: (shifts: ShiftConfig[]) => void;
   
   // Save functionality
-  saveAssignments: () => Promise<void>;
+  saveAssignments: (assignmentsToSave?: Assignment[]) => Promise<void>;
   lastSaved: Date | null;
   isSaving: boolean;
   
@@ -192,58 +192,53 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   // Fetch locations from API
   const { locations: apiLocations, isLoading: isLoadingLocations } = useLocations();
   
-  // Initialize crew members with empty array - will be populated from API
-  const [crewMembers, setCrewMembers] = useState<CrewMemberExtended[]>([]);
-  
-  // Update crew members when API data arrives - no localStorage
-  useEffect(() => {
-    if (apiCrewMembers.length > 0) {
-      // Map crew members from API - use all fields from database
-      const extendedCrew: CrewMemberExtended[] = apiCrewMembers.map(member => ({
-        id: member.id,
-        name: member.name,
-        position: member.position,
-        department: member.department,
-        role: member.role ?? undefined,
-        status: (member.status as any),
-        contact: member.contact ?? undefined,
-        email: member.email ?? undefined,
-        joinDate: member.joinDate ?? undefined,
-        leaveStart: (member as any).leaveStart ?? undefined,
-        leaveEnd: (member as any).leaveEnd ?? undefined,
-        languages: (member as any).languages,
-        skills: (member as any).skills,
-        avatar: (member as any).avatar,
-        nickname: (member as any).nickname,
-        color: (member as any).color,
-        onBoardContact: (member as any).onBoardContact,
-        phone: (member as any).phone ?? member.contact,
-        notes: (member as any).notes,
-        shift: (member as any).shift,
-      }));
-      setCrewMembers(extendedCrew);
-    }
+  // Map API crew members to extended format directly (no duplicate state)
+  const crewMembers: CrewMemberExtended[] = useMemo(() => {
+    return apiCrewMembers.map(member => ({
+      id: member.id,
+      name: member.name,
+      position: member.position,
+      department: member.department,
+      role: member.role ?? undefined,
+      status: (member.status as any),
+      contact: member.contact ?? undefined,
+      email: member.email ?? undefined,
+      joinDate: member.joinDate ?? undefined,
+      leaveStart: (member as any).leaveStart ?? undefined,
+      leaveEnd: (member as any).leaveEnd ?? undefined,
+      languages: (member as any).languages,
+      skills: (member as any).skills,
+      avatar: (member as any).avatar,
+      nickname: (member as any).nickname,
+      color: (member as any).color,
+      onBoardContact: (member as any).onBoardContact,
+      phone: (member as any).phone ?? member.contact,
+      notes: (member as any).notes,
+      shift: (member as any).shift,
+    }));
   }, [apiCrewMembers]);
 
-  // Initialize assignments with empty array - will be populated from API
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  // Use API assignments directly (no duplicate state)
+  const assignments: Assignment[] = apiAssignments;
 
-  // Initialize shifts with empty array - will be populated from API
-  const [shifts, setShifts] = useState<ShiftConfig[]>([]);
-  
-  // Update shifts when API data arrives
-  useEffect(() => {
-    if (apiShifts && apiShifts.length > 0) {
-      setShifts(apiShifts);
-    }
-  }, [apiShifts]);
+  // Use API shifts directly (no duplicate state)
+  const shifts: ShiftConfig[] = apiShifts;
 
-  // Update assignments when API data arrives
-  useEffect(() => {
-    if (apiAssignments && apiAssignments.length > 0) {
-      setAssignments(apiAssignments);
-    }
-  }, [apiAssignments]);
+  // Setter functions that invalidate React Query cache instead of setting local state
+  const setCrewMembers = useCallback((members: CrewMemberExtended[]) => {
+    // Invalidate crew members cache to trigger re-fetch
+    queryClient.invalidateQueries({ queryKey: ['crewMembers'] });
+  }, [queryClient]);
+
+  const setAssignments = useCallback((assignments: Assignment[]) => {
+    // Invalidate assignments cache to trigger re-fetch
+    queryClient.invalidateQueries({ queryKey: ['assignments'] });
+  }, [queryClient]);
+
+  const setShifts = useCallback((shifts: ShiftConfig[]) => {
+    // Invalidate shifts cache to trigger re-fetch
+    queryClient.invalidateQueries({ queryKey: ['shifts'] });
+  }, [queryClient]);
 
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
@@ -529,13 +524,17 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   };
 
   // Save assignments to database
-  const saveAssignments = async () => {
+  // Accepts optional assignmentsToSave parameter to avoid race conditions
+  const saveAssignments = async (assignmentsToSave?: Assignment[]) => {
     setIsSaving(true);
-    setPreviousAssignments([...assignments]);
+
+    // Use provided assignments or fallback to context assignments
+    const assignmentsData = assignmentsToSave || assignments;
+    setPreviousAssignments([...assignmentsData]);
 
     try {
       // Get all unique dates from assignments
-      const uniqueDates = Array.from(new Set(assignments.map(a => a.date)));
+      const uniqueDates = Array.from(new Set(assignmentsData.map(a => a.date)));
 
       // Delete all existing assignments for these dates first
       // This ensures removed assignments are actually deleted from the database
@@ -544,12 +543,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       }
 
       // Now create all the new assignments
-      if (assignments.length > 0) {
-        await createBulkAssignments.mutateAsync(assignments);
+      if (assignmentsData.length > 0) {
+        await createBulkAssignments.mutateAsync(assignmentsData);
       }
 
       const now = new Date();
       setLastSaved(now);
+
+      // Invalidate assignments cache to trigger re-fetch
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
     } catch (error) {
       console.error('[AppData] Failed to save assignments:', error);
       throw error;
