@@ -73,6 +73,25 @@ export function useUserPreferences() {
     },
   });
 
+  // Update notification preferences mutation
+  const updateNotificationsMutation = useMutation({
+    mutationFn: (data: {
+      emailNotifications?: boolean;
+      notificationEmail?: string;
+      emergencyContacts?: string[];
+    }) => api.userPreferences.updateNotifications(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      console.log('✅ Notification preferences saved');
+    },
+    onError: (error: any) => {
+      console.error('❌ Failed to save notification preferences:', error);
+      toast.error('Failed to save notification preferences', {
+        description: error.message || 'Please try again',
+      });
+    },
+  });
+
   return {
     preferences,
     isLoading,
@@ -86,10 +105,13 @@ export function useUserPreferences() {
     updateThemeAsync: updateThemeMutation.mutateAsync,
     resetDashboard: resetDashboardMutation.mutate,
     resetDashboardAsync: resetDashboardMutation.mutateAsync,
+    updateNotifications: updateNotificationsMutation.mutate,
+    updateNotificationsAsync: updateNotificationsMutation.mutateAsync,
 
     // Loading states
     isUpdatingDashboard: updateDashboardMutation.isPending,
     isUpdatingTheme: updateThemeMutation.isPending,
     isResetting: resetDashboardMutation.isPending,
+    isUpdatingNotifications: updateNotificationsMutation.isPending,
   };
 }

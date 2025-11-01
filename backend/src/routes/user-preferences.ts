@@ -31,7 +31,10 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
         dashboardLayout: null,
         activeWidgets: null,
         theme: 'light',
-        language: 'en'
+        language: 'en',
+        emailNotifications: false,
+        notificationEmail: null,
+        emergencyContacts: null
       });
     }
 
@@ -40,6 +43,9 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
       activeWidgets: preferences.activeWidgets,
       theme: preferences.theme,
       language: preferences.language,
+      emailNotifications: preferences.emailNotifications,
+      notificationEmail: preferences.notificationEmail,
+      emergencyContacts: preferences.emergencyContacts,
       updatedAt: preferences.updatedAt
     });
   } catch (error) {
@@ -120,6 +126,48 @@ router.put('/theme', authMiddleware, async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error updating theme preference:', error);
     res.status(500).json({ error: 'Failed to update theme' });
+  }
+});
+
+/**
+ * PUT /api/user-preferences/notifications
+ * Update notification preferences (email, emergency contacts)
+ */
+router.put('/notifications', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { emailNotifications, notificationEmail, emergencyContacts } = req.body;
+
+    const preferences = await prisma.userPreferences.upsert({
+      where: { userId },
+      update: {
+        emailNotifications: emailNotifications !== undefined ? emailNotifications : undefined,
+        notificationEmail: notificationEmail !== undefined ? notificationEmail : undefined,
+        emergencyContacts: emergencyContacts !== undefined ? emergencyContacts : undefined,
+      },
+      create: {
+        userId,
+        emailNotifications: emailNotifications ?? false,
+        notificationEmail,
+        emergencyContacts,
+      }
+    });
+
+    res.json({
+      success: true,
+      emailNotifications: preferences.emailNotifications,
+      notificationEmail: preferences.notificationEmail,
+      emergencyContacts: preferences.emergencyContacts,
+      updatedAt: preferences.updatedAt
+    });
+  } catch (error) {
+    console.error('Error updating notification preferences:', error);
+    res.status(500).json({ error: 'Failed to update notification preferences' });
   }
 });
 

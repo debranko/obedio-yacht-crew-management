@@ -658,6 +658,12 @@ export interface UserPreferencesDTO {
   activeWidgets?: string[] | null;
   theme?: 'light' | 'dark' | 'auto';
   language?: string;
+
+  // Notification preferences
+  emailNotifications?: boolean;
+  notificationEmail?: string | null;
+  emergencyContacts?: string[] | null;
+
   updatedAt?: string;
 }
 
@@ -694,6 +700,25 @@ export const userPreferencesApi = {
     }>('/user-preferences/theme', {
       method: 'PUT',
       body: JSON.stringify({ theme }),
+    }),
+
+  /**
+   * Update notification preferences
+   */
+  updateNotifications: (data: {
+    emailNotifications?: boolean;
+    notificationEmail?: string;
+    emergencyContacts?: string[];
+  }) =>
+    fetchApi<{
+      success: boolean;
+      emailNotifications: boolean;
+      notificationEmail: string | null;
+      emergencyContacts: any;
+      updatedAt: string;
+    }>('/user-preferences/notifications', {
+      method: 'PUT',
+      body: JSON.stringify(data),
     }),
 
   /**
