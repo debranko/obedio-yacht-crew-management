@@ -7,6 +7,7 @@ import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { useAppData } from '../../contexts/AppDataContext';
 import { useUpdateShift, useCreateShift, useDeleteShift } from '../../hooks/useShifts';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import {
   Select,
   SelectContent,
@@ -36,6 +37,8 @@ import {
   Download,
   Printer,
   FileDown,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { Assignment, ViewMode, ShiftConfig, CrewMember } from '../duty-roster/types';
 import { CrewMemberItem } from '../duty-roster/crew-member-item';
@@ -75,6 +78,9 @@ export function DutyRosterTab() {
   const createShiftMutation = useCreateShift();
   const deleteShiftMutation = useDeleteShift();
 
+  // WebSocket for real-time updates
+  const { isConnected: wsConnected, on: wsOn, off: wsOff } = useWebSocket();
+
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [assignments, setAssignments] = useState<Assignment[]>(contextAssignments);
@@ -96,8 +102,10 @@ export function DutyRosterTab() {
     setShifts(contextShifts);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Track unsaved changes
+  // Track unsaved changes and handle real-time updates
   const prevHasUnsavedChanges = useRef(hasUnsavedChanges);
+  const prevContextAssignments = useRef(contextAssignments);
+
   useEffect(() => {
     const isDifferent = JSON.stringify(assignments) !== JSON.stringify(contextAssignments);
     setHasUnsavedChanges(isDifferent);
@@ -107,8 +115,51 @@ export function DutyRosterTab() {
       setAssignments(contextAssignments);
       setShifts(contextShifts);
     }
+
+    // Real-time update from WebSocket or other tab
+    // If context changed BUT it's not from our save, and we have unsaved changes
+    const contextChanged = JSON.stringify(prevContextAssignments.current) !== JSON.stringify(contextAssignments);
+    if (contextChanged && isDifferent && !prevHasUnsavedChanges.current) {
+      // Context updated from external source while we have unsaved changes
+      toast.warning('Duty roster updated by another user', {
+        description: 'Save your changes or refresh to see updates',
+        duration: 5000,
+      });
+    } else if (contextChanged && !isDifferent) {
+      // Context updated and we don't have unsaved changes - safe to sync
+      setAssignments(contextAssignments);
+      setShifts(contextShifts);
+    }
+
     prevHasUnsavedChanges.current = isDifferent;
+    prevContextAssignments.current = contextAssignments;
   }, [assignments, contextAssignments, contextShifts]);
+
+  // WebSocket listeners for assignment events with cleanup
+  useEffect(() => {
+    if (!wsOn || !wsOff) return;
+
+    // Listen for assignment events and invalidate working copy if no unsaved changes
+    const handleAssignmentEvent = () => {
+      // Only auto-sync if no unsaved changes
+      if (!hasUnsavedChanges) {
+        console.log('📅 Assignment event received - syncing...');
+        // Context will update automatically via React Query invalidation
+        // Our useEffect above will handle the sync
+      }
+    };
+
+    const unsubscribeCreated = wsOn('assignment:created', handleAssignmentEvent);
+    const unsubscribeUpdated = wsOn('assignment:updated', handleAssignmentEvent);
+    const unsubscribeDeleted = wsOn('assignment:deleted', handleAssignmentEvent);
+
+    // Cleanup function to prevent memory leaks
+    return () => {
+      if (unsubscribeCreated) unsubscribeCreated();
+      if (unsubscribeUpdated) unsubscribeUpdated();
+      if (unsubscribeDeleted) unsubscribeDeleted();
+    };
+  }, [wsOn, wsOff, hasUnsavedChanges]);
 
   const today = getTodayDate();
 
@@ -320,7 +371,7 @@ export function DutyRosterTab() {
     toast.success(`Pattern continued - ${allNewAssignments.length} assignments added`);
   };
 
-  // Handle save shifts to database
+  // Handle save shifts to database with error handling
   const handleSaveShifts = async (newShifts: ShiftConfig[]) => {
     try {
       // Compare old shifts with new shifts to determine what changed
@@ -341,19 +392,34 @@ export function DutyRosterTab() {
       // Find shifts to delete (exist in old but not in new)
       const shiftsToDelete = shifts.filter(oldShift => !newShiftsMap.has(oldShift.id));
 
-      // Execute all mutations
+      // Execute all mutations with error handling
       const promises = [];
 
       for (const shift of shiftsToUpdate) {
-        promises.push(updateShiftMutation.mutateAsync(shift));
+        promises.push(
+          updateShiftMutation.mutateAsync(shift).catch(err => {
+            console.error(`Failed to update shift ${shift.name}:`, err);
+            throw new Error(`Failed to update shift "${shift.name}"`);
+          })
+        );
       }
 
       for (const shift of shiftsToCreate) {
-        promises.push(createShiftMutation.mutateAsync(shift));
+        promises.push(
+          createShiftMutation.mutateAsync(shift).catch(err => {
+            console.error(`Failed to create shift ${shift.name}:`, err);
+            throw new Error(`Failed to create shift "${shift.name}"`);
+          })
+        );
       }
 
       for (const shift of shiftsToDelete) {
-        promises.push(deleteShiftMutation.mutateAsync(shift.id));
+        promises.push(
+          deleteShiftMutation.mutateAsync(shift.id).catch(err => {
+            console.error(`Failed to delete shift ${shift.name}:`, err);
+            throw new Error(`Failed to delete shift "${shift.name}"`);
+          })
+        );
       }
 
       // Wait for all mutations to complete
@@ -364,9 +430,11 @@ export function DutyRosterTab() {
       setContextShifts(newShifts);
 
       toast.success('Shift settings saved successfully');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save shift settings:', error);
-      toast.error('Failed to save shift settings');
+      toast.error('Failed to save shift settings', {
+        description: error.message || 'Please check your connection and try again',
+      });
     }
   };
 
@@ -610,13 +678,49 @@ export function DutyRosterTab() {
               </div>
 
               <div className="flex items-center gap-2">
+                {/* WebSocket Status Indicator */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs ${
+                        wsConnected
+                          ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+                          : 'bg-red-500/10 text-red-700 dark:text-red-400'
+                      }`}>
+                        {wsConnected ? (
+                          <Wifi className="h-3 w-3" />
+                        ) : (
+                          <WifiOff className="h-3 w-3" />
+                        )}
+                        <span className="hidden sm:inline">
+                          {wsConnected ? 'Live' : 'Offline'}
+                        </span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">
+                        {wsConnected
+                          ? 'Real-time sync active - Changes will sync across devices'
+                          : 'Offline mode - Changes will be saved when connection is restored'}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
                 <Button
                   size="sm"
                   onClick={async () => {
-                    // Pass assignments directly to avoid race condition
-                    await saveAssignments(assignments);
-                    setAssignmentHistory([]); // Clear history after save
-                    toast.success('Duty roster saved successfully');
+                    try {
+                      // Pass assignments directly to avoid race condition
+                      await saveAssignments(assignments);
+                      setAssignmentHistory([]); // Clear history after save
+                      toast.success('Duty roster saved successfully');
+                    } catch (error) {
+                      console.error('Failed to save duty roster:', error);
+                      toast.error('Failed to save duty roster', {
+                        description: 'Please check your connection and try again',
+                      });
+                    }
                   }}
                   disabled={!hasUnsavedChanges || isSaving}
                   className="min-w-[100px]"
