@@ -112,10 +112,11 @@ export function detectAndContinuePattern(
   crewMembers: CrewMember[],
   filterByInterior: boolean = true
 ): Assignment[] {
-  // Filter crew members by department AND exclude on-leave and off-duty crew
+  // Filter crew members by department AND exclude on-leave crew
+  // Note: off-duty crew CAN be assigned for future shifts
   const filteredCrew = filterByInterior
-    ? crewMembers.filter((c) => c.department === 'Interior' && c.status !== 'on-leave' && c.status !== 'off-duty')
-    : crewMembers.filter((c) => c.status !== 'on-leave' && c.status !== 'off-duty');
+    ? crewMembers.filter((c) => c.department === 'Interior' && c.status !== 'on-leave')
+    : crewMembers.filter((c) => c.status !== 'on-leave');
   // Get all assignments for this shift, sorted by date
   const shiftAssignments = assignments
     .filter((a) => a.shiftId === shiftId)
@@ -179,10 +180,11 @@ export function autoFillAssignments(
   crewMembers: CrewMember[],
   filterByInterior: boolean = true
 ): Assignment[] {
-  // Filter crew members by department AND exclude on-leave and off-duty crew
+  // Filter crew members by department AND exclude on-leave crew
+  // Note: off-duty crew CAN be assigned for future shifts
   const filteredCrew = filterByInterior
-    ? crewMembers.filter((c) => c.department === 'Interior' && c.status !== 'on-leave' && c.status !== 'off-duty')
-    : crewMembers.filter((c) => c.status !== 'on-leave' && c.status !== 'off-duty');
+    ? crewMembers.filter((c) => c.department === 'Interior' && c.status !== 'on-leave')
+    : crewMembers.filter((c) => c.status !== 'on-leave');
 
   if (filteredCrew.length === 0) {
     return [];
