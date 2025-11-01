@@ -75,9 +75,15 @@ export function IncomingRequestDialog({
     if (!request) return;
 
     const updateTime = () => {
+      // Guard: Handle missing or invalid timestamp
+      if (!request.timestamp || !(request.timestamp instanceof Date)) {
+        setTimeAgo("Just now");
+        return;
+      }
+
       const now = new Date();
       const diff = Math.floor((now.getTime() - request.timestamp.getTime()) / 1000);
-      
+
       if (diff < 10) setTimeAgo("Just now");
       else if (diff < 60) setTimeAgo(`${diff}s ago`);
       else setTimeAgo(`${Math.floor(diff / 60)}m ago`);
@@ -556,14 +562,20 @@ export function useIncomingRequests() {
 
     // Find oldest pending request that should be shown
     const pendingRequests = serviceRequests.filter(req => req.status === 'pending');
-    
+
     for (const request of pendingRequests) {
+      // Guard: Skip requests with missing or invalid timestamp
+      if (!request.timestamp || !(request.timestamp instanceof Date)) {
+        console.warn('⚠️ Request has invalid timestamp:', request.id);
+        continue;
+      }
+
       const age = now - request.timestamp.getTime();
       const lastShown = lastShownTime[request.id];
-      
+
       // Additional guard: prevent showing same request if shown very recently (within 1500ms)
       const shownRecently = lastShown && (now - lastShown) < 1500;
-      
+
       // Show if:
       // 1. New request created AFTER initialization (< 5 seconds old AND created after init) OR
       // 2. Repeat interval passed since last shown (if repeatInterval > 0)

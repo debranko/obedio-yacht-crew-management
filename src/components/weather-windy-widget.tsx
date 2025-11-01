@@ -52,6 +52,14 @@ export function WeatherWindyWidget({ className }: WeatherWindyWidgetProps) {
     try {
       setLoading(true);
       const coords = getCurrentCoordinates();
+
+      // Guard: Return early if no coordinates available
+      if (!coords || coords.latitude == null || coords.longitude == null) {
+        console.warn('⚠️ Weather widget: No coordinates available');
+        setLoading(false);
+        return;
+      }
+
       const lat = coords.latitude;
       const lon = coords.longitude;
 
@@ -104,10 +112,10 @@ export function WeatherWindyWidget({ className }: WeatherWindyWidgetProps) {
     }
   };
 
-  // Windy map configuration
+  // Windy map configuration with safe coordinates
   const coords = getCurrentCoordinates();
-  const lat = coords.latitude;
-  const lon = coords.longitude;
+  const lat = coords?.latitude ?? 43.7384; // Default to Monaco if unavailable
+  const lon = coords?.longitude ?? 7.4246;
   const zoom = 8;
 
   const windyUrl = `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&width=650&height=350&zoom=${zoom}&level=surface&overlay=wind&product=ecmwf&menu=&message=true&marker=&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1`;
