@@ -650,6 +650,65 @@ export const messagesApi = {
 };
 
 // =====================
+// USER PREFERENCES API
+// =====================
+
+export interface UserPreferencesDTO {
+  dashboardLayout?: any | null;
+  activeWidgets?: string[] | null;
+  theme?: 'light' | 'dark' | 'auto';
+  language?: string;
+  updatedAt?: string;
+}
+
+export const userPreferencesApi = {
+  /**
+   * Get user preferences
+   */
+  get: () => fetchApi<UserPreferencesDTO>('/user-preferences'),
+
+  /**
+   * Update dashboard layout and widgets
+   */
+  updateDashboard: (data: {
+    dashboardLayout?: any;
+    activeWidgets?: string[];
+  }) =>
+    fetchApi<{
+      success: boolean;
+      dashboardLayout: any;
+      activeWidgets: string[];
+      updatedAt: string;
+    }>('/user-preferences/dashboard', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Update theme preference
+   */
+  updateTheme: (theme: 'light' | 'dark' | 'auto') =>
+    fetchApi<{
+      success: boolean;
+      theme: string;
+    }>('/user-preferences/theme', {
+      method: 'PUT',
+      body: JSON.stringify({ theme }),
+    }),
+
+  /**
+   * Reset dashboard to defaults
+   */
+  resetDashboard: () =>
+    fetchApi<{
+      success: boolean;
+      message: string;
+    }>('/user-preferences/dashboard', {
+      method: 'DELETE',
+    }),
+};
+
+// =====================
 // EXPORT ALL
 // =====================
 
@@ -661,6 +720,7 @@ export const api = {
   shifts: shiftsApi,
   assignments: assignmentsApi,
   messages: messagesApi,
+  userPreferences: userPreferencesApi,
 
   // Direct methods for convenience
   get: (endpoint: string) => fetchApi<any>(endpoint),

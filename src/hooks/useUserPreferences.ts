@@ -1,82 +1,75 @@
 /**
  * User Preferences Hook
  * Manages user-specific dashboard layout and preferences
- * Syncs with backend and falls back to localStorage
+ * Uses typed API with backend sync and WebSocket support
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../services/api';
+import { api, UserPreferencesDTO } from '../services/api';
+import { toast } from 'sonner';
 
-interface DashboardPreferences {
-  dashboardLayout: any;
-  activeWidgets: string[];
-  theme?: string;
-  language?: string;
-  updatedAt?: string;
-}
+const QUERY_KEY = ['userPreferences'];
 
 /**
- * Fetch user preferences from backend
- */
-const fetchPreferences = async (): Promise<DashboardPreferences> => {
-  const response = await api.get('/user-preferences');
-  return response.data;
-};
-
-/**
- * Update dashboard preferences on backend
- */
-const updateDashboardPreferences = async (data: {
-  dashboardLayout?: any;
-  activeWidgets?: string[];
-}) => {
-  const response = await api.put('/user-preferences/dashboard', data);
-  return response;
-};
-
-/**
- * Reset dashboard to defaults
- */
-const resetDashboard = async () => {
-  const response = await api.delete('/user-preferences/dashboard');
-  return response;
-};
-
-/**
- * Hook to manage user preferences
+ * Hook to manage user preferences with backend sync
  */
 export function useUserPreferences() {
   const queryClient = useQueryClient();
 
+  // Fetch preferences
   const {
     data: preferences,
     isLoading,
     error,
+    refetch,
   } = useQuery({
-    queryKey: ['userPreferences'],
-    queryFn: fetchPreferences,
+    queryKey: QUERY_KEY,
+    queryFn: () => api.userPreferences.get(),
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1, // Only retry once if backend fails
-    // Don't throw on error, just return undefined
-    throwOnError: false,
+    throwOnError: false, // Don't throw on error, just return undefined
   });
 
-  const updateMutation = useMutation({
-    mutationFn: updateDashboardPreferences,
-    onSuccess: (data) => {
-      console.log('✅ Dashboard preferences saved successfully:', data);
-      queryClient.invalidateQueries({ queryKey: ['userPreferences'] });
-      return data;
-    },
-    onError: (error) => {
-      console.error('❌ Failed to save dashboard preferences:', error);
-    },
-  });
-
-  const resetMutation = useMutation({
-    mutationFn: resetDashboard,
+  // Update dashboard mutation
+  const updateDashboardMutation = useMutation({
+    mutationFn: (data: { dashboardLayout?: any; activeWidgets?: string[] }) =>
+      api.userPreferences.updateDashboard(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['userPreferences'] });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      console.log('✅ Dashboard preferences saved');
+    },
+    onError: (error: any) => {
+      console.error('❌ Failed to save dashboard preferences:', error);
+      toast.error('Failed to save dashboard preferences', {
+        description: error.message || 'Please try again',
+      });
+    },
+  });
+
+  // Update theme mutation
+  const updateThemeMutation = useMutation({
+    mutationFn: (theme: 'light' | 'dark' | 'auto') =>
+      api.userPreferences.updateTheme(theme),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      toast.success('Theme updated');
+    },
+    onError: (error: any) => {
+      console.error('❌ Failed to update theme:', error);
+      toast.error('Failed to update theme');
+    },
+  });
+
+  // Reset dashboard mutation
+  const resetDashboardMutation = useMutation({
+    mutationFn: () => api.userPreferences.resetDashboard(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      toast.success('Dashboard reset to defaults');
+    },
+    onError: (error: any) => {
+      console.error('❌ Failed to reset dashboard:', error);
+      toast.error('Failed to reset dashboard');
     },
   });
 
@@ -84,9 +77,19 @@ export function useUserPreferences() {
     preferences,
     isLoading,
     error,
-    updateDashboard: updateMutation.mutate,
-    resetDashboard: resetMutation.mutate,
-    isUpdating: updateMutation.isPending,
-    isResetting: resetMutation.isPending,
+    refetch,
+
+    // Mutations
+    updateDashboard: updateDashboardMutation.mutate,
+    updateDashboardAsync: updateDashboardMutation.mutateAsync,
+    updateTheme: updateThemeMutation.mutate,
+    updateThemeAsync: updateThemeMutation.mutateAsync,
+    resetDashboard: resetDashboardMutation.mutate,
+    resetDashboardAsync: resetDashboardMutation.mutateAsync,
+
+    // Loading states
+    isUpdatingDashboard: updateDashboardMutation.isPending,
+    isUpdatingTheme: updateThemeMutation.isPending,
+    isResetting: resetDashboardMutation.isPending,
   };
 }
