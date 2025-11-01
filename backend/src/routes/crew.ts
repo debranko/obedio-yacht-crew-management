@@ -34,7 +34,8 @@ r.post('/', validate(CreateCrewMemberSchema), asyncHandler(async (req, res) => {
     leaveEnd,
     languages,
     skills,
-    role // Role from frontend (e.g., "chief-stewardess", "stewardess", "crew", "eto")
+    role, // Role from frontend (e.g., "chief-stewardess", "stewardess", "crew", "eto")
+    avatar
   } = req.body;
 
   // Split name into firstName and lastName
@@ -42,38 +43,35 @@ r.post('/', validate(CreateCrewMemberSchema), asyncHandler(async (req, res) => {
   const firstName = nameParts[0];
   const lastName = nameParts.slice(1).join(' ') || nameParts[0]; // If no last name, use first name
 
-  let user = null;
-  let username = null;
-  let temporaryPassword = null;
+  // Always create User account for login credentials (even without email)
+  // Generate unique username using nickname if provided, otherwise use firstName
+  const usernameBase = nickname || firstName;
+  const username = await generateUniqueUsername(usernameBase, lastName, prisma);
 
-  // Only create User account if email is provided
-  if (email) {
-    // Generate unique username using nickname if provided, otherwise use firstName
-    const usernameBase = nickname || firstName;
-    username = await generateUniqueUsername(usernameBase, lastName, prisma);
+  // Generate temporary password
+  const temporaryPassword = generatePassword();
+  const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
 
-    // Generate temporary password
-    temporaryPassword = generatePassword();
-    const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
+  // Use provided email or generate placeholder email (for crew without email)
+  const userEmail = email || `${username}@obedio.local`;
 
-    // Create User account
-    user = await prisma.user.create({
-      data: {
-        username,
-        email: email,
-        password: hashedPassword,
-        role: role!, // Use role from request (chief-stewardess, stewardess, crew, eto)
-        firstName,
-        lastName,
-      }
-    });
-  }
+  // Create User account
+  const user = await prisma.user.create({
+    data: {
+      username,
+      email: userEmail,
+      password: hashedPassword,
+      role: role!, // Use role from request (chief-stewardess, stewardess, crew, eto)
+      firstName,
+      lastName,
+    }
+  });
 
-  // Create CrewMember (with or without User account link) using raw SQL
+  // Create CrewMember linked to User account
   const crewMemberResult = await prisma.$queryRaw`
     INSERT INTO "CrewMember" (
       id, name, nickname, position, department, status, contact, email,
-      "joinDate", "leaveStart", "leaveEnd", languages, skills, role, "userId",
+      "joinDate", "leaveStart", "leaveEnd", languages, skills, role, "userId", avatar,
       "createdAt", "updatedAt"
     ) VALUES (
       gen_random_uuid()::text,
@@ -90,7 +88,8 @@ r.post('/', validate(CreateCrewMemberSchema), asyncHandler(async (req, res) => {
       ${languages || []}::text[],
       ${skills || []}::text[],
       ${role},
-      ${user?.id || null},
+      ${user.id},
+      ${avatar || null},
       CURRENT_TIMESTAMP,
       CURRENT_TIMESTAMP
     )
@@ -99,18 +98,15 @@ r.post('/', validate(CreateCrewMemberSchema), asyncHandler(async (req, res) => {
 
   const crewMember: any = (crewMemberResult as any[])[0];
 
-  // Return crew member data WITH credentials (only if user account was created)
+  // Return crew member data WITH credentials (always included now)
   const responseData: any = {
     ...crewMember,
-  };
-
-  if (user && username && temporaryPassword) {
-    responseData.credentials = {
+    credentials: {
       username,
       password: temporaryPassword, // Send plain password (only shown once!)
       message: 'Save these credentials! Password will not be shown again.'
-    };
-  }
+    }
+  };
 
   res.json({
     success: true,
