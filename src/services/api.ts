@@ -57,15 +57,33 @@ async function fetchApi<T>(
 export interface CrewMemberDTO {
   id: string;
   name: string;
+  nickname?: string | null;
   position: string;
   department: string;
   status: string;
   contact?: string | null;
   email?: string | null;
+  phone?: string | null;
+  onBoardContact?: string | null;
   joinDate?: string | null;
+  leaveStart?: string | null;
+  leaveEnd?: string | null;
+  languages?: string[];
+  skills?: string[];
   role?: string | null;
+  avatar?: string | null;
+  color?: string;
+  notes?: string | null;
+  shift?: string | null;
+  userId?: string | null;
   createdAt: string;
   updatedAt: string;
+  // Only present in POST /crew response (when creating new crew)
+  credentials?: {
+    username: string;
+    password: string;
+    message: string;
+  };
 }
 
 export const crewApi = {
