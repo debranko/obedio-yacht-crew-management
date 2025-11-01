@@ -64,6 +64,7 @@ import {
 } from "../ui/table";
 import { YACHT_TIMEZONES, VESSEL_TYPES } from "../../types/system-settings";
 import { useYachtSettingsApi } from "../../hooks/useYachtSettingsApi";
+import { useUserPreferences } from "../../hooks/useUserPreferences";
 import {
   Alert,
   AlertDescription,
@@ -179,10 +180,18 @@ interface SettingsPageProps {
 export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   const { rolePermissions, updateRolePermissions, userPreferences, updateUserPreferences } = useAppData();
   const [activeTab, setActiveTab] = useState(initialTab);
-  
+
   // Use yacht settings API hook
   const { settings: yachtSettings, updateSettings: updateYachtSettings, isLoading: isLoadingSettings } = useYachtSettingsApi();
-  
+
+  // Use user preferences API hook for notification settings
+  const {
+    preferences: userPrefs,
+    updateNotifications,
+    isUpdatingNotifications,
+    refetch: refetchUserPrefs
+  } = useUserPreferences();
+
   // Update active tab when initialTab prop changes
   useEffect(() => {
     setActiveTab(initialTab);
@@ -445,7 +454,7 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
         const response = await fetch('/api/notification-settings', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         if (response.ok) {
           const settings = await response.json();
           setPushNotifications(settings.pushEnabled);
@@ -457,19 +466,18 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
           setQuietHoursEnabled(settings.quietHoursEnabled);
           if (settings.quietHoursStart) setQuietHoursStart(settings.quietHoursStart);
           if (settings.quietHoursEnd) setQuietHoursEnd(settings.quietHoursEnd);
-          
-          // Get email from user preferences (since backend doesn't store it)
-          const userEmail = localStorage.getItem('userEmail');
-          if (userEmail) setNotificationEmail(userEmail);
-          
-          // Emergency contacts are stored separately in localStorage for now
-          const savedContacts = localStorage.getItem('emergencyContacts');
-          if (savedContacts) {
-            try {
-              setEmergencyContacts(JSON.parse(savedContacts));
-            } catch (e) {
-              console.error('Failed to parse emergency contacts');
-            }
+        }
+
+        // Load email notifications and emergency contacts from user preferences API
+        if (userPrefs) {
+          if (userPrefs.emailNotifications !== undefined) {
+            setEmailNotifications(userPrefs.emailNotifications);
+          }
+          if (userPrefs.notificationEmail) {
+            setNotificationEmail(userPrefs.notificationEmail);
+          }
+          if (userPrefs.emergencyContacts) {
+            setEmergencyContacts(userPrefs.emergencyContacts as string[]);
           }
         }
       } catch (error) {
@@ -478,14 +486,14 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
         setIsLoadingNotifications(false);
       }
     };
-    
+
     loadNotificationSettings();
-  }, [yachtSettings]);
+  }, [yachtSettings, userPrefs]);
 
   const handleSaveNotifications = async () => {
     try {
       const token = localStorage.getItem('token');
-      
+
       // Save notification settings to backend
       const response = await fetch('/api/notification-settings', {
         method: 'PUT',
@@ -505,22 +513,18 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
           quietHoursEnd: quietHoursEnabled ? quietHoursEnd : null
         })
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to save notification settings');
       }
-      
-      // Save email notification preference to user preferences
-      if (emailNotifications && notificationEmail) {
-        localStorage.setItem('userEmail', notificationEmail);
-        localStorage.setItem('emailNotifications', String(emailNotifications));
-      }
-      
-      // Save emergency contacts to localStorage for now
-      if (emergencyContacts.length > 0) {
-        localStorage.setItem('emergencyContacts', JSON.stringify(emergencyContacts));
-      }
-      
+
+      // Save email notifications and emergency contacts to user preferences API
+      updateNotifications({
+        emailNotifications,
+        notificationEmail: notificationEmail || undefined,
+        emergencyContacts: emergencyContacts.length > 0 ? emergencyContacts : undefined,
+      });
+
       toast.success("Notification settings saved successfully");
     } catch (error) {
       toast.error("Failed to save notification settings");
