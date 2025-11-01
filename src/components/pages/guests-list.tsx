@@ -50,7 +50,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
-import { Skeleton } from '../ui/skeleton';
+import { Skeleton, SkeletonTable, SkeletonStat } from '../ui/skeleton';
 import { toast } from 'sonner';
 import type { Guest } from '../../contexts/AppDataContext';
 import { KpiCard } from '../kpi-card';
@@ -476,11 +476,8 @@ export function GuestsListPage() {
       {/* Table */}
       <div className="border border-border rounded-lg overflow-hidden bg-card">
         {isLoadingGuests ? (
-          <div className="p-8 space-y-4">
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
+          <div className="p-8">
+            <SkeletonTable rows={8} />
           </div>
         ) : (
           <Table className="table-zebra">
