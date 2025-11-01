@@ -5,9 +5,10 @@ import { useLocations } from '../../hooks/useLocations';
 import { useGuests, useGuestsStats, useGuestsMeta } from '../../hooks/useGuests';
 import { useGuestsQueryParams } from '../../hooks/useGuestsQueryParams';
 import { useGuestMutations } from '../../hooks/useGuestMutations';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { GuestsService } from '../../services/guests';
 import { Button } from '../ui/button';
-import { MoreVertical, Users, Calendar, Star, AlertTriangle, Loader2, BellOff, MapPin, Edit2, Download, Plus, UserCheck } from 'lucide-react';
+import { MoreVertical, Users, Calendar, Star, AlertTriangle, Loader2, BellOff, MapPin, Edit2, Download, Plus, UserCheck, Wifi, WifiOff } from 'lucide-react';
 import { Card } from '../ui/card';
 import GuestsToolbar, { FilterState } from '../guests/GuestsToolbar';
 import { DNDGuestsKpiCard } from '../dnd-guests-kpi-card';
@@ -61,7 +62,10 @@ export function GuestsListPage() {
   const { locations, updateLocation } = useLocations();
   const { qp, set, reset } = useGuestsQueryParams();
   const { deleteGuest, isDeleting } = useGuestMutations();
-  
+
+  // WebSocket for real-time updates
+  const { isConnected: wsConnected, on: wsOn, off: wsOff } = useWebSocket();
+
   // Dialog states
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
@@ -75,6 +79,32 @@ export function GuestsListPage() {
   const { data: guestsData, isLoading: isLoadingGuests } = useGuests(qp);
   const { data: stats, isLoading: isLoadingStats } = useGuestsStats();
   const { data: meta } = useGuestsMeta();
+
+  // WebSocket listeners for real-time guest updates
+  useEffect(() => {
+    if (!wsOn || !wsOff) return;
+
+    // Handle guest events - invalidate queries to refetch
+    const handleGuestEvent = (data: any) => {
+      console.log('👥 Guest event received:', data);
+
+      // Invalidate all guest-related queries
+      queryClient.invalidateQueries({ queryKey: ['guests'] });
+      queryClient.invalidateQueries({ queryKey: ['guests-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['guests-meta'] });
+    };
+
+    const unsubscribeCreated = wsOn('guest:created', handleGuestEvent);
+    const unsubscribeUpdated = wsOn('guest:updated', handleGuestEvent);
+    const unsubscribeDeleted = wsOn('guest:deleted', handleGuestEvent);
+
+    // Cleanup
+    return () => {
+      if (unsubscribeCreated) unsubscribeCreated();
+      if (unsubscribeUpdated) unsubscribeUpdated();
+      if (unsubscribeDeleted) unsubscribeDeleted();
+    };
+  }, [wsOn, wsOff, queryClient]);
 
   // Calculate active filters for UI display
   const activeFilters = useMemo(() => {
@@ -365,11 +395,26 @@ export function GuestsListPage() {
 
       {/* New GuestsToolbar Component */}
       <div className="sticky top-0 z-20 bg-background/95 backdrop-blur -mx-6 lg:-mx-8 px-6 lg:px-8 py-4 border-b border-border">
-        <GuestsToolbar
-          onFiltersChange={handleFiltersChange}
-          onExport={handleExportFromToolbar}
-          onAddGuest={() => setIsAddDialogOpen(true)}
-        />
+        <div className="flex items-center justify-between gap-4">
+          <GuestsToolbar
+            onFiltersChange={handleFiltersChange}
+            onExport={handleExportFromToolbar}
+            onAddGuest={() => setIsAddDialogOpen(true)}
+          />
+
+          {/* WebSocket Status Indicator */}
+          <div
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs ${
+              wsConnected
+                ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+                : 'bg-red-500/10 text-red-700 dark:text-red-400'
+            }`}
+            title={wsConnected ? 'Real-time updates active' : 'Real-time updates offline'}
+          >
+            {wsConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+            <span className="hidden sm:inline">{wsConnected ? 'Live' : 'Offline'}</span>
+          </div>
+        </div>
       </div>
 
       {/* Results Info and Bulk Actions */}

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -23,8 +24,11 @@ import {
   Wine,
   Waves,
   Settings,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { useAppData } from '../../contexts/AppDataContext';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import type { ServiceRequest, InteriorTeam } from '../../contexts/AppDataContext';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { ServiceRequestsSettingsDialog } from '../service-requests-settings-dialog';
@@ -57,6 +61,7 @@ export function ServiceRequestsPage({
   isFullscreen: externalFullscreen,
   onToggleFullscreen: externalToggleFullscreen
 }: ServiceRequestsPageProps = {}) {
+  const queryClient = useQueryClient();
   const {
     serviceRequests,
     acceptServiceRequest,
@@ -72,6 +77,9 @@ export function ServiceRequestsPage({
 
   const createServiceRequest = useCreateServiceRequest();
 
+  // WebSocket for real-time updates
+  const { isConnected: wsConnected, on: wsOn, off: wsOff } = useWebSocket();
+
   // Track completing requests with timers
   const [completingRequests, setCompletingRequests] = useState<Record<string, number>>({});
   const [showHistory, setShowHistory] = useState(false);
@@ -84,6 +92,41 @@ export function ServiceRequestsPage({
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // WebSocket listeners for real-time service request updates
+  useEffect(() => {
+    if (!wsOn || !wsOff) return;
+
+    // Handle service request events - invalidate queries to refetch
+    const handleServiceRequestEvent = (data: any) => {
+      console.log('📞 Service request event received:', data);
+
+      // Invalidate service request queries
+      queryClient.invalidateQueries({ queryKey: ['service-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['service-requests-api'] });
+
+      // Play notification sound for new requests
+      if (data.type === 'created' && userPreferences?.soundEnabled !== false) {
+        try {
+          const audio = new Audio('/sounds/notification.mp3');
+          audio.play().catch((e) => console.log('Could not play notification sound:', e));
+        } catch (e) {
+          console.log('Notification sound not available');
+        }
+      }
+    };
+
+    const unsubscribeCreated = wsOn('service-request:created', handleServiceRequestEvent);
+    const unsubscribeUpdated = wsOn('service-request:updated', handleServiceRequestEvent);
+    const unsubscribeCompleted = wsOn('service-request:completed', handleServiceRequestEvent);
+
+    // Cleanup
+    return () => {
+      if (unsubscribeCreated) unsubscribeCreated();
+      if (unsubscribeUpdated) unsubscribeUpdated();
+      if (unsubscribeCompleted) unsubscribeCompleted();
+    };
+  }, [wsOn, wsOff, queryClient, userPreferences]);
 
   const [delegateDialogOpen, setDelegateDialogOpen] = useState(false);
   const [forwardDialogOpen, setForwardDialogOpen] = useState(false);
@@ -325,6 +368,19 @@ export function ServiceRequestsPage({
               </div>
 
               <div className="flex items-center gap-3">
+                {/* WebSocket Status Indicator */}
+                <div
+                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs ${
+                    wsConnected
+                      ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+                      : 'bg-red-500/10 text-red-700 dark:text-red-400'
+                  }`}
+                  title={wsConnected ? 'Real-time updates active' : 'Real-time updates offline'}
+                >
+                  {wsConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+                  <span className="hidden sm:inline">{wsConnected ? 'Live' : 'Offline'}</span>
+                </div>
+
                 {/* Status Badge - Show count */}
                 {stats.pending > 0 && (
                   <Badge variant="destructive" className={`animate-pulse ${isFullscreen ? 'text-lg px-6 py-3' : 'text-base px-4 py-2'}`}>

@@ -3,19 +3,21 @@
  * For Interior department to track different locations within the property
  */
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocations } from "../../hooks/useLocations";
 import { useGuests } from "../../hooks/useGuests";
 import { useGuestMutations } from "../../hooks/useGuestMutations";
 import { useDevices, useDeviceMutations } from "../../hooks/useDevices";
 import { useDND } from "../../hooks/useDND";
+import { useWebSocket } from "../../hooks/useWebSocket";
 import { useAppData } from "../../contexts/AppDataContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { Location, LOCATION_TYPES, LOCATION_STATUS_LABELS } from "../../domain/locations";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
-import { Plus, MapPin, Smartphone, Edit2, Trash2, Search, Image as ImageIcon, X, Upload, BellOff, Bell, Users } from "lucide-react";
+import { Plus, MapPin, Smartphone, Edit2, Trash2, Search, Image as ImageIcon, X, Upload, BellOff, Bell, Users, Wifi, WifiOff } from "lucide-react";
 import { Switch } from "../ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../ui/dialog";
 import { Input } from "../ui/input";
@@ -27,9 +29,13 @@ import { toast } from "sonner";
 import { DNDWidget } from "../dnd-widget";
 
 export function LocationsPage() {
+  const queryClient = useQueryClient();
   const { locations, isLoading, createLocation, updateLocation, deleteLocation } = useLocations();
   const { dndLocations, hasDND } = useDND();
-  
+
+  // WebSocket for real-time updates
+  const { isConnected: wsConnected, on: wsOn, off: wsOff } = useWebSocket();
+
   // Use React Query for guests (real-time updates from database)
   const { data: guestsData } = useGuests({ page: 1, limit: 1000 });
   const guests = (guestsData as any)?.items || [];
@@ -87,6 +93,45 @@ export function LocationsPage() {
       doNotDisturb: false
     });
   };
+
+  // WebSocket listeners for real-time location updates
+  useEffect(() => {
+    if (!wsOn || !wsOff) return;
+
+    // Handle location events - invalidate queries to refetch
+    const handleLocationEvent = (data: any) => {
+      console.log('🏠 Location event received:', data);
+
+      // Invalidate location-related queries
+      queryClient.invalidateQueries({ queryKey: ['locations'] });
+      queryClient.invalidateQueries({ queryKey: ['dnd-locations'] });
+    };
+
+    // Handle DND toggle specifically
+    const handleDNDToggle = (data: any) => {
+      console.log('🔕 DND toggled:', data);
+
+      // Invalidate queries to refetch
+      queryClient.invalidateQueries({ queryKey: ['locations'] });
+      queryClient.invalidateQueries({ queryKey: ['dnd-locations'] });
+
+      // Show toast notification
+      toast.info(`DND ${data.doNotDisturb ? 'enabled' : 'disabled'} for ${data.name}`);
+    };
+
+    const unsubscribeCreated = wsOn('location:created', handleLocationEvent);
+    const unsubscribeUpdated = wsOn('location:updated', handleLocationEvent);
+    const unsubscribeDeleted = wsOn('location:deleted', handleLocationEvent);
+    const unsubscribeDND = wsOn('location:dnd-toggled', handleDNDToggle);
+
+    // Cleanup
+    return () => {
+      if (unsubscribeCreated) unsubscribeCreated();
+      if (unsubscribeUpdated) unsubscribeUpdated();
+      if (unsubscribeDeleted) unsubscribeDeleted();
+      if (unsubscribeDND) unsubscribeDND();
+    };
+  }, [wsOn, wsOff, queryClient]);
 
   const handleCreate = async () => {
     if (!formData.name.trim()) {
@@ -498,10 +543,25 @@ export function LocationsPage() {
             Manage areas and zones within your property
           </p>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Location
-        </Button>
+        <div className="flex items-center gap-3">
+          {/* WebSocket Status Indicator */}
+          <div
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs ${
+              wsConnected
+                ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+                : 'bg-red-500/10 text-red-700 dark:text-red-400'
+            }`}
+            title={wsConnected ? 'Real-time updates active' : 'Real-time updates offline'}
+          >
+            {wsConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+            <span className="hidden sm:inline">{wsConnected ? 'Live' : 'Offline'}</span>
+          </div>
+
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Location
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
