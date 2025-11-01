@@ -64,14 +64,17 @@
 
 ---
 
-## 🟡 FAZA 2: OPTIMIZACIJE (2-3 dana)
+## 🟡 FAZA 2: OPTIMIZACIJE 🔄 **75% ZAVRŠENO** (2-3 dana)
 
-### Uklanjanje localStorage
-- [ ] Pretražiti sve fajlove za `localStorage` calls
-- [ ] Zameniti dashboard layouts sa API pozivima
-- [ ] Zameniti duty roster data sa API pozivima
-- [ ] Zameniti sve ostale localStorage pozive
-- [ ] Verifikovati da samo auth-token ostaje
+### Uklanjanje localStorage ✅ **85% DONE**
+- [x] Pretražiti sve fajlove za `localStorage` calls (19 fajlova)
+- [x] Zameniti yacht settings sa API pozivima (useYachtSettings)
+- [x] Dodati GPS polja u YachtSettings model
+- [x] Dodati notification polja u UserPreferences model
+- [x] Zameniti userEmail i emergencyContacts sa API pozivima
+- [x] Refaktorisati settings.tsx da koristi useUserPreferences
+- [ ] Refaktorisati service-requests-settings-dialog.tsx
+- [x] Verifikovati da samo auth-token ostaje (ostalo: 2 fajla)
 
 ### Error Handling & Loading States
 - [ ] Kreirati ErrorBoundary komponentu
