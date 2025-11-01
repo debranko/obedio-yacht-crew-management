@@ -23,6 +23,21 @@ import {
   SelectValue,
 } from '../ui/select';
 import { Zap, Watch, Radio, Wifi, MapPin, User } from 'lucide-react';
+import { toast } from 'sonner';
+
+// Types for locations and crew members
+interface DeviceLocation {
+  id: string;
+  name: string;
+  type: string;
+  floor?: string;
+}
+
+interface CrewMemberBasic {
+  id: string;
+  name: string;
+  position: string;
+}
 
 interface AddDeviceDialogProps {
   open: boolean;
@@ -35,9 +50,9 @@ interface AddDeviceDialogProps {
     locationId?: string;
     crewMemberId?: string;
     connectionType?: string;
-  }) => void;
-  locations: any[];
-  crewMembers?: any[];
+  }) => Promise<void>;
+  locations: DeviceLocation[];
+  crewMembers?: CrewMemberBasic[];
   defaultType?: 'smart_button' | 'watch' | 'repeater';
 }
 
@@ -82,10 +97,34 @@ export function AddDeviceDialog({
   const [connectionType, setConnectionType] = useState<string>('wifi');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Validate deviceId format
+  const validateDeviceId = (id: string): boolean => {
+    const trimmed = id.trim();
+    // MAC address format: XX:XX:XX:XX:XX:XX or XX-XX-XX-XX-XX-XX
+    const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
+    // Serial format: BTN-XXX, WATCH-XXX, etc.
+    const serialRegex = /^[A-Z]+-[0-9]+$/;
+    // ESP32 device ID format
+    const espRegex = /^ESP[0-9A-F]{6,12}$/i;
+
+    return macRegex.test(trimmed) || serialRegex.test(trimmed) || espRegex.test(trimmed) || trimmed.length >= 6;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!deviceId.trim() || !name.trim()) {
+    const trimmedDeviceId = deviceId.trim();
+    const trimmedName = name.trim();
+
+    if (!trimmedDeviceId || !trimmedName) {
+      toast.error('Device ID and name are required');
+      return;
+    }
+
+    if (!validateDeviceId(trimmedDeviceId)) {
+      toast.error('Invalid device ID format', {
+        description: 'Use MAC address, serial (e.g., BTN-001), or ESP ID format',
+      });
       return;
     }
 
@@ -93,8 +132,8 @@ export function AddDeviceDialog({
 
     try {
       await onAdd({
-        deviceId: deviceId.trim(),
-        name: name.trim(),
+        deviceId: trimmedDeviceId,
+        name: trimmedName,
         type,
         subType: subType || undefined,
         locationId: locationId || undefined,
@@ -111,7 +150,11 @@ export function AddDeviceDialog({
       setConnectionType('wifi');
       onClose();
     } catch (error) {
-      console.error('Failed to add device:', error);
+      // Error is already handled by parent component with toast
+      // Just log for debugging
+      if (error instanceof Error) {
+        console.error('Device creation error:', error.message);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -143,7 +186,10 @@ export function AddDeviceDialog({
           {/* Device Type */}
           <div className="space-y-2">
             <Label>Device Type</Label>
-            <Select value={type} onValueChange={(v: any) => setType(v)}>
+            <Select
+              value={type}
+              onValueChange={(v) => setType(v as 'smart_button' | 'watch' | 'repeater')}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>

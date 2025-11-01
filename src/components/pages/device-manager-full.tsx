@@ -139,7 +139,15 @@ export function DeviceManagerPage() {
   };
 
   // Handle add new device
-  const handleAdd = async (deviceData: any) => {
+  const handleAdd = async (deviceData: {
+    deviceId: string;
+    name: string;
+    type: 'smart_button' | 'watch' | 'repeater' | 'mobile_app';
+    subType?: string;
+    locationId?: string;
+    crewMemberId?: string;
+    connectionType?: string;
+  }) => {
     try {
       await createDevice({
         ...deviceData,
@@ -148,8 +156,11 @@ export function DeviceManagerPage() {
       toast.success(`Device ${deviceData.name} added successfully!`);
       refetch(); // Refresh device list
     } catch (error) {
-      console.error('Failed to add device:', error);
-      toast.error('Failed to add device');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('Failed to add device:', errorMessage);
+      toast.error('Failed to add device', {
+        description: errorMessage,
+      });
       throw error; // Re-throw to let dialog handle it
     }
   };
