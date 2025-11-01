@@ -7,6 +7,7 @@ import { Card } from "../ui/card";
 import { CameraDialog } from "../camera-dialog";
 import { useAppData } from "../../contexts/AppDataContext";
 import { useCreateCrewMember, useUpdateCrewMember, useDeleteCrewMember } from "../../hooks/useCrewMembers";
+import { useDeleteAssignmentsByCrew, useDeleteAssignment } from "../../hooks/useAssignments";
 import { useDevices } from "../../hooks/useDevices";
 import { DutyTimerCard } from "../duty-timer-card";
 import {
@@ -95,6 +96,8 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
   const createCrewMutation = useCreateCrewMember();
   const updateCrewMutation = useUpdateCrewMember();
   const deleteCrewMutation = useDeleteCrewMember();
+  const deleteAssignmentsByCrew = useDeleteAssignmentsByCrew();
+  const deleteAssignment = useDeleteAssignment();
 
   // Fetch devices from database to show assigned devices
   const { data: allDevices = [] } = useDevices();
@@ -281,13 +284,15 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
       }
     }, {
       onSuccess: () => {
-        // If status changed TO "on-leave", remove all duty assignments
+        // If status changed TO "on-leave", remove all duty assignments FROM DATABASE
         if (!wasOnLeave && isNowOnLeave) {
-          const updatedAssignments = contextAssignments.filter(
-            assignment => assignment.crewId !== selectedCrew.id
-          );
-          setContextAssignments(updatedAssignments);
-          toast.info(`${formData.name} removed from all duty assignments`);
+          deleteAssignmentsByCrew.mutate({
+            crewMemberId: selectedCrew.id
+          }, {
+            onSuccess: () => {
+              toast.info(`${formData.name} removed from all duty assignments`);
+            }
+          });
         }
 
         setIsCrewSheetOpen(false);
@@ -322,11 +327,11 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
     if (!isEmergencyOverride) {
       // Remove from Duty Roster assignments only if assigned in calendar
       const today = new Date().toISOString().split('T')[0];
-      
+
       // Parse shift time string (e.g., "06:00 - 14:00") to find matching shift config
       const shiftTimeMatch = dutyInfo.shift.match(/^(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})$/);
       let currentShiftId: string | undefined;
-      
+
       if (shiftTimeMatch) {
         const [, startTime, endTime] = shiftTimeMatch;
         const currentShift = contextShifts.find(
@@ -334,23 +339,19 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
         );
         currentShiftId = currentShift?.id;
       }
-      
-      // Filter out assignments for this crew member on today's date and current shift
-      const updatedAssignments = contextAssignments.filter(assignment => {
-        // Remove assignment if it matches this crew member, today, and current shift
-        if (
-          assignment.crewId === contextCrew.id && 
-          assignment.date === today && 
-          currentShiftId &&
-          assignment.shiftId === currentShiftId
-        ) {
-          return false; // Remove this assignment
-        }
-        return true; // Keep all other assignments
-      });
-      
-      // Update context assignments
-      setContextAssignments(updatedAssignments);
+
+      // Find assignment to delete from database
+      const assignmentToDelete = contextAssignments.find(assignment =>
+        assignment.crewId === contextCrew.id &&
+        assignment.date === today &&
+        currentShiftId &&
+        assignment.shiftId === currentShiftId
+      );
+
+      // Delete assignment from database
+      if (assignmentToDelete) {
+        deleteAssignment.mutate(assignmentToDelete.id);
+      }
     }
     
     // Update crew status in database via backend API
@@ -568,12 +569,8 @@ export function CrewListPage({ onNavigate, onNavigateToSettingsRoles }: CrewList
       }
     }, {
       onSuccess: () => {
-        // Update local context after successful API call
-        const updatedContextCrew = contextCrewMembers.map(cm =>
-          cm.id === updatedCrew.id ? updatedCrew : cm
-        );
-        setContextCrewMembers(updatedContextCrew);
         // Success toast is handled by the mutation hook
+        // Note: React Query automatically invalidates cache and re-fetches
       }
     });
   };
