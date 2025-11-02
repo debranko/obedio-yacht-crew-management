@@ -72,7 +72,8 @@ export function useYachtSettings() {
     queryKey: QUERY_KEY,
     queryFn: async () => {
       const response = await api.get<{ success: boolean; data: YachtSettings }>('/yacht-settings');
-      return response.data;
+      // Response structure is { success: boolean, data: YachtSettings }
+      return response.data?.data || response.data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1,
