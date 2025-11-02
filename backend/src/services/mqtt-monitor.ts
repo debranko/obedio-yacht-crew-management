@@ -27,7 +27,7 @@ class MQTTMonitor {
     this.io = new SocketIOServer(this.httpServer, {
       cors: { origin: '*' }
     });
-    this.port = parseInt(process.env.MQTT_MONITOR_PORT || '8888');
+    this.port = parseInt(process.env.MQTT_MONITOR_PORT || '8889');
 
     this.setupRoutes();
     this.setupSocketIO();

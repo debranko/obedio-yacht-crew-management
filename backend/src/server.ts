@@ -92,13 +92,7 @@ const globalLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 attempts per 15 min per IP
-  message: { success: false, error: 'Too many login attempts, please try again in 15 minutes' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// Auth limiter removed - no rate limiting on login for development
 
 // Apply global rate limiter to all API routes
 app.use('/api/', globalLimiter);
@@ -138,7 +132,7 @@ app.get('/api-docs/swagger.json', (req, res) => {
 });
 
 // Routes - Apply strict rate limiting to auth endpoints
-app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/crew', crewRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/guests', guestRoutes);
@@ -186,8 +180,8 @@ async function startServer() {
     await mqttService.connect(websocketService.getIO());
     console.log('✅ MQTT service connected');
 
-    // Start MQTT Monitor Dashboard
-    mqttMonitor.start();
+    // Start MQTT Monitor Dashboard (temporarily disabled due to port conflict)
+    // mqttMonitor.start();
     
     httpServer.listen(PORT, () => {
       console.log(`
@@ -201,7 +195,7 @@ async function startServer() {
    • API Health: http://localhost:${PORT}/api/health
    • Auth: http://localhost:${PORT}/api/auth/login
    • WebSocket: ws://localhost:${PORT}
-   • MQTT Monitor: http://localhost:${process.env.MQTT_MONITOR_PORT || 8888}
+   • MQTT Monitor: http://localhost:${process.env.MQTT_MONITOR_PORT || 8889}
    • API Docs: http://localhost:${PORT}/api-docs 📚
 
 📊 Available Endpoints:
