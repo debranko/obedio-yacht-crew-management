@@ -1,11 +1,14 @@
 /**
  * useYachtSettings Hook
  * Manages yacht settings with backend API sync (replaced localStorage)
- * Uses React Query for server-side state management
+ * Uses React Query for server-side state management with WebSocket updates
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { toast } from 'sonner';
+import { api } from '../services/api';
+import { useWebSocket } from './useWebSocket';
 
 const QUERY_KEY = ['yachtSettings'];
 
@@ -25,6 +28,7 @@ export interface YachtSettings {
   timeFormat: string;
   weatherUnits: string;
   windSpeedUnits: string;
+  weatherUpdateInterval: number; // Weather update interval in seconds (default: 30)
 
   // GPS Location fields
   latitude?: number | null;
@@ -43,6 +47,7 @@ export interface YachtSettingsUpdate {
   timeFormat?: string;
   weatherUnits?: string;
   windSpeedUnits?: string;
+  weatherUpdateInterval?: number;
   latitude?: number | null;
   longitude?: number | null;
   accuracy?: number | null;
@@ -51,10 +56,11 @@ export interface YachtSettingsUpdate {
 }
 
 /**
- * Fetch yacht settings from backend API
+ * Fetch yacht settings from backend API with WebSocket real-time updates
  */
 export function useYachtSettings() {
   const queryClient = useQueryClient();
+  const { on, off } = useWebSocket();
 
   // Fetch settings
   const {
@@ -65,54 +71,80 @@ export function useYachtSettings() {
   } = useQuery({
     queryKey: QUERY_KEY,
     queryFn: async () => {
-      const token = localStorage.getItem('obedio-auth-token');
-      const response = await fetch('/api/yacht-settings', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch yacht settings');
-      }
-
-      const result = await response.json();
-      return result.data as YachtSettings;
+      const response = await api.get<{ success: boolean; data: YachtSettings }>('/yacht-settings');
+      return response.data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1,
   });
 
-  // Update settings mutation
+  // Listen for WebSocket updates
+  useEffect(() => {
+    if (!on || !off) return;
+
+    const handleSettingsUpdate = (updatedSettings: YachtSettings) => {
+      console.log('📡 Yacht settings updated via WebSocket:', updatedSettings);
+
+      // Update React Query cache
+      queryClient.setQueryData(QUERY_KEY, updatedSettings);
+
+      toast.success('Settings updated', {
+        description: 'Yacht settings have been updated',
+      });
+    };
+
+    const unsubscribe = on('settings:updated', handleSettingsUpdate);
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [on, off, queryClient]);
+
+  // Update settings mutation with optimistic updates
   const updateMutation = useMutation({
     mutationFn: async (updates: YachtSettingsUpdate) => {
-      const token = localStorage.getItem('obedio-auth-token');
-      const response = await fetch('/api/yacht-settings', {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updates),
-      });
+      const response = await api.put<{ success: boolean; data: YachtSettings }>('/yacht-settings', updates);
+      return response.data;
+    },
+    // Optimistic update
+    onMutate: async (updates: YachtSettingsUpdate) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY });
 
-      if (!response.ok) {
-        throw new Error('Failed to update yacht settings');
+      // Snapshot current value
+      const previousSettings = queryClient.getQueryData<YachtSettings>(QUERY_KEY);
+
+      // Optimistically update cache
+      if (previousSettings) {
+        queryClient.setQueryData<YachtSettings>(QUERY_KEY, {
+          ...previousSettings,
+          ...updates,
+        });
       }
 
-      const result = await response.json();
-      return result.data as YachtSettings;
+      // Return context with previous value
+      return { previousSettings };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+    onSuccess: (data) => {
+      // Update with actual server data
+      queryClient.setQueryData(QUERY_KEY, data);
       console.log('✅ Yacht settings saved');
+      toast.success('Settings saved successfully');
     },
-    onError: (error: any) => {
+    onError: (error: any, _updates, context) => {
+      // Rollback on error
+      if (context?.previousSettings) {
+        queryClient.setQueryData(QUERY_KEY, context.previousSettings);
+      }
+
       console.error('❌ Failed to save yacht settings:', error);
       toast.error('Failed to save yacht settings', {
         description: error.message || 'Please try again',
       });
+    },
+    onSettled: () => {
+      // Always refetch after error or success
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
     },
   });
 

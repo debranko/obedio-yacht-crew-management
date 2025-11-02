@@ -63,7 +63,7 @@ import {
   TableRow,
 } from "../ui/table";
 import { YACHT_TIMEZONES, VESSEL_TYPES } from "../../types/system-settings";
-import { useYachtSettingsApi } from "../../hooks/useYachtSettingsApi";
+import { useYachtSettings } from "../../hooks/useYachtSettings";
 import { useUserPreferences } from "../../hooks/useUserPreferences";
 import {
   Alert,
@@ -181,8 +181,8 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   const { rolePermissions, updateRolePermissions, userPreferences, updateUserPreferences } = useAppData();
   const [activeTab, setActiveTab] = useState(initialTab);
 
-  // Use yacht settings API hook
-  const { settings: yachtSettings, updateSettings: updateYachtSettings, isLoading: isLoadingSettings } = useYachtSettingsApi();
+  // Use yacht settings hook with WebSocket support
+  const { settings: yachtSettings, updateSettings: updateYachtSettings, isLoading: isLoadingSettings, isUpdating } = useYachtSettings();
 
   // Use user preferences API hook for notification settings
   const {
@@ -256,8 +256,8 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   // Initialize state from backend settings
   useEffect(() => {
     if (yachtSettings) {
-      setYachtName(yachtSettings.vesselName || "");
-      setYachtType(yachtSettings.vesselType || "motor-yacht");
+      setYachtName(yachtSettings.name || "");
+      setYachtType(yachtSettings.type || "motor-yacht");
       setTimezone(yachtSettings.timezone || "Europe/Monaco");
       setFloors(yachtSettings.floors || []);
     }
@@ -315,19 +315,14 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
       servingNowTimeout,
       requestDialogRepeatInterval,
     });
-    
-    // Save vessel settings to backend
-    try {
-      await updateYachtSettings({
-        vesselName: yachtName,
-        vesselType: yachtType,
-        timezone: timezone,
-        floors: floors,
-      });
-      toast.success("General settings saved successfully");
-    } catch (error) {
-      toast.error("Failed to save settings");
-    }
+
+    // Save vessel settings to backend (with optimistic updates and WebSocket)
+    updateYachtSettings({
+      name: yachtName,
+      type: yachtType,
+      timezone: timezone,
+      floors: floors,
+    });
   };
   
   const handleAddFloor = () => {
@@ -865,9 +860,9 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
             </Card>
             
             <div className="flex justify-end">
-              <Button onClick={handleSaveGeneral} disabled={isLoadingSettings}>
+              <Button onClick={handleSaveGeneral} disabled={isLoadingSettings || isUpdating}>
                 <Save className="h-4 w-4 mr-2" />
-                Save General Settings
+                {isUpdating ? 'Saving...' : 'Save General Settings'}
               </Button>
             </div>
           </div>
