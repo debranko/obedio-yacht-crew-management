@@ -125,8 +125,8 @@ export const availableWidgets: WidgetConfig[] = [
     icon: Radio,
     defaultSize: { w: 3, h: 4, minW: 3, minH: 4 },
     category: "status",
-    // No permissions required - admins need this for testing
-    recommendedForRoles: ["admin"],
+    // Not shown by default - can be added manually from Manage Widgets
+    recommendedForRoles: [],
   },
   // Mock/hardcoded widgets removed: Active Devices, Service Requests Chart, Response Time Chart
   // These had fake data and are not production-ready
