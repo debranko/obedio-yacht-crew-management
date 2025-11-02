@@ -651,32 +651,34 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-3xl grid-cols-6">
-          <TabsTrigger value="general">
-            <SettingsIcon className="h-4 w-4 mr-2" />
-            General
-          </TabsTrigger>
-          <TabsTrigger value="categories">
-            <Tag className="h-4 w-4 mr-2" />
-            Categories
-          </TabsTrigger>
-          <TabsTrigger value="notifications">
-            <Bell className="h-4 w-4 mr-2" />
-            Notifications
-          </TabsTrigger>
-          <TabsTrigger value="roles">
-            <Shield className="h-4 w-4 mr-2" />
-            Permissions
-          </TabsTrigger>
-          <TabsTrigger value="system">
-            <Server className="h-4 w-4 mr-2" />
-            System
-          </TabsTrigger>
-          <TabsTrigger value="backup">
-            <Database className="h-4 w-4 mr-2" />
-            Backup
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-2">
+          <TabsList className="inline-flex w-auto min-w-full">
+            <TabsTrigger value="general" className="flex-shrink-0">
+              <SettingsIcon className="h-4 w-4 mr-2" />
+              General
+            </TabsTrigger>
+            <TabsTrigger value="categories" className="flex-shrink-0">
+              <Tag className="h-4 w-4 mr-2" />
+              Categories
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="flex-shrink-0">
+              <Bell className="h-4 w-4 mr-2" />
+              Notifications
+            </TabsTrigger>
+            <TabsTrigger value="roles" className="flex-shrink-0">
+              <Shield className="h-4 w-4 mr-2" />
+              Permissions
+            </TabsTrigger>
+            <TabsTrigger value="system" className="flex-shrink-0">
+              <Server className="h-4 w-4 mr-2" />
+              System
+            </TabsTrigger>
+            <TabsTrigger value="backup" className="flex-shrink-0">
+              <Database className="h-4 w-4 mr-2" />
+              Backup
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* General Settings Tab */}
         <TabsContent value="general" className="space-y-6">
