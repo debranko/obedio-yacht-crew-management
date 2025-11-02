@@ -147,24 +147,53 @@ export function DutyRosterProvider({ children }: { children: ReactNode }) {
     const today = new Date().toISOString().split('T')[0];
     const todayAssignments = assignments.filter(a => a.date === today);
 
+    // Get current time in HH:MM format
+    const now = new Date();
+    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+    // Find currently active shift based on time
+    const activeShifts = shifts.filter(shift => {
+      if (!shift.isActive) return false;
+
+      // Handle shifts that cross midnight
+      if (shift.startTime > shift.endTime) {
+        return currentTime >= shift.startTime || currentTime < shift.endTime;
+      }
+
+      return currentTime >= shift.startTime && currentTime < shift.endTime;
+    });
+
+    // Get crew members on duty (assigned to active shifts)
     const onDuty = crewMembers.filter(member =>
-      todayAssignments.some(a => a.crewMemberId === member.id && a.shift === 'on-duty')
+      todayAssignments.some(a =>
+        a.crewMemberId === member.id &&
+        activeShifts.some(shift => shift.name === a.shift)
+      )
     );
 
-    const nextShift = crewMembers.filter(member =>
-      todayAssignments.some(a => a.crewMemberId === member.id && a.shift === 'next-shift')
-    );
+    // Find next upcoming shift
+    const futureShifts = shifts
+      .filter(shift => shift.isActive && currentTime < shift.startTime)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-    const backup = crewMembers.filter(member =>
-      todayAssignments.some(a => a.crewMemberId === member.id && a.shift === 'backup')
-    );
+    const nextShiftConfig = futureShifts[0];
 
-    const nextBackup = crewMembers.filter(member =>
-      todayAssignments.some(a => a.crewMemberId === member.id && a.shift === 'next-backup')
-    );
+    // Get crew members for next shift
+    const nextShift = nextShiftConfig
+      ? crewMembers.filter(member =>
+          todayAssignments.some(a =>
+            a.crewMemberId === member.id &&
+            a.shift === nextShiftConfig.name
+          )
+        )
+      : [];
+
+    // Backup and next backup (kept for compatibility but typically empty)
+    const backup: CrewMemberExtended[] = [];
+    const nextBackup: CrewMemberExtended[] = [];
 
     return { onDuty, nextShift, backup, nextBackup };
-  }, [assignments, crewMembers]);
+  }, [assignments, crewMembers, shifts]);
 
   // Detect roster changes for notifications
   const detectRosterChanges = useCallback((): CrewChange[] => {
