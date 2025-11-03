@@ -82,13 +82,14 @@
 ---
 
 ### 5. Updated Documentation 📚
-**Created:**
-- ✅ `BUGFIX-SUMMARY-2025-11-03.md` - Complete bugfix reference
-- ✅ Updated `OBEDIO-API-MASTER-REFERENCE.md` - Added bugfix changelog + WebSocket refactoring notes
+**Updated:**
+- ✅ `OBEDIO-API-MASTER-REFERENCE.md` - Added bugfix changelog + WebSocket refactoring notes
 
 **Updated Sections:**
 - WebSocket Events - Documented singleton architecture
 - Bugfix Changelog - All 4 bugs documented with root cause, solution, impact
+
+**Note:** Per user feedback, do NOT create separate bugfix summary documents. All fixes should be documented in OBEDIO-API-MASTER-REFERENCE.md only.
 
 ---
 
@@ -119,9 +120,9 @@
 
 ## 📁 IMPORTANT FILES REFERENCE
 
-### Documentation (Updated Today)
+### Documentation (Essential Only)
 1. **`OBEDIO-API-MASTER-REFERENCE.md`** - Complete API inventory + bugfix changelog
-2. **`BUGFIX-SUMMARY-2025-11-03.md`** - Quick bugfix reference
+2. **`DATABASE-INVENTORY.md`** - Database schema reference
 3. **`.claude/obedio-development-rules.md`** - Development workflow (mandatory)
 4. **`.claude/session-state.md`** - This file!
 
@@ -136,7 +137,6 @@
 ### Must Read Before Any Task
 1. `.claude/obedio-development-rules.md` - Complete workflow
 2. `OBEDIO-API-MASTER-REFERENCE.md` - API inventory (search first!)
-3. `BUGFIX-SUMMARY-2025-11-03.md` - Recent fixes
 
 ---
 
@@ -162,7 +162,7 @@
 ### On Session Start:
 1. **Read this file** (`.claude/session-state.md`)
 2. **Read rules** (`.claude/obedio-development-rules.md`)
-3. **Scan bugfix summary** (`BUGFIX-SUMMARY-2025-11-03.md`)
+3. **Check API reference** (`OBEDIO-API-MASTER-REFERENCE.md` - bugfix changelog section)
 4. Confirm to user: "✅ Session state loaded. All systems operational. Ready for next task."
 
 ### When Given Task:
