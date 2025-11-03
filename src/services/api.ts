@@ -272,6 +272,14 @@ export const serviceRequestsApi = {
     fetchApi<ServiceRequestDTO>(`/service-requests/${id}/cancel`, {
       method: 'POST',
     }),
+
+  /**
+   * Clear all service requests
+   */
+  clearAll: () =>
+    fetchApi<{ message: string }>('/service-requests/clear-all', {
+      method: 'DELETE',
+    }),
 };
 
 // =====================

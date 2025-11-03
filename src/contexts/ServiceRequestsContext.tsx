@@ -6,7 +6,7 @@
 
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useServiceRequestsApi } from '../hooks/useServiceRequestsApi';
+import { useServiceRequestsApi, useAcceptServiceRequest, useCompleteServiceRequest } from '../hooks/useServiceRequestsApi';
 import { ServiceRequest, ServiceRequestHistory } from '../types/service-requests';
 
 interface ServiceRequestsContextType {
@@ -16,7 +16,7 @@ interface ServiceRequestsContextType {
 
   // Service Request operations
   addServiceRequest: (request: Omit<ServiceRequest, 'id' | 'timestamp'>) => ServiceRequest;
-  acceptServiceRequest: (requestId: string, crewMemberName: string) => void;
+  acceptServiceRequest: (requestId: string, crewMemberId: string) => void;
   delegateServiceRequest: (requestId: string, toCrewMember: string) => void;
   completeServiceRequest: (requestId: string, crewMemberName?: string) => void;
 
@@ -32,6 +32,10 @@ export function ServiceRequestsProvider({ children }: { children: ReactNode }) {
 
   // Fetch service requests from API using React Query
   const { serviceRequests: apiServiceRequests, isLoading } = useServiceRequestsApi();
+
+  // React Query mutations for service request operations
+  const acceptMutation = useAcceptServiceRequest();
+  const completeMutation = useCompleteServiceRequest();
 
   // Service Request History - will be fetched from backend via useServiceRequestHistory hook
   // For now keeping local state for backward compatibility
@@ -62,16 +66,13 @@ export function ServiceRequestsProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   // Accept service request
-  const acceptServiceRequest = useCallback((requestId: string, crewMemberName: string) => {
+  const acceptServiceRequest = useCallback((requestId: string, crewMemberId: string) => {
     const request = apiServiceRequests.find(r => r.id === requestId);
     if (!request) return;
 
-    // TODO: Properly implement history tracking based on ServiceRequestHistory type
-
-    // Invalidate cache to trigger refetch
-    queryClient.invalidateQueries({ queryKey: ['service-requests'] });
-    queryClient.invalidateQueries({ queryKey: ['service-requests-api'] });
-  }, [apiServiceRequests, queryClient]);
+    // Call backend API to accept the request
+    acceptMutation.mutate({ id: requestId, crewId: crewMemberId });
+  }, [apiServiceRequests, acceptMutation]);
 
   // Delegate service request
   const delegateServiceRequest = useCallback((requestId: string, toCrewMember: string) => {
@@ -102,10 +103,9 @@ export function ServiceRequestsProvider({ children }: { children: ReactNode }) {
       }]);
     }
 
-    // Invalidate cache to trigger refetch
-    queryClient.invalidateQueries({ queryKey: ['service-requests'] });
-    queryClient.invalidateQueries({ queryKey: ['service-requests-api'] });
-  }, [apiServiceRequests, queryClient]);
+    // Call backend API to complete the request
+    completeMutation.mutate(requestId);
+  }, [apiServiceRequests, completeMutation]);
 
   // Clear service request history
   const clearServiceRequestHistory = useCallback(() => {

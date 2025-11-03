@@ -48,6 +48,8 @@ function transformServiceRequest(dto: ServiceRequestDTOWithRelations): ServiceRe
   const cabinImage = dto.location?.imageUrl ||
     (dto.location?.name ? `/images/locations/${dto.location.name}.jpg` : undefined);
 
+  const frontendStatus = mapBackendStatusToFrontend(dto.status);
+
   return {
     id: dto.id,
     guestName,
@@ -59,7 +61,7 @@ function transformServiceRequest(dto: ServiceRequestDTOWithRelations): ServiceRe
     voiceTranscript: dto.voiceTranscript || undefined,
     voiceAudioUrl: dto.voiceAudioUrl || undefined,
     cabinImage,
-    status: mapBackendStatusToFrontend(dto.status),
+    status: frontendStatus,
     assignedTo: dto.assignedTo || undefined,
     categoryId: dto.categoryId || undefined,
     category: dto.category || undefined,
@@ -78,13 +80,14 @@ function mapBackendStatusToFrontend(backendStatus: string): ServiceRequest['stat
   const statusMap: Record<string, ServiceRequest['status']> = {
     'pending': 'pending',
     'in-progress': 'accepted',
+    'in_progress': 'accepted',  // Backend uses underscore format
     'completed': 'completed',
     'cancelled': 'completed', // Map cancelled to completed for now
     'serving': 'accepted',
     'accepted': 'accepted',
     'delegated': 'delegated'
   };
-  
+
   return statusMap[backendStatus.toLowerCase()] || 'pending';
 }
 

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { Card } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -26,6 +26,7 @@ import {
   Settings,
   Wifi,
   WifiOff,
+  Trash2,
 } from 'lucide-react';
 import { useAppData } from '../../contexts/AppDataContext';
 import { useWebSocket } from '../../hooks/useWebSocket';
@@ -37,6 +38,7 @@ import { ServiceRequestsSettingsDialog } from '../service-requests-settings-dial
 import { ServingRequestCard } from '../serving-request-card';
 import { useCreateServiceRequest, useAcceptServiceRequest, useCompleteServiceRequest, useUpdateServiceRequest } from '../../hooks/useServiceRequestsApi';
 import { useServiceCategories } from '../../hooks/useServiceCategories';
+import { api } from '../../services/api';
 import {
   Dialog,
   DialogContent,
@@ -89,6 +91,20 @@ export function ServiceRequestsPage({
   const { mutate: acceptRequest } = useAcceptServiceRequest();
   const { mutate: completeRequest } = useCompleteServiceRequest();
   const { mutate: updateRequest } = useUpdateServiceRequest();
+
+  // Clear all service requests mutation
+  const clearAllMutation = useMutation({
+    mutationFn: () => api.serviceRequests.clearAll(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['service-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['service-requests-api'] });
+      toast.success('All service requests cleared');
+      setClearAllDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to clear requests');
+    }
+  });
 
   // WebSocket for real-time updates
   const { isConnected: wsConnected, on: wsOn, off: wsOff } = useWebSocket();
@@ -149,6 +165,7 @@ export function ServiceRequestsPage({
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const [internalFullscreen, setInternalFullscreen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+  const [clearAllDialogOpen, setClearAllDialogOpen] = useState(false);
 
   // Use external fullscreen state if provided, otherwise use internal
   const isFullscreen = externalFullscreen !== undefined ? externalFullscreen : internalFullscreen;
@@ -454,6 +471,18 @@ export function ServiceRequestsPage({
                 >
                   <Bell className={`${isFullscreen ? 'h-5 w-5' : 'h-4 w-4'}`} />
                   {createServiceRequest.isPending ? 'Creating...' : 'Test Request'}
+                </Button>
+
+                {/* Clear All Requests Button */}
+                <Button
+                  variant="destructive"
+                  size={isFullscreen ? 'lg' : 'default'}
+                  onClick={() => setClearAllDialogOpen(true)}
+                  disabled={clearAllMutation.isPending || serviceRequests.length === 0}
+                  className={`gap-2 ${isFullscreen ? 'h-14 px-6' : ''}`}
+                >
+                  <Trash2 className={`${isFullscreen ? 'h-5 w-5' : 'h-4 w-4'}`} />
+                  {clearAllMutation.isPending ? 'Clearing...' : 'Clear All'}
                 </Button>
 
                 {/* Settings Button */}
@@ -922,6 +951,53 @@ export function ServiceRequestsPage({
         open={settingsDialogOpen}
         onOpenChange={setSettingsDialogOpen}
       />
+
+      {/* Clear All Requests Confirmation Dialog */}
+      <Dialog open={clearAllDialogOpen} onOpenChange={setClearAllDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clear All Service Requests?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete all service requests from the database.
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-destructive mb-1">
+                    Warning: This will delete {serviceRequests.length} service request{serviceRequests.length !== 1 ? 's' : ''}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    All pending, active, and completed requests will be permanently removed.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setClearAllDialogOpen(false)}
+              disabled={clearAllMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => clearAllMutation.mutate()}
+              disabled={clearAllMutation.isPending}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              {clearAllMutation.isPending ? 'Clearing...' : 'Clear All Requests'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

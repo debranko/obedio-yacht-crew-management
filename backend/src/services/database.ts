@@ -563,6 +563,16 @@ export class DatabaseService {
     return request;
   }
 
+  async deleteAllServiceRequests() {
+    // Delete all service request history first (foreign key constraint)
+    await this.prisma.serviceRequestHistory.deleteMany({});
+
+    // Delete all service requests
+    const result = await this.prisma.serviceRequest.deleteMany({});
+
+    return result;
+  }
+
   // ===== SMART BUTTON INTEGRATION =====
 
   async handleSmartButtonPress(data: {

@@ -105,10 +105,16 @@ export function IncomingRequestDialog({
 
   const handleAccept = () => {
     if (!request) return;
-    
-    // Get current user (in production, from auth context)
-    const currentUser = onDutyCrew[0]?.name || 'Crew Member';
-    acceptServiceRequest(request.id, currentUser);
+
+    // Get current user ID (in production, from auth context)
+    const currentUserId = onDutyCrew[0]?.id || '';
+
+    if (!currentUserId) {
+      toast.error('No crew member on duty to accept request');
+      return;
+    }
+
+    acceptServiceRequest(request.id, currentUserId);
     toast.success(`Request from ${request.guestName} accepted`);
     onClose();
   };

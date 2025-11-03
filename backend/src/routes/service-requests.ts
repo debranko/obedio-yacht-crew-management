@@ -50,4 +50,9 @@ router.put('/:id/complete', requirePermission('service-requests.complete'), asyn
   res.json(apiSuccess(request));
 }));
 
+router.delete('/clear-all', requirePermission('service-requests.delete'), asyncHandler(async (req, res) => {
+  await dbService.deleteAllServiceRequests();
+  res.json(apiSuccess({ message: 'All service requests deleted' }));
+}));
+
 export default router;

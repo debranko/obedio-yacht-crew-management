@@ -1,5 +1,5 @@
 # OBEDIO API MASTER REFERENCE
-**Living Document - Updated: 2025-11-03 Evening (Post-Bugfix)**
+**Living Document - Updated: 2025-11-03 Night (Service Requests Bugfix + Clear All Feature)**
 **Project**: Luxury Minimal Web App Design (Obedio Yacht Crew Management)
 
 ---
@@ -83,7 +83,7 @@
 ### 3. SERVICE REQUESTS API
 **File**: `backend/src/routes/service-requests.ts`
 **Base Path**: `/api/service-requests`
-**Permissions**: `service-requests.view`, `service-requests.create`, `service-requests.accept`, `service-requests.complete`
+**Permissions**: `service-requests.view`, `service-requests.create`, `service-requests.accept`, `service-requests.complete`, `service-requests.delete`
 
 | Endpoint | Method | Permission | Description | Query Params | Request Body |
 |----------|--------|------------|-------------|--------------|--------------|
@@ -91,10 +91,17 @@
 | `/` | POST | `service-requests.create` | Create new service request | None | `ServiceRequestDTO` |
 | `/:id/accept` | PUT | `service-requests.accept` | Assign request to crew member | None | `{ crewMemberId }` |
 | `/:id/complete` | PUT | `service-requests.complete` | Mark request as completed | None | None |
+| `/clear-all` | DELETE | `service-requests.delete` | **Delete ALL service requests** (clears database) | None | None |
 
 **Pagination**: Returns `{ items, page, limit, total, totalPages }`
 **WebSocket Events**: `service-request:created`, `service-request:assigned`, `service-request:completed`, `service-request:status-changed`
 **Used By**: `service-requests.tsx`, `ServiceRequestsContext.tsx`
+
+**⚠️ IMPORTANT - Status Mapping**:
+- Backend returns: `"IN_PROGRESS"` (with underscore, uppercase)
+- Frontend maps: `in_progress` → `accepted` (after `.toLowerCase()`)
+- Mapping also supports: `in-progress` (dash version for compatibility)
+- **Bug Fixed 2025-11-03**: Added `in_progress` mapping to fix "Serving Now" widget not showing accepted requests
 
 ---
 
@@ -520,9 +527,15 @@ useCompleteServiceRequest() => mutation
 useCancelServiceRequest() => mutation
 ```
 
+**API Methods** (via `src/services/api.ts`):
+```typescript
+api.serviceRequests.clearAll() => Promise<{ message: string }>
+```
+
 **Special Features**:
 - **Backend-to-Frontend transformation**: Maps `ServiceRequestDTO` to `ServiceRequest`
-- **Status mapping**: `in-progress` → `accepted`, `cancelled` → `completed`
+- **Status mapping**: `in-progress` → `accepted`, `in_progress` → `accepted`, `cancelled` → `completed`
+- **Bug Fixed 2025-11-03**: Added `in_progress` (underscore) to status mapping
 - Auto-refresh every 60 seconds
 - Stale time: 30 seconds
 
@@ -703,6 +716,7 @@ All page components are in: `src/components/pages/`
 - `POST /api/service-requests` - Create new request
 - `PUT /api/service-requests/:id/accept` - Assign to crew member
 - `PUT /api/service-requests/:id/complete` - Mark completed
+- `DELETE /api/service-requests/clear-all` - **Clear all requests** (delete everything)
 - `GET /api/user-preferences` - Load Service Requests settings
 - `PUT /api/user-preferences/service-requests` - Save settings
 
@@ -713,6 +727,7 @@ All page components are in: `src/components/pages/`
 - Guest photos (if enabled in settings)
 - Timer for serving timeout
 - Sound alerts on new requests
+- **"Clear All Requests" button** - Deletes all service requests with confirmation dialog
 - Settings dialog with 12 configurable options
 - Real-time updates via WebSocket
 
@@ -729,6 +744,12 @@ All page components are in: `src/components/pages/`
 10. Auto-priority VIP (yes/no)
 11. Auto-priority master cabin (yes/no)
 12. Dialog repeat interval (seconds)
+
+**⚠️ Bug Fixed 2025-11-03**:
+- **Problem**: Accepted service requests not appearing in "Serving Now" widget
+- **Root Cause**: Backend returns `IN_PROGRESS` (underscore), frontend mapping only had `in-progress` (dash)
+- **Fix**: Added `in_progress` key to status mapping in `useServiceRequestsApi.ts`
+- **Result**: Now correctly maps both `in-progress` and `in_progress` to `accepted` status
 
 ---
 
@@ -1221,6 +1242,58 @@ After creating/modifying an API, update:
 
 ---
 
+#### 5. Service Requests - "Serving Now" Widget Not Showing Accepted Requests (RESOLVED)
+**Problem**: Service requests accepted via popup dialog were not appearing in "Serving Now" widget
+
+**Root Cause**:
+- Backend returns status: `"IN_PROGRESS"` (uppercase with underscore)
+- Frontend status mapping only had: `'in-progress': 'accepted'` (lowercase with dash)
+- After `.toLowerCase()`: `"IN_PROGRESS"` → `"in_progress"` (underscore preserved!)
+- No match found, defaulted to `'pending'` status
+- Result: Accepted requests never showed in "Serving Now" (filters for `status === 'accepted'`)
+
+**Debug Evidence**:
+```
+🔍 Transform Service Request:
+backendStatus: "IN_PROGRESS"
+frontendStatus: "pending"  ← WRONG! Should be "accepted"
+assignedTo: "Alina Ela"
+```
+
+**Files Fixed**:
+- ✅ `src/hooks/useServiceRequestsApi.ts:92` - Added `'in_progress': 'accepted'` to status mapping
+- ✅ `src/contexts/ServiceRequestsContext.tsx` - Fixed accept/complete methods to call backend API
+- ✅ `src/components/incoming-request-dialog.tsx` - Fixed to pass crew ID instead of name
+
+**Impact**:
+- Accepted service requests now correctly appear in "Serving Now" widget
+- Status transformation handles both `in-progress` and `in_progress` formats
+
+---
+
+#### 6. Service Requests - Clear All Feature (NEW FEATURE)
+**Problem**: Many old service requests cluttering the database with no way to clear them
+
+**Solution**: Added "Clear All Requests" button with confirmation dialog
+
+**Files Added/Modified**:
+- ✅ `backend/src/routes/service-requests.ts` - Added `DELETE /clear-all` endpoint
+- ✅ `backend/src/services/database.ts` - Added `deleteAllServiceRequests()` method
+- ✅ `src/services/api.ts` - Added `clearAll()` API method
+- ✅ `src/components/pages/service-requests.tsx` - Added Clear All button with confirmation dialog
+
+**Features**:
+- Red destructive button in Service Requests page header
+- Confirmation dialog with warning message
+- Shows count of requests to be deleted
+- Disabled when no requests exist
+- Deletes both ServiceRequest and ServiceRequestHistory records (foreign key constraint)
+- Invalidates React Query cache to refresh UI
+
+**Impact**: Users can now clear all old service requests with one click
+
+---
+
 ### Testing Checklist After Bugfixes
 
 - ✅ WebSocket connects ONCE on app load (check console)
@@ -1229,10 +1302,12 @@ After creating/modifying an API, update:
 - ✅ No React Query undefined warnings
 - ✅ Locations page loads with guest data
 - ✅ All 5 major sections work: Dashboard, Crew, Guests, Devices, Locations
+- ✅ Service requests accepted via popup show in "Serving Now" widget
+- ✅ "Clear All Requests" button works with confirmation dialog
 
 ---
 
 **End of Document**
-**Last Updated**: 2025-11-03 (Evening - Post-Bugfix)
+**Last Updated**: 2025-11-03 (Night - Service Requests Bugfix + Clear All Feature)
 **Maintained By**: Claude Code Assistant
 **Next Review Date**: When adding/modifying any API
