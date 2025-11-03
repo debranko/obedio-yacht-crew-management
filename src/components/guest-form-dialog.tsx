@@ -57,7 +57,7 @@ function CabinSelect({ value, onValueChange }: { value?: string; onValueChange: 
           </SelectItem>
         ) : (
           cabins.map((cabin) => (
-            <SelectItem key={cabin.id} value={cabin.name}>
+            <SelectItem key={cabin.id} value={cabin.id}>
               {cabin.name} {cabin.floor && `(${cabin.floor})`}
             </SelectItem>
           ))
@@ -82,7 +82,7 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
     nationality: '',
     languages: [],
     passportNumber: '',
-    cabin: '',
+    locationId: '',
     checkInDate: new Date().toISOString().split('T')[0],
     checkInTime: '14:00',
     checkOutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -130,7 +130,7 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
         nationality: '',
         languages: [],
         passportNumber: '',
-        cabin: '',
+        locationId: '',
         checkInDate: new Date().toISOString().split('T')[0],
         checkInTime: '14:00',
         checkOutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -513,8 +513,8 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
               <div className="space-y-2">
                 <Label htmlFor="cabin">Cabin Assignment</Label>
                 <CabinSelect
-                  value={formData.cabin}
-                  onValueChange={(value) => setFormData({ ...formData, cabin: value })}
+                  value={formData.locationId}
+                  onValueChange={(value) => setFormData({ ...formData, locationId: value })}
                 />
               </div>
 

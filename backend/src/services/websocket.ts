@@ -126,6 +126,22 @@ export class WebSocketService {
   }
 
   /**
+   * Emit service request assigned event (when crew member accepts)
+   */
+  emitServiceRequestAssigned(request: any): void {
+    this.broadcast('service-request:assigned', request);
+    console.log(`📋 Service request assigned: ${request.id} → ${request.assignedTo}`);
+  }
+
+  /**
+   * Emit service request status changed event
+   */
+  emitServiceRequestStatusChanged(request: any): void {
+    this.broadcast('service-request:status-changed', request);
+    console.log(`🔄 Service request status changed: ${request.id} → ${request.status}`);
+  }
+
+  /**
    * Emit emergency alert
    */
   emitEmergencyAlert(emergency: any): void {
@@ -179,6 +195,48 @@ export class WebSocketService {
    */
   emitAssignmentChanged(event: 'created' | 'updated' | 'deleted', assignment: any): void {
     this.broadcast(`assignment:${event}`, assignment);
+  }
+
+  /**
+   * Emit assignment created event
+   */
+  emitAssignmentCreated(assignment: any): void {
+    this.emitAssignmentChanged('created', assignment);
+  }
+
+  /**
+   * Emit assignment updated event
+   */
+  emitAssignmentUpdated(assignment: any): void {
+    this.emitAssignmentChanged('updated', assignment);
+  }
+
+  /**
+   * Emit assignment deleted event
+   */
+  emitAssignmentDeleted(assignment: any): void {
+    this.emitAssignmentChanged('deleted', assignment);
+  }
+
+  /**
+   * Emit shift created event
+   */
+  emitShiftCreated(shift: any): void {
+    this.broadcast('shift:created', shift);
+  }
+
+  /**
+   * Emit shift updated event
+   */
+  emitShiftUpdated(shift: any): void {
+    this.broadcast('shift:updated', shift);
+  }
+
+  /**
+   * Emit shift deleted event
+   */
+  emitShiftDeleted(shift: any): void {
+    this.broadcast('shift:deleted', shift);
   }
 
   /**

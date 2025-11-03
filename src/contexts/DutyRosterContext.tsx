@@ -107,6 +107,8 @@ export function DutyRosterProvider({ children }: { children: ReactNode }) {
   const saveAssignments = useCallback(async (assignmentsToSave?: Assignment[]) => {
     const toSave = assignmentsToSave || assignments;
 
+    console.log('💾 saveAssignments: Starting save...', { assignmentsCount: toSave.length });
+
     setIsSaving(true);
     try {
       // Group assignments by date for bulk operations
@@ -118,27 +120,46 @@ export function DutyRosterProvider({ children }: { children: ReactNode }) {
         return acc;
       }, {} as Record<string, Assignment[]>);
 
+      console.log('💾 saveAssignments: Grouped by date', {
+        dates: Object.keys(assignmentsByDate),
+        totalDates: Object.keys(assignmentsByDate).length
+      });
+
       // Process each date
       for (const [date, dateAssignments] of Object.entries(assignmentsByDate)) {
+        console.log(`💾 saveAssignments: Processing date ${date}...`, { count: dateAssignments.length });
+
         // Delete existing assignments for this date
+        console.log(`🗑️ saveAssignments: Deleting existing assignments for ${date}...`);
         await deleteAssignmentsByDate.mutateAsync(date);
+        console.log(`✅ saveAssignments: Deleted assignments for ${date}`);
 
         // Create new assignments
         if (dateAssignments.length > 0) {
+          console.log(`➕ saveAssignments: Creating ${dateAssignments.length} assignments for ${date}...`);
           await createBulkAssignments.mutateAsync(dateAssignments);
+          console.log(`✅ saveAssignments: Created assignments for ${date}`);
         }
       }
 
       setLastSaved(new Date());
       setPreviousAssignments(toSave);
 
+      console.log('💾 saveAssignments: Invalidating queries...');
       // Invalidate cache to refetch
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
-    } catch (error) {
-      console.error('Failed to save assignments:', error);
+      console.log('✅ saveAssignments: Save completed successfully!');
+    } catch (error: any) {
+      console.error('❌ saveAssignments: Failed to save assignments:', error);
+      console.error('❌ saveAssignments: Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       throw error;
     } finally {
       setIsSaving(false);
+      console.log('💾 saveAssignments: Saving state cleared');
     }
   }, [assignments, createBulkAssignments, deleteAssignmentsByDate, queryClient]);
 
@@ -163,13 +184,26 @@ export function DutyRosterProvider({ children }: { children: ReactNode }) {
       return currentTime >= shift.startTime && currentTime < shift.endTime;
     });
 
-    // Get crew members on duty (assigned to active shifts)
-    const onDuty = crewMembers.filter(member =>
-      todayAssignments.some(a =>
-        a.crewMemberId === member.id &&
-        activeShifts.some(shift => shift.name === a.shift)
-      )
-    );
+    // Get crew members on duty - PRIORITIZE crew.status field
+    // Include: 1) Anyone with status='on-duty', OR 2) Anyone assigned to active shifts
+    const onDutySet = new Set<string>();
+
+    // 1. Add crew members with status='on-duty' (manual override via toggle)
+    crewMembers.forEach(member => {
+      if (member.status === 'on-duty') {
+        onDutySet.add(member.id);
+      }
+    });
+
+    // 2. Add crew members assigned to currently active shifts
+    todayAssignments.forEach(a => {
+      if (activeShifts.some(shift => shift.name === a.shift)) {
+        onDutySet.add(a.crewMemberId);
+      }
+    });
+
+    // Convert Set to actual crew member objects
+    const onDuty = crewMembers.filter(member => onDutySet.has(member.id));
 
     // Find next upcoming shift
     const futureShifts = shifts

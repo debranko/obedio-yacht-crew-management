@@ -123,7 +123,7 @@ export function CrewMemberDetailsDialog({
 
     try {
       // Update device in database with crewMemberId
-      await updateDevice({
+      await updateDevice.mutateAsync({
         id: device.id,
         data: {
           crewMemberId: crewMember.id
@@ -154,7 +154,7 @@ export function CrewMemberDetailsDialog({
       }
 
       // Update device in database - set crewMemberId to null
-      await updateDevice({
+      await updateDevice.mutateAsync({
         id: device.id,
         data: {
           crewMemberId: null

@@ -8,6 +8,8 @@ import { prisma } from '../services/db';
 import { asyncHandler, validate } from '../middleware/error-handler';
 import { CreateAssignmentSchema, UpdateAssignmentSchema } from '../validators/schemas';
 import { authMiddleware } from '../middleware/auth';
+import { websocketService } from '../services/websocket';
+import { apiSuccess, apiError } from '../utils/api-response';
 
 const router = Router();
 
@@ -47,11 +49,7 @@ router.get('/', asyncHandler(async (req, res) => {
     }
   });
 
-  res.json({
-    success: true,
-    data: assignments,
-    count: assignments.length
-  });
+  res.json(apiSuccess(assignments));
 }));
 
 /**
@@ -69,12 +67,7 @@ router.get('/by-date/:date', asyncHandler(async (req, res) => {
     }
   });
 
-  res.json({
-    success: true,
-    data: assignments,
-    count: assignments.length,
-    date
-  });
+  res.json(apiSuccess(assignments));
 }));
 
 /**
@@ -106,13 +99,7 @@ router.get('/by-week/:startDate', asyncHandler(async (req, res) => {
     }
   });
 
-  res.json({
-    success: true,
-    data: assignments,
-    count: assignments.length,
-    startDate,
-    endDate
-  });
+  res.json(apiSuccess(assignments));
 }));
 
 /**
@@ -139,12 +126,7 @@ router.get('/crew/:crewMemberId', asyncHandler(async (req, res) => {
     }
   });
 
-  res.json({
-    success: true,
-    data: assignments,
-    count: assignments.length,
-    crewMemberId
-  });
+  res.json(apiSuccess(assignments));
 }));
 
 /**
@@ -160,13 +142,10 @@ router.get('/:id', asyncHandler(async (req, res) => {
   });
 
   if (!assignment) {
-    return res.status(404).json({
-      success: false,
-      error: 'Assignment not found'
-    });
+    return res.status(404).json(apiError('Assignment not found', 'NOT_FOUND'));
   }
 
-  res.json({ success: true, data: assignment });
+  res.json(apiSuccess(assignment));
 }));
 
 /**
@@ -185,10 +164,7 @@ router.post('/', validate(CreateAssignmentSchema), asyncHandler(async (req, res)
   });
 
   if (existing) {
-    return res.status(409).json({
-      success: false,
-      error: 'Assignment already exists for this date, shift, crew member, and type'
-    });
+    return res.status(409).json(apiError('Assignment already exists for this date, shift, crew member, and type', 'CONFLICT'));
   }
 
   const assignment = await prisma.assignment.create({
@@ -198,11 +174,10 @@ router.post('/', validate(CreateAssignmentSchema), asyncHandler(async (req, res)
     }
   });
 
-  res.status(201).json({
-    success: true,
-    data: assignment,
-    message: 'Assignment created successfully'
-  });
+  // Broadcast assignment creation to all connected clients
+  websocketService.emitAssignmentCreated(assignment);
+
+  res.status(201).json(apiSuccess(assignment));
 }));
 
 /**
@@ -213,33 +188,48 @@ router.post('/bulk', asyncHandler(async (req, res) => {
   const { assignments } = req.body;
 
   if (!Array.isArray(assignments)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Assignments must be an array'
-    });
+    return res.status(400).json(apiError('Assignments must be an array', 'VALIDATION_ERROR'));
   }
 
   // Validate each assignment
   const validatedAssignments = assignments.map(a =>
     CreateAssignmentSchema.parse(a)
-  );
+  ) as Array<{
+    date: string;
+    shiftId: string;
+    crewMemberId: string;
+    type: 'primary' | 'backup';
+    notes?: string | null;
+  }>;
 
-  // Create all assignments in a transaction
-  const created = await prisma.$transaction(
-    validatedAssignments.map(data =>
-      prisma.assignment.create({
-        data,
-        include: { shift: true }
-      })
-    )
-  );
-
-  res.status(201).json({
-    success: true,
-    data: created,
-    count: created.length,
-    message: `${created.length} assignment(s) created successfully`
+  // Use createMany with skipDuplicates to handle unique constraint violations gracefully
+  const result = await prisma.assignment.createMany({
+    data: validatedAssignments,
+    skipDuplicates: true, // Skip assignments that already exist (unique constraint)
   });
+
+  // Fetch the created assignments to return with shift data and broadcast
+  // Get all assignments for the dates in the validated assignments
+  const dates = Array.from(new Set(validatedAssignments.map(a => a.date)));
+  const created = await prisma.assignment.findMany({
+    where: {
+      date: { in: dates },
+      OR: validatedAssignments.map(a => ({
+        date: a.date,
+        shiftId: a.shiftId,
+        crewMemberId: a.crewMemberId,
+        type: a.type
+      }))
+    },
+    include: { shift: true }
+  });
+
+  // Broadcast bulk assignment creation to all connected clients
+  created.forEach(assignment => {
+    websocketService.emitAssignmentCreated(assignment);
+  });
+
+  res.status(201).json(apiSuccess({ count: result.count, assignments: created }));
 }));
 
 /**
@@ -255,11 +245,10 @@ router.put('/:id', validate(UpdateAssignmentSchema), asyncHandler(async (req, re
     }
   });
 
-  res.json({
-    success: true,
-    data: assignment,
-    message: 'Assignment updated successfully'
-  });
+  // Broadcast assignment update to all connected clients
+  websocketService.emitAssignmentUpdated(assignment);
+
+  res.json(apiSuccess(assignment));
 }));
 
 /**
@@ -267,14 +256,20 @@ router.put('/:id', validate(UpdateAssignmentSchema), asyncHandler(async (req, re
  * Delete a single assignment
  */
 router.delete('/:id', asyncHandler(async (req, res) => {
+  const assignment = await prisma.assignment.findUnique({
+    where: { id: req.params.id }
+  });
+
   await prisma.assignment.delete({
     where: { id: req.params.id }
   });
 
-  res.json({
-    success: true,
-    message: 'Assignment deleted successfully'
-  });
+  // Broadcast assignment deletion to all connected clients
+  if (assignment) {
+    websocketService.emitAssignmentDeleted(assignment);
+  }
+
+  res.json(apiSuccess({ deleted: true, id: req.params.id }));
 }));
 
 /**
@@ -288,11 +283,10 @@ router.delete('/by-date/:date', asyncHandler(async (req, res) => {
     where: { date }
   });
 
-  res.json({
-    success: true,
-    count: result.count,
-    message: `${result.count} assignment(s) deleted for ${date}`
-  });
+  // Note: WebSocket broadcast for bulk delete not implemented (too many events)
+  // Consider implementing a bulk delete event in websocketService if needed
+
+  res.json(apiSuccess({ deleted: true, count: result.count, date }));
 }));
 
 /**
@@ -313,11 +307,10 @@ router.delete('/crew/:crewMemberId', asyncHandler(async (req, res) => {
 
   const result = await prisma.assignment.deleteMany({ where });
 
-  res.json({
-    success: true,
-    count: result.count,
-    message: `${result.count} assignment(s) deleted for crew member ${crewMemberId}`
-  });
+  // Note: WebSocket broadcast for bulk delete not implemented (too many events)
+  // Consider implementing a bulk delete event in websocketService if needed
+
+  res.json(apiSuccess({ deleted: true, count: result.count, crewMemberId }));
 }));
 
 export default router;
