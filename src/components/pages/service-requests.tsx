@@ -311,7 +311,8 @@ export function ServiceRequestsPage({
         id: selectedRequest.id,
         data: {
           categoryId: selectedCategoryId,
-          status: 'delegated', // Mark as delegated when forwarded to category
+          // Don't change status - backend doesn't support 'delegated'
+          // Request keeps its current status (pending/IN_PROGRESS/etc)
         },
       },
       {

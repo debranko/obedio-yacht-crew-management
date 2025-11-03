@@ -150,7 +150,7 @@ interface AppDataContextType {
   serviceRequests: ServiceRequest[];
   addServiceRequest: (request: Omit<ServiceRequest, 'id' | 'timestamp'>) => ServiceRequest;
   acceptServiceRequest: (requestId: string, crewMemberId: string) => void;
-  delegateServiceRequest: (requestId: string, toCrewMember: string) => void;
+  delegateServiceRequest: (requestId: string, crewMemberId: string) => void;
   completeServiceRequest: (requestId: string, crewMemberName?: string) => void;
   serviceRequestHistory: ServiceRequestHistory[];
   clearServiceRequestHistory: () => void;
