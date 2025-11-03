@@ -1,5 +1,5 @@
 # OBEDIO API MASTER REFERENCE
-**Living Document - Updated: 2025-11-03 Night (Service Requests Bugfix + Clear All Feature)**
+**Living Document - Updated: 2025-11-04 (Service Requests: Finish/Delegate/Forward Fixes)**
 **Project**: Luxury Minimal Web App Design (Obedio Yacht Crew Management)
 
 ---
@@ -1294,20 +1294,108 @@ assignedTo: "Alina Ela"
 
 ---
 
+#### 7. Service Requests - Finish Button Foreign Key Constraint (RESOLVED)
+**Problem**: Clicking "Finish" button throws Prisma foreign key error and request doesn't complete
+
+**Error Message**:
+```
+Foreign key constraint violated: ActivityLog_userId_fkey (index)
+at: backend/src/services/database.ts:547
+```
+
+**Root Cause**:
+- ActivityLog.userId has foreign key constraint to User table (not CrewMember table)
+- Code was passing `request.assignedToId` (which is CrewMember ID)
+- Should pass User ID from CrewMember.userId relation
+
+**Files Fixed**:
+- ✅ `backend/src/services/database.ts:547` - Changed from `userId: request.assignedToId` to `userId: request.CrewMember?.userId || null`
+
+**Impact**:
+- "Finish" button now works without errors
+- Completed requests properly logged in ActivityLog
+- Request disappears from "Serving Now" widget
+- Request added to history correctly
+
+---
+
+#### 8. Service Requests - Delegate Button Not Working (RESOLVED)
+**Problem**: Clicking "Delegate" shows toast but request doesn't appear in "Serving Now" widget
+
+**Root Cause Analysis**:
+- `delegateServiceRequest()` function was empty (only invalidated cache)
+- Frontend passed crew member NAME instead of crew member ID
+- Backend has NO separate "delegated" status
+- Backend supports: PENDING, IN_PROGRESS, COMPLETED, CANCELLED only
+- Delegate should work same as Accept (both assign crew + set IN_PROGRESS status)
+
+**Files Fixed (Rule #9 - Entire Codebase Search)**:
+- ✅ `src/contexts/ServiceRequestsContext.tsx:78-84` - Changed delegateServiceRequest to call accept API: `acceptMutation.mutate({ id, crewId })`
+- ✅ `src/contexts/AppDataContext.tsx:153` - Fixed type signature: `crewMemberId` instead of `toCrewMember`
+- ✅ `src/components/incoming-request-dialog.tsx:126,395,436` - handleSelectCrew now receives (crewId, crewName) and passes crew.id
+- ✅ `src/components/service-request-panel.tsx:374,77-92` - SelectItem value changed from crew.name to crew.id, confirmDelegate finds name for toast
+- ✅ `src/components/pages/service-requests.tsx:916,287-300` - SelectItem value changed from crew.name to crew.id, confirmDelegate finds name for toast
+
+**How It Works Now**:
+1. User clicks "Delegate" → Selects crew member from dropdown
+2. Frontend calls `delegateServiceRequest(requestId, crewMemberId)`
+3. Function calls backend `PUT /api/service-requests/:id/accept` with crewMemberId
+4. Backend sets status to `IN_PROGRESS` and assigns crew member
+5. Frontend maps `IN_PROGRESS` → `accepted` status
+6. Request appears in "Serving Now" widget (filters `status === 'accepted'`)
+
+**Impact**:
+- Delegate button now fully functional
+- Uses correct crew member ID (not name) for database relations
+- Request properly assigned and appears in "Serving Now" widget
+- Same backend endpoint as Accept (consolidated logic)
+
+---
+
+#### 9. Service Requests - Forward Sets Invalid Status (RESOLVED)
+**Problem**: Forward feature was setting `status: 'delegated'` which backend doesn't support
+
+**Root Cause**:
+- `confirmForward()` in service-requests.tsx set `status: 'delegated'`
+- Backend validator only accepts: PENDING, IN_PROGRESS, COMPLETED, CANCELLED
+- Would cause validation errors when forwarding requests
+
+**Files Fixed**:
+- ✅ `src/components/pages/service-requests.tsx:314-315` - Removed status change from forward operation
+
+**How It Works Now**:
+- Forward only updates `categoryId` field
+- Request status remains unchanged (keeps current status)
+- No backend validation errors
+
+**Impact**:
+- Forward feature works without errors
+- Request maintains proper status lifecycle
+- Category assignment works correctly
+
+---
+
 ### Testing Checklist After Bugfixes
 
+#### Core Functionality
 - ✅ WebSocket connects ONCE on app load (check console)
 - ✅ No disconnect/reconnect loop
 - ✅ Weather widgets show "No coordinates set" gracefully (if no GPS)
 - ✅ No React Query undefined warnings
 - ✅ Locations page loads with guest data
 - ✅ All 5 major sections work: Dashboard, Crew, Guests, Devices, Locations
+
+#### Service Requests (Latest Fixes - 2025-11-04)
 - ✅ Service requests accepted via popup show in "Serving Now" widget
 - ✅ "Clear All Requests" button works with confirmation dialog
+- ✅ **"Finish" button completes request without errors** (ActivityLog fix)
+- ✅ **Completed requests disappear from "Serving Now" widget**
+- ✅ **"Delegate" button assigns request and shows in "Serving Now"** (Uses accept API)
+- ✅ **Forward updates category without breaking status**
 
 ---
 
 **End of Document**
-**Last Updated**: 2025-11-03 (Night - Service Requests Bugfix + Clear All Feature)
+**Last Updated**: 2025-11-04 (Service Requests: Finish/Delegate/Forward Fixes)
 **Maintained By**: Claude Code Assistant
 **Next Review Date**: When adding/modifying any API
