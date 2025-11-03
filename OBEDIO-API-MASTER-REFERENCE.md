@@ -150,6 +150,7 @@
 ### 6. LOCATIONS API
 **File**: `backend/src/routes/locations.ts`
 **Base Path**: `/api/locations`
+**Auth**: ✅ `authMiddleware` (server.ts:141)
 **Permissions**: `locations.view`, `locations.create`, `locations.update`, `locations.delete`
 
 | Endpoint | Method | Permission | Description | Request Body |
@@ -164,6 +165,7 @@
 
 **WebSocket Events**: `location:created`, `location:updated`, `location:deleted`, `location:dnd-toggled`
 **Used By**: `locations.tsx`, `GuestsContext.tsx`
+**Fixed**: 2025-11-03 - Added missing authMiddleware to enable authentication
 
 ---
 
