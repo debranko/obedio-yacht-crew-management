@@ -8,6 +8,8 @@ import { prisma } from '../services/db';
 import { asyncHandler, validate } from '../middleware/error-handler';
 import { CreateShiftSchema, UpdateShiftSchema } from '../validators/schemas';
 import { authMiddleware } from '../middleware/auth';
+import { websocketService } from '../services/websocket';
+import { apiSuccess, apiError } from '../utils/api-response';
 
 const router = Router();
 
@@ -30,11 +32,7 @@ router.get('/', asyncHandler(async (_, res) => {
     ORDER BY s."order" ASC
   `;
 
-  res.json({
-    success: true,
-    data: shifts,
-    count: (shifts as any[]).length
-  });
+  res.json(apiSuccess(shifts));
 }));
 
 /**
@@ -52,11 +50,7 @@ router.get('/active', asyncHandler(async (_, res) => {
     }
   });
 
-  res.json({
-    success: true,
-    data: shifts,
-    count: shifts.length
-  });
+  res.json(apiSuccess(shifts));
 }));
 
 /**
@@ -78,13 +72,10 @@ router.get('/:id', asyncHandler(async (req, res) => {
   });
 
   if (!shift) {
-    return res.status(404).json({
-      success: false,
-      error: 'Shift not found'
-    });
+    return res.status(404).json(apiError('Shift not found', 'NOT_FOUND'));
   }
 
-  res.json({ success: true, data: shift });
+  res.json(apiSuccess(shift));
 }));
 
 /**
@@ -96,11 +87,10 @@ router.post('/', validate(CreateShiftSchema), asyncHandler(async (req, res) => {
     data: req.body
   });
 
-  res.status(201).json({
-    success: true,
-    data: shift,
-    message: 'Shift created successfully'
-  });
+  // Broadcast shift creation to all connected clients
+  websocketService.emitShiftCreated(shift);
+
+  res.status(201).json(apiSuccess(shift));
 }));
 
 /**
@@ -116,7 +106,7 @@ router.put('/:id', validate(UpdateShiftSchema), asyncHandler(async (req, res) =>
   const values = Object.values(data);
 
   if (fields.length === 0) {
-    return res.status(400).json({ success: false, error: 'No fields to update' });
+    return res.status(400).json(apiError('No fields to update', 'VALIDATION_ERROR'));
   }
 
   const setClause = fields.map((f, i) => `"${f}" = $${i + 2}`).join(', ');
@@ -127,11 +117,12 @@ router.put('/:id', validate(UpdateShiftSchema), asyncHandler(async (req, res) =>
     ...values
   );
 
-  res.json({
-    success: true,
-    data: (shift as any[])[0],
-    message: 'Shift updated successfully'
-  });
+  const updatedShift = (shift as any[])[0];
+
+  // Broadcast shift update to all connected clients
+  websocketService.emitShiftUpdated(updatedShift);
+
+  res.json(apiSuccess(updatedShift));
 }));
 
 /**
@@ -139,14 +130,20 @@ router.put('/:id', validate(UpdateShiftSchema), asyncHandler(async (req, res) =>
  * Delete a shift (cascades to assignments)
  */
 router.delete('/:id', asyncHandler(async (req, res) => {
+  const shift = await prisma.shift.findUnique({
+    where: { id: req.params.id }
+  });
+
   await prisma.shift.delete({
     where: { id: req.params.id }
   });
 
-  res.json({
-    success: true,
-    message: 'Shift deleted successfully'
-  });
+  // Broadcast shift deletion to all connected clients
+  if (shift) {
+    websocketService.emitShiftDeleted(shift);
+  }
+
+  res.json(apiSuccess({ deleted: true, id: req.params.id }));
 }));
 
 /**
@@ -161,11 +158,10 @@ router.post('/:id/toggle-active', asyncHandler(async (req, res) => {
     data: { isActive }
   });
 
-  res.json({
-    success: true,
-    data: shift,
-    message: `Shift ${isActive ? 'activated' : 'deactivated'} successfully`
-  });
+  // Broadcast shift toggle to all connected clients
+  websocketService.emitShiftUpdated(shift);
+
+  res.json(apiSuccess(shift));
 }));
 
 /**
@@ -176,14 +172,11 @@ router.post('/reorder', asyncHandler(async (req, res) => {
   const { shifts } = req.body; // Array of { id, order }
 
   if (!Array.isArray(shifts)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Shifts must be an array'
-    });
+    return res.status(400).json(apiError('Shifts must be an array', 'VALIDATION_ERROR'));
   }
 
   // Update each shift's order in a transaction
-  await prisma.$transaction(
+  const updatedShifts = await prisma.$transaction(
     shifts.map(({ id, order }) =>
       prisma.shift.update({
         where: { id },
@@ -192,10 +185,12 @@ router.post('/reorder', asyncHandler(async (req, res) => {
     )
   );
 
-  res.json({
-    success: true,
-    message: 'Shift order updated successfully'
+  // Broadcast shift reorder to all connected clients
+  updatedShifts.forEach(shift => {
+    websocketService.emitShiftUpdated(shift);
   });
+
+  res.json(apiSuccess({ reordered: true, count: updatedShifts.length }));
 }));
 
 export default router;

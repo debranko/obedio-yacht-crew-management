@@ -5,6 +5,7 @@ import { generatePassword, generateUniqueUsername } from '../utils/password-gene
 import { asyncHandler, validate } from '../middleware/error-handler';
 import { CreateCrewMemberSchema, UpdateCrewMemberSchema } from '../validators/schemas';
 import { websocketService } from '../services/websocket';
+import { apiSuccess, apiError } from '../utils/api-response';
 
 const r = Router();
 
@@ -13,7 +14,7 @@ r.get('/', asyncHandler(async (_, res) => {
     orderBy: { name: 'asc' },
     include: { user: true } // Include linked user account
   });
-  res.json({ success: true, data });
+  res.json(apiSuccess(data));
 }));
 
 /**
@@ -108,10 +109,7 @@ r.post('/', validate(CreateCrewMemberSchema), asyncHandler(async (req, res) => {
     }
   };
 
-  res.json({
-    success: true,
-    data: responseData
-  });
+  res.json(apiSuccess(responseData));
 }));
 
 /**
@@ -130,7 +128,7 @@ r.put('/:id', validate(UpdateCrewMemberSchema), asyncHandler(async (req, res) =>
     websocketService.emitCrewStatusChanged(crewMember);
   }
 
-  res.json({ success: true, data: crewMember });
+  res.json(apiSuccess(crewMember));
 }));
 
 /**
@@ -141,7 +139,7 @@ r.delete('/:id', asyncHandler(async (req, res) => {
     where: { id: req.params.id }
   });
 
-  res.json({ success: true, message: 'Crew member deleted successfully' });
+  res.json(apiSuccess({ deleted: true, id: req.params.id }));
 }));
 
 export default r;

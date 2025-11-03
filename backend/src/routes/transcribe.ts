@@ -8,6 +8,7 @@ import multer from 'multer';
 import OpenAI from 'openai';
 import fs from 'fs';
 import path from 'path';
+import { apiSuccess, apiError } from '../utils/api-response';
 
 const router = express.Router();
 
@@ -60,10 +61,7 @@ router.post('/', upload.single('audio'), async (req, res) => {
   try {
     if (!req.file) {
       console.log('❌ No file in request');
-      return res.status(400).json({
-        success: false,
-        message: 'No audio file provided'
-      });
+      return res.status(400).json(apiError('No audio file provided', 'VALIDATION_ERROR'));
     }
 
     console.log('🎙️ Transcribing audio file:', {
@@ -89,11 +87,10 @@ router.post('/', upload.single('audio'), async (req, res) => {
 
     console.log('✅ Transcription successful:', transcription.text);
 
-    res.json({
-      success: true,
+    res.json(apiSuccess({
       transcript: transcription.text,
       duration: req.body.duration ? parseFloat(req.body.duration) : null
-    });
+    }));
 
   } catch (error: any) {
     console.error('❌ Transcription error:', error);
@@ -109,12 +106,10 @@ router.post('/', upload.single('audio'), async (req, res) => {
       fs.unlinkSync(req.file.path);
     }
 
-    res.status(500).json({
-      success: false,
-      message: 'Failed to transcribe audio',
+    res.status(500).json(apiError('Failed to transcribe audio', 'TRANSCRIPTION_ERROR', {
       error: error.message,
       details: error.response?.data || error.toString()
-    });
+    }));
   }
 });
 
@@ -125,14 +120,13 @@ router.post('/', upload.single('audio'), async (req, res) => {
 router.get('/test', (req, res) => {
   const hasApiKey = !!process.env.OPENAI_API_KEY;
   
-  res.json({
-    success: true,
+  res.json(apiSuccess({
     message: 'Transcription service is ready',
     openai: {
       configured: hasApiKey,
       keyPreview: hasApiKey ? `${process.env.OPENAI_API_KEY?.substring(0, 10)}...` : 'not configured'
     }
-  });
+  }));
 });
 
 export default router;

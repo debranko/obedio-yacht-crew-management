@@ -37,13 +37,13 @@ export function useDeviceLogs(params?: DeviceLogParams) {
   return useQuery({
     queryKey: ['device-logs', params],
     queryFn: async () => {
-      const token = localStorage.getItem('obedio-auth-token');
+      // Auth handled by HTTP-only cookies (server runs 24/7)
       const apiUrl = import.meta.env.VITE_API_URL || '/api';
       const response = await fetch(`${apiUrl}${endpoint}`, {
         headers: {
           'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
         },
+        credentials: 'include', // Send HTTP-only cookie automatically
       });
       
       if (!response.ok) {

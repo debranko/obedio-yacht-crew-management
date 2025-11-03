@@ -105,7 +105,8 @@ export function useYachtSettings() {
   const updateMutation = useMutation({
     mutationFn: async (updates: YachtSettingsUpdate) => {
       const response = await api.put<{ success: boolean; data: YachtSettings }>('/yacht-settings', updates);
-      return response.data;
+      // Extract data from nested response structure
+      return response.data?.data || response.data;
     },
     // Optimistic update
     onMutate: async (updates: YachtSettingsUpdate) => {

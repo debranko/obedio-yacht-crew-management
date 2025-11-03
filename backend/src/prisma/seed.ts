@@ -34,7 +34,7 @@ async function seed() {
         username: 'admin',
         email: 'admin@yacht.local',
         password: adminPassword,
-        role: 'ADMIN',
+        role: 'admin',
         firstName: 'System',
         lastName: 'Administrator'
       }
@@ -215,7 +215,7 @@ async function seed() {
           name: 'Maria Lopez',
           position: 'Chief Stewardess',
           department: 'INTERIOR',
-          status: 'ON_DUTY',
+          status: 'on_duty',
           contact: '+1 555 0101',
           email: 'maria.lopez@yacht.com'
         }
@@ -226,7 +226,7 @@ async function seed() {
           name: 'Sarah Johnson',
           position: 'Stewardess',
           department: 'INTERIOR',
-          status: 'ON_DUTY',
+          status: 'on_duty',
           contact: '+1 555 0102',
           email: 'sarah.johnson@yacht.com'
         }
@@ -237,7 +237,7 @@ async function seed() {
           name: 'Sophie Martin',
           position: 'Stewardess',
           department: 'INTERIOR',
-          status: 'OFF_DUTY',
+          status: 'off_duty',
           contact: '+1 555 0103',
           email: 'sophie.martin@yacht.com'
         }
@@ -253,8 +253,8 @@ async function seed() {
           id: 'guest-1',
           firstName: 'Alexander',
           lastName: 'Anderson',
-          type: 'PRIMARY',
-          status: 'ONBOARD',
+          type: 'owner',
+          status: 'onboard',
           nationality: 'USA',
           languages: ['English', 'French'],
           locationId: 'owner-1', // Owner's Stateroom
@@ -274,8 +274,8 @@ async function seed() {
           id: 'guest-2',
           firstName: 'Victoria',
           lastName: 'Chen',
-          type: 'PARTNER',
-          status: 'ONBOARD',
+          type: 'partner',
+          status: 'onboard',
           nationality: 'China',
           languages: ['English', 'Mandarin'],
           locationId: 'owner-2', // VIP Cabin
@@ -294,8 +294,8 @@ async function seed() {
           id: 'guest-3',
           firstName: 'James',
           lastName: 'Williams',
-          type: 'VIP',
-          status: 'ONBOARD',
+          type: 'vip',
+          status: 'onboard',
           nationality: 'UK',
           languages: ['English'],
           locationId: 'lower-1', // Cabin 6

@@ -18,11 +18,9 @@ async function fetchApi<T>(
   endpoint: string,
   options?: RequestInit
 ): Promise<T> {
-  const token = localStorage.getItem('obedio-auth-token');
-
+  // Auth handled by HTTP-only cookies (server runs 24/7)
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` }),
     ...options?.headers,
   };
 
@@ -30,6 +28,7 @@ async function fetchApi<T>(
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers,
+      credentials: 'include', // Sends HTTP-only cookie automatically
     });
 
     if (!response.ok) {
@@ -254,8 +253,8 @@ export const serviceRequestsApi = {
    */
   accept: (id: string, crewId: string) =>
     fetchApi<ServiceRequestDTO>(`/service-requests/${id}/accept`, {
-      method: 'POST',
-      body: JSON.stringify({ crewId }),
+      method: 'PUT',
+      body: JSON.stringify({ crewMemberId: crewId }),
     }),
 
   /**
@@ -263,7 +262,7 @@ export const serviceRequestsApi = {
    */
   complete: (id: string) =>
     fetchApi<ServiceRequestDTO>(`/service-requests/${id}/complete`, {
-      method: 'POST',
+      method: 'PUT',
     }),
 
   /**
@@ -631,7 +630,7 @@ export const messagesApi = {
    * Mark all messages as read
    */
   markAllAsRead: () =>
-    fetchApi<{ success: boolean; count: number }>('/messages/mark-all-read', {
+    fetchApi<{ count: number }>('/messages/mark-all-read', {
       method: 'PUT',
     }),
 
@@ -639,7 +638,7 @@ export const messagesApi = {
    * Delete message
    */
   delete: (messageId: string) =>
-    fetchApi<{ success: boolean }>(`/messages/${messageId}`, {
+    fetchApi<{ deleted: boolean; id: string }>(`/messages/${messageId}`, {
       method: 'DELETE',
     }),
 
@@ -664,6 +663,20 @@ export interface UserPreferencesDTO {
   notificationEmail?: string | null;
   emergencyContacts?: string[] | null;
 
+  // Service Requests preferences
+  serviceRequestDisplayMode?: string | null;
+  serviceRequestViewStyle?: string | null;
+  serviceRequestSortOrder?: string | null;
+  serviceRequestShowGuestPhotos?: boolean;
+  serviceRequestServingTimeout?: number;
+  serviceRequestSoundAlerts?: boolean;
+  serviceRequestVisualFlash?: boolean;
+  serviceRequestResponseWarning?: number;
+  serviceRequestAutoArchive?: number;
+  serviceRequestAutoPriorityVIP?: boolean;
+  serviceRequestAutoPriorityMaster?: boolean;
+  requestDialogRepeatInterval?: number;
+
   updatedAt?: string;
 }
 
@@ -681,7 +694,6 @@ export const userPreferencesApi = {
     activeWidgets?: string[];
   }) =>
     fetchApi<{
-      success: boolean;
       dashboardLayout: any;
       activeWidgets: string[];
       updatedAt: string;
@@ -695,7 +707,6 @@ export const userPreferencesApi = {
    */
   updateTheme: (theme: 'light' | 'dark' | 'auto') =>
     fetchApi<{
-      success: boolean;
       theme: string;
     }>('/user-preferences/theme', {
       method: 'PUT',
@@ -711,7 +722,6 @@ export const userPreferencesApi = {
     emergencyContacts?: string[];
   }) =>
     fetchApi<{
-      success: boolean;
       emailNotifications: boolean;
       notificationEmail: string | null;
       emergencyContacts: any;
@@ -722,11 +732,32 @@ export const userPreferencesApi = {
     }),
 
   /**
+   * Update Service Requests preferences
+   */
+  updateServiceRequests: (data: {
+    serviceRequestDisplayMode?: string;
+    serviceRequestViewStyle?: string;
+    serviceRequestSortOrder?: string;
+    serviceRequestShowGuestPhotos?: boolean;
+    serviceRequestServingTimeout?: number;
+    serviceRequestSoundAlerts?: boolean;
+    serviceRequestVisualFlash?: boolean;
+    serviceRequestResponseWarning?: number;
+    serviceRequestAutoArchive?: number;
+    serviceRequestAutoPriorityVIP?: boolean;
+    serviceRequestAutoPriorityMaster?: boolean;
+    requestDialogRepeatInterval?: number;
+  }) =>
+    fetchApi<UserPreferencesDTO>('/user-preferences/service-requests', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  /**
    * Reset dashboard to defaults
    */
   resetDashboard: () =>
     fetchApi<{
-      success: boolean;
       message: string;
     }>('/user-preferences/dashboard', {
       method: 'DELETE',

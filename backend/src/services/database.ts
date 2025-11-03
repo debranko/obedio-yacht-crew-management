@@ -429,7 +429,8 @@ export class DatabaseService {
         include: {
           guest: true,
           location: true,
-          category: true
+          category: true,
+          CrewMember: true  // Include assigned crew member details
         },
         orderBy: { createdAt: 'desc' },
         skip,
@@ -453,7 +454,8 @@ export class DatabaseService {
       include: {
         guest: true,
         location: true,
-        category: true
+        category: true,
+        CrewMember: true  // Include assigned crew member details
       }
     });
   }
@@ -494,7 +496,8 @@ export class DatabaseService {
       include: {
         guest: true,
         location: true,
-        category: true
+        category: true,
+        CrewMember: true  // Include assigned crew member details
       }
     });
   }
@@ -509,7 +512,8 @@ export class DatabaseService {
       include: {
         guest: true,
         location: true,
-        category: true
+        category: true,
+        CrewMember: true  // Include assigned crew member details
       }
     });
 

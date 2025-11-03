@@ -10,6 +10,7 @@ import { prisma } from '../services/db';
 import { mqttService } from '../services/mqtt.service';
 import { websocketService } from '../services/websocket';
 import { v4 as uuidv4 } from 'uuid';
+import { apiSuccess, apiError } from '../utils/api-response';
 
 const router = Router();
 
@@ -27,11 +28,10 @@ router.post('/discover', authMiddleware, asyncHandler(async (req, res) => {
     sessionId: uuidv4()
   });
   
-  res.json({
-    success: true,
+  res.json(apiSuccess({
     message: 'Discovery started. Devices will appear as they respond.',
     timeout: 30000 // 30 seconds discovery window
-  });
+  }));
 }));
 
 /**
@@ -46,10 +46,9 @@ router.get('/pairing', authMiddleware, asyncHandler(async (req, res) => {
     }
   }
   
-  res.json({
-    success: true,
+  res.json(apiSuccess({
     devices: Array.from(pairingDevices.values())
-  });
+  }));
 }));
 
 /**
@@ -61,22 +60,16 @@ router.post('/pair/:deviceId', authMiddleware, asyncHandler(async (req, res) => 
   
   const pairingDevice = pairingDevices.get(deviceId);
   if (!pairingDevice) {
-    return res.status(404).json({
-      success: false,
-      error: 'Device not found or pairing window expired'
-    });
+    return res.status(404).json(apiError('Device not found or pairing window expired', 'NOT_FOUND'));
   }
-  
+
   // Check if device already exists
   const existingDevice = await prisma.device.findUnique({
     where: { deviceId }
   });
-  
+
   if (existingDevice) {
-    return res.status(400).json({
-      success: false,
-      error: 'Device already paired'
-    });
+    return res.status(400).json(apiError('Device already paired', 'VALIDATION_ERROR'));
   }
   
   // Create device in database
@@ -121,10 +114,7 @@ router.post('/pair/:deviceId', authMiddleware, asyncHandler(async (req, res) => 
   // Notify via WebSocket
   websocketService.broadcast('device:paired', device);
   
-  res.json({
-    success: true,
-    device
-  });
+  res.json(apiSuccess({ device }));
 }));
 
 /**
@@ -162,10 +152,9 @@ router.post('/simulate-announce', asyncHandler(async (req, res) => {
     battery: 80 + Math.floor(Math.random() * 20)
   });
   
-  res.json({
-    success: true,
+  res.json(apiSuccess({
     message: `Simulated device ${deviceId} announcement`
-  });
+  }));
 }));
 
 /**
@@ -183,10 +172,9 @@ router.delete('/pairing/:deviceId', authMiddleware, asyncHandler(async (req, res
     });
   }
   
-  res.json({
-    success: true,
+  res.json(apiSuccess({
     message: 'Pairing cancelled'
-  });
+  }));
 }));
 
 export default router;

@@ -3,6 +3,8 @@ import { asyncHandler } from '../middleware/error-handler';
 import { requirePermission, authMiddleware } from '../middleware/auth';
 import { prisma } from '../services/db';
 import { websocketService } from '../services/websocket';
+import { calculatePagination, buildPaginationMeta } from '../utils/pagination';
+import { apiSuccess, apiError } from '../utils/api-response';
 
 const router = Router();
 
@@ -67,14 +69,14 @@ router.get('/logs', requirePermission('devices.view'), asyncHandler(async (req, 
     ];
   }
 
-  const skip = (Number(page) - 1) * Number(limit);
+  const { skip, take, page: pageNum, limit: limitNum } = calculatePagination(Number(page), Number(limit));
 
   const [logs, total] = await Promise.all([
     prisma.deviceLog.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       skip,
-      take: Number(limit),
+      take,
       include: {
         device: {
           select: {
@@ -95,32 +97,25 @@ router.get('/logs', requirePermission('devices.view'), asyncHandler(async (req, 
     prisma.deviceLog.count({ where })
   ]);
 
-  // Transform logs to match frontend expectations
+  // Transform logs to match frontend expectations (BACKEND TRANSFORMATION)
   const transformedLogs = logs.map(log => ({
     id: log.id,
     timestamp: log.createdAt,
     createdAt: log.createdAt,
     deviceId: log.device.deviceId,
     deviceName: log.device.name,
+    device: log.device.name,  // Alias for compatibility
     location: log.device.location?.name || null,
     status: mapEventTypeToStatus(log.eventType),
     message: formatEventMessage(log.eventType, log.eventData),
     event: log.eventType,
+    eventType: log.eventType,  // Alias for compatibility
     user: (log.eventData as any)?.user || null,
     severity: log.severity
   }));
 
   console.log(`✅ Returning ${transformedLogs.length} device logs`);
-  res.json({
-    success: true,
-    data: transformedLogs,
-    pagination: {
-      page: Number(page),
-      limit: Number(limit),
-      total,
-      totalPages: Math.ceil(total / Number(limit))
-    }
-  });
+  res.json(apiSuccess(transformedLogs, buildPaginationMeta(total, pageNum, limitNum)));
 }));
 
 /**
@@ -139,19 +134,16 @@ router.get('/stats/summary', requirePermission('devices.view'), asyncHandler(asy
     })
   ]);
 
-  res.json({
-    success: true,
-    data: {
-      total,
-      online,
-      offline,
-      lowBattery,
-      byType: byType.reduce((acc: any, item: any) => {
-        acc[item.type] = item._count;
-        return acc;
-      }, {})
-    }
-  });
+  res.json(apiSuccess({
+    total,
+    online,
+    offline,
+    lowBattery,
+    byType: byType.reduce((acc: any, item: any) => {
+      acc[item.type] = item._count;
+      return acc;
+    }, {})
+  }));
 }));
 
 /**
@@ -165,23 +157,41 @@ router.get('/', requirePermission('devices.view'), asyncHandler(async (req, res)
 
   const { type, status, locationId, crewMemberId } = req.query;
 
+  // Build WHERE conditions using Prisma (secure, no SQL injection)
   const where: any = {};
+
   if (type) where.type = type as string;
   if (status) where.status = status as string;
   if (locationId) where.locationId = locationId as string;
   if (crewMemberId) where.crewMemberId = crewMemberId as string;
 
+  // Execute query using Prisma (secure and type-safe)
   const devices = await prisma.device.findMany({
     where,
     include: {
-      location: { select: { id: true, name: true, type: true, floor: true } },
-      crewMember: { select: { id: true, name: true, position: true } }
+      location: {
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          floor: true
+        }
+      },
+      crewMember: {
+        select: {
+          id: true,
+          name: true,
+          position: true
+        }
+      }
     },
-    orderBy: { createdAt: 'desc' }
+    orderBy: {
+      createdAt: 'desc'
+    }
   });
 
   console.log(`✅ Returning ${devices.length} devices`);
-  res.json({ success: true, data: devices });
+  res.json(apiSuccess(devices));
 }));
 
 /**
@@ -202,10 +212,10 @@ router.get('/:id', requirePermission('devices.view'), asyncHandler(async (req, r
   });
 
   if (!device) {
-    return res.status(404).json({ success: false, error: 'Device not found' });
+    return res.status(404).json(apiError('Device not found', 'NOT_FOUND'));
   }
 
-  res.json({ success: true, data: device });
+  res.json(apiSuccess(device));
 }));
 
 /**
@@ -234,7 +244,7 @@ router.post('/', requirePermission('devices.add'), asyncHandler(async (req, res)
   // Broadcast device creation to all connected clients
   websocketService.emitDeviceEvent('created', device);
 
-  res.status(201).json({ success: true, data: device });
+  res.status(201).json(apiSuccess(device));
 }));
 
 /**
@@ -307,7 +317,7 @@ router.put('/:id', requirePermission('devices.edit'), asyncHandler(async (req, r
     websocketService.emitDeviceStatusChanged(device);
   }
 
-  res.json({ success: true, data: device });
+  res.json(apiSuccess(device));
 }));
 
 /**
@@ -319,7 +329,7 @@ router.delete('/:id', requirePermission('devices.delete'), asyncHandler(async (r
     where: { id: req.params.id }
   });
 
-  res.json({ success: true, message: 'Device deleted' });
+  res.json(apiSuccess({ deleted: true, id: req.params.id }));
 }));
 
 /**
@@ -341,10 +351,10 @@ router.get('/:id/config', requirePermission('devices.view'), asyncHandler(async 
   });
 
   if (!device) {
-    return res.status(404).json({ success: false, error: 'Device not found' });
+    return res.status(404).json(apiError('Device not found', 'NOT_FOUND'));
   }
 
-  res.json({ success: true, data: device });
+  res.json(apiSuccess(device));
 }));
 
 /**
@@ -378,7 +388,7 @@ router.put('/:id/config', requirePermission('devices.edit'), asyncHandler(async 
     }
   });
 
-  res.json({ success: true, data: device });
+  res.json(apiSuccess(device));
 }));
 
 /**
@@ -391,7 +401,7 @@ router.post('/:id/test', requirePermission('devices.edit'), asyncHandler(async (
   });
 
   if (!device) {
-    return res.status(404).json({ success: false, error: 'Device not found' });
+    return res.status(404).json(apiError('Device not found', 'NOT_FOUND'));
   }
 
   // Log test signal
@@ -421,16 +431,16 @@ router.post('/:id/test', requirePermission('devices.edit'), asyncHandler(async (
     }
   }
 
-  res.json({
-    success: true,
+  res.json(apiSuccess({
     message: 'Test signal sent to device',
-    data: { deviceId: device.deviceId, testType: 'led_blink' }
-  });
+    deviceId: device.deviceId,
+    testType: 'led_blink'
+  }));
 }));
 
 /**
  * GET /api/devices/:id/logs
- * Get device event logs
+ * Get device event logs with transformation
  */
 router.get('/:id/logs', requirePermission('devices.view'), asyncHandler(async (req, res) => {
   const { limit = 100, eventType } = req.query;
@@ -441,10 +451,36 @@ router.get('/:id/logs', requirePermission('devices.view'), asyncHandler(async (r
   const logs = await prisma.deviceLog.findMany({
     where,
     orderBy: { createdAt: 'desc' },
-    take: Number(limit)
+    take: Number(limit),
+    include: {
+      device: {
+        select: {
+          deviceId: true,
+          name: true,
+          location: { select: { name: true } }
+        }
+      }
+    }
   });
 
-  res.json({ success: true, data: logs });
+  // Transform logs on BACKEND before sending to frontend
+  const transformedLogs = logs.map(log => ({
+    id: log.id,
+    deviceId: log.device.deviceId,
+    deviceName: log.device.name,
+    device: log.device.name,  // Alias for compatibility
+    location: log.device.location?.name || null,
+    eventType: log.eventType,
+    event: log.eventType,  // Alias for compatibility
+    eventData: log.eventData,
+    status: mapEventTypeToStatus(log.eventType),
+    message: formatEventMessage(log.eventType, log.eventData),
+    timestamp: log.createdAt,
+    createdAt: log.createdAt,
+    severity: log.severity
+  }));
+
+  res.json(apiSuccess(transformedLogs));
 }));
 
 // Helper functions for device logs (moved to top of file where /logs endpoint is defined)

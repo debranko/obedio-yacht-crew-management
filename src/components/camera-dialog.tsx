@@ -30,7 +30,17 @@ export function CameraDialog({ open, onOpenChange, onCapture }: CameraDialogProp
   // Start camera when dialog opens
   useEffect(() => {
     if (open && !capturedImage && !error) {
-      startCamera();
+      // Small delay to ensure video element is mounted in DOM
+      const timeoutId = setTimeout(() => {
+        startCamera();
+      }, 100);
+
+      return () => {
+        clearTimeout(timeoutId);
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
+      };
     }
 
     // Cleanup: stop camera when dialog closes
@@ -65,9 +75,28 @@ export function CameraDialog({ open, onOpenChange, onCapture }: CameraDialogProp
       setStream(mediaStream);
       setError(null);
 
-      // Attach stream to video element
+      // Wait for video element to be ready, then attach stream and start playback
       if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
+        const video = videoRef.current;
+        video.srcObject = mediaStream;
+
+        // Wait for metadata to load, then explicitly start playback
+        video.onloadedmetadata = async () => {
+          try {
+            await video.play();
+            console.log('Camera video playing successfully');
+          } catch (playError) {
+            console.warn('Video autoplay failed:', playError);
+            // Try one more time after a brief delay
+            setTimeout(async () => {
+              try {
+                await video.play();
+              } catch (retryError) {
+                console.error('Video play retry failed:', retryError);
+              }
+            }, 500);
+          }
+        };
       }
 
       setIsLoading(false);
@@ -204,9 +233,29 @@ export function CameraDialog({ open, onOpenChange, onCapture }: CameraDialogProp
         </DialogHeader>
 
         <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
-          {/* Loading State */}
+          {/* Video preview - ALWAYS in DOM */}
+          {!capturedImage && (
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+            />
+          )}
+
+          {/* Captured image preview */}
+          {capturedImage && (
+            <img
+              src={capturedImage}
+              alt="Captured"
+              className="w-full h-full object-cover"
+            />
+          )}
+
+          {/* Loading State - overlay on top of video */}
           {isLoading && !error && (
-            <div className="absolute inset-0 flex items-center justify-center bg-muted">
+            <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
               <div className="text-center">
                 <Camera className="h-12 w-12 text-muted-foreground mx-auto mb-2 animate-pulse" />
                 <p className="text-sm text-muted-foreground">Starting camera...</p>
@@ -214,9 +263,9 @@ export function CameraDialog({ open, onOpenChange, onCapture }: CameraDialogProp
             </div>
           )}
 
-          {/* Error State */}
+          {/* Error State - overlay on top of video */}
           {error && !capturedImage && (
-            <div className="absolute inset-0 flex items-center justify-center bg-muted p-6">
+            <div className="absolute inset-0 flex items-center justify-center bg-muted p-6 z-10">
               <div className="text-center max-w-md">
                 <div className="mb-4 inline-flex items-center justify-center w-16 h-16 rounded-full bg-destructive/10">
                   <X className="h-8 w-8 text-destructive" />
@@ -238,26 +287,6 @@ export function CameraDialog({ open, onOpenChange, onCapture }: CameraDialogProp
                 </div>
               </div>
             </div>
-          )}
-
-          {/* Video preview */}
-          {!capturedImage && !error && !isLoading && (
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover"
-            />
-          )}
-
-          {/* Captured image preview */}
-          {capturedImage && (
-            <img
-              src={capturedImage}
-              alt="Captured"
-              className="w-full h-full object-cover"
-            />
           )}
 
           {/* Hidden canvas for capture */}

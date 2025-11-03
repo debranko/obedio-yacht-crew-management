@@ -3,6 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { authMiddleware } from '../middleware/auth';
+import { apiSuccess, apiError } from '../utils/api-response';
 
 const router = Router();
 
@@ -54,10 +55,7 @@ const upload = multer({
 router.post('/image', authMiddleware, upload.single('image'), (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No file uploaded'
-      });
+      return res.status(400).json(apiError('No file uploaded', 'VALIDATION_ERROR'));
     }
 
     // Return URL to access the uploaded image
@@ -65,22 +63,16 @@ router.post('/image', authMiddleware, upload.single('image'), (req, res) => {
 
     console.log('✅ Image uploaded:', req.file.filename);
 
-    res.json({
-      success: true,
-      data: {
-        filename: req.file.filename,
-        url: imageUrl,
-        size: req.file.size,
-        mimetype: req.file.mimetype
-      },
+    res.json(apiSuccess({
+      filename: req.file.filename,
+      url: imageUrl,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
       message: 'Image uploaded successfully'
-    });
+    }));
   } catch (error: any) {
     console.error('❌ Upload error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to upload image'
-    });
+    res.status(500).json(apiError(error.message || 'Failed to upload image', 'UPLOAD_ERROR'));
   }
 });
 
@@ -95,26 +87,21 @@ router.delete('/image/:filename', authMiddleware, (req, res) => {
 
     // Check if file exists
     if (!fs.existsSync(filePath)) {
-      return res.status(404).json({
-        success: false,
-        message: 'Image not found'
-      });
+      return res.status(404).json(apiError('Image not found', 'NOT_FOUND'));
     }
 
     // Delete file
     fs.unlinkSync(filePath);
     console.log('🗑️  Image deleted:', filename);
 
-    res.json({
-      success: true,
+    res.json(apiSuccess({
+      deleted: true,
+      filename,
       message: 'Image deleted successfully'
-    });
+    }));
   } catch (error: any) {
     console.error('❌ Delete error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to delete image'
-    });
+    res.status(500).json(apiError(error.message || 'Failed to delete image', 'DELETE_ERROR'));
   }
 });
 

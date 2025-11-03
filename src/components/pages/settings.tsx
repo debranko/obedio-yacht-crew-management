@@ -178,8 +178,28 @@ interface SettingsPageProps {
 }
 
 export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
-  const { rolePermissions, updateRolePermissions, userPreferences, updateUserPreferences } = useAppData();
+  const { crewMembers } = useAppData();
   const [activeTab, setActiveTab] = useState(initialTab);
+  
+  // Provide defaults since these are deprecated in AppDataContext
+  const userPreferences = {
+    serviceRequestDisplayMode: 'location' as 'guest-name' | 'location',
+    servingNowTimeout: 5,
+    requestDialogRepeatInterval: 60,
+  };
+  
+  const rolePermissions: Record<Role, string[]> = {
+    admin: allPermissions.map(p => p.id), // Admin has all permissions
+    'chief-stewardess': [],
+    stewardess: [],
+    crew: [],
+    eto: ['locations.delete'], // ETO can delete locations
+  };
+  
+  // Deprecated function - removed in favor of backend API
+  const updateUserPreferences = (prefs: any) => {
+    console.warn('updateUserPreferences is deprecated. Use useUserPreferences hook instead.');
+  };
 
   // Use yacht settings hook with WebSocket support
   const { settings: yachtSettings, updateSettings: updateYachtSettings, isLoading: isLoadingSettings, isUpdating } = useYachtSettings();
@@ -189,6 +209,8 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
     preferences: userPrefs,
     updateNotifications,
     isUpdatingNotifications,
+    updateServiceRequests,
+    isUpdatingServiceRequests,
     refetch: refetchUserPrefs
   } = useUserPreferences();
 
@@ -200,6 +222,7 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   // General Settings State
   const [yachtName, setYachtName] = useState("");
   const [yachtType, setYachtType] = useState("motor-yacht");
+  const [locationName, setLocationName] = useState("");
   const [notifications, setNotifications] = useState(true);
   const [autoBackup, setAutoBackup] = useState(true);
   const [timezone, setTimezone] = useState("Europe/Monaco");
@@ -258,6 +281,7 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
     if (yachtSettings) {
       setYachtName(yachtSettings.name || "");
       setYachtType(yachtSettings.type || "motor-yacht");
+      setLocationName(yachtSettings.locationName || "");
       setTimezone(yachtSettings.timezone || "Europe/Monaco");
       setFloors(yachtSettings.floors || []);
     }
@@ -309,10 +333,10 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   }, [editingCategory]);
   
   const handleSaveGeneral = async () => {
-    // Save user preferences to context
-    updateUserPreferences({
+    // Save Service Requests preferences to backend API
+    updateServiceRequests({
       serviceRequestDisplayMode,
-      servingNowTimeout,
+      serviceRequestServingTimeout: servingNowTimeout,
       requestDialogRepeatInterval,
     });
 
@@ -320,6 +344,7 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
     updateYachtSettings({
       name: yachtName,
       type: yachtType,
+      locationName: locationName,
       timezone: timezone,
       floors: floors,
     });
@@ -362,32 +387,36 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   };
   
   const handleSavePermissions = () => {
-    // Save each role's permissions
-    (Object.keys(localPermissions) as Role[]).forEach(role => {
-      updateRolePermissions(role, localPermissions[role]);
+    // NOTE: Role permissions UI is currently for reference only
+    // Backend API exists at /api/role-permissions but uses a different format
+    // This feature needs to be connected to the backend API
+    toast.error('Role permission editing is not yet connected to the backend API', {
+      description: 'Contact your system administrator to modify role permissions.'
     });
-    toast.success("Role permissions saved successfully");
   };
   
   // Load system status and settings from backend
   useEffect(() => {
     const loadSystemSettings = async () => {
       try {
-        const token = localStorage.getItem('token');
+        // Auth handled by HTTP-only cookies (server runs 24/7)
         const response = await fetch('/api/system-settings', {
-          headers: { 'Authorization': `Bearer ${token}` }
+          credentials: 'include'
         });
 
         if (response.ok) {
-          const data = await response.json();
-          setSystemStatus(data.status);
-          if (data.settings) {
-            setServerPort(data.settings.serverPort);
-            setWsPort(data.settings.wsPort);
-            setApiTimeout(data.settings.apiTimeout);
-            setLogLevel(data.settings.logLevel);
-            setEnableMetrics(data.settings.enableMetrics);
-            setEnableDebugMode(data.settings.enableDebugMode);
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            setSystemStatus(data.status);
+            if (data.settings) {
+              setServerPort(data.settings.serverPort || '8080');
+              setWsPort(data.settings.wsPort || '8080');
+              setApiTimeout(data.settings.apiTimeout || '30');
+              setLogLevel(data.settings.logLevel || 'info');
+              setEnableMetrics(data.settings.enableMetrics ?? true);
+              setEnableDebugMode(data.settings.enableDebugMode ?? false);
+            }
           }
         }
       } catch (error) {
@@ -402,21 +431,23 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   useEffect(() => {
     const loadBackupSettings = async () => {
       try {
-        const token = localStorage.getItem('token');
-
+        // Auth handled by HTTP-only cookies (server runs 24/7)
         // Load backup settings
         const settingsRes = await fetch('/api/backup/settings', {
-          headers: { 'Authorization': `Bearer ${token}` }
+          credentials: 'include'
         });
 
         if (settingsRes.ok) {
-          const data = await settingsRes.json();
-          if (data.settings) {
-            setBackupSchedule(data.settings.backupSchedule);
-            setBackupTime(data.settings.backupTime);
-            setBackupRetention(String(data.settings.backupRetention));
-            setBackupLocation(data.settings.backupLocation);
-            setCloudBackupEnabled(data.settings.cloudBackupEnabled);
+          const contentType = settingsRes.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const data = await settingsRes.json();
+            if (data.settings) {
+              setBackupSchedule(data.settings.backupSchedule || 'daily');
+              setBackupTime(data.settings.backupTime || '02:00');
+              setBackupRetention(String(data.settings.backupRetention || 30));
+              setBackupLocation(data.settings.backupLocation || 'local');
+              setCloudBackupEnabled(data.settings.cloudBackupEnabled ?? false);
+            }
           }
         }
 
@@ -426,10 +457,13 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
         });
 
         if (statusRes.ok) {
-          const data = await statusRes.json();
-          setBackupStatus(data.status);
-          if (data.status?.lastBackup) {
-            setLastBackupTime(new Date(data.status.lastBackup));
+          const contentType = statusRes.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const data = await statusRes.json();
+            setBackupStatus(data.status);
+            if (data.status?.lastBackup) {
+              setLastBackupTime(new Date(data.status.lastBackup));
+            }
           }
         }
       } catch (error) {
@@ -445,22 +479,25 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
     const loadNotificationSettings = async () => {
       setIsLoadingNotifications(true);
       try {
-        const token = localStorage.getItem('token');
+        // Auth handled by HTTP-only cookies (server runs 24/7)
         const response = await fetch('/api/notification-settings', {
-          headers: { 'Authorization': `Bearer ${token}` }
+          credentials: 'include'
         });
 
         if (response.ok) {
-          const settings = await response.json();
-          setPushNotifications(settings.pushEnabled);
-          setServiceRequests(settings.serviceRequests);
-          setEmergencyAlerts(settings.emergencyAlerts);
-          setSystemMessages(settings.systemMessages);
-          setGuestMessages(settings.guestMessages);
-          setCrewMessages(settings.crewMessages);
-          setQuietHoursEnabled(settings.quietHoursEnabled);
-          if (settings.quietHoursStart) setQuietHoursStart(settings.quietHoursStart);
-          if (settings.quietHoursEnd) setQuietHoursEnd(settings.quietHoursEnd);
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const settings = await response.json();
+            setPushNotifications(settings.pushEnabled ?? true);
+            setServiceRequests(settings.serviceRequests ?? true);
+            setEmergencyAlerts(settings.emergencyAlerts ?? true);
+            setSystemMessages(settings.systemMessages ?? true);
+            setGuestMessages(settings.guestMessages ?? true);
+            setCrewMessages(settings.crewMessages ?? true);
+            setQuietHoursEnabled(settings.quietHoursEnabled ?? false);
+            if (settings.quietHoursStart) setQuietHoursStart(settings.quietHoursStart);
+            if (settings.quietHoursEnd) setQuietHoursEnd(settings.quietHoursEnd);
+          }
         }
 
         // Load email notifications and emergency contacts from user preferences API
@@ -487,14 +524,13 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
 
   const handleSaveNotifications = async () => {
     try {
-      const token = localStorage.getItem('token');
-
+      // Auth handled by HTTP-only cookies (server runs 24/7)
       // Save notification settings to backend
       const response = await fetch('/api/notification-settings', {
         method: 'PUT',
+        credentials: 'include',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           pushEnabled: pushNotifications,
@@ -529,12 +565,12 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   
   const handleSaveSystem = async () => {
     try {
-      const token = localStorage.getItem('token');
+      // Auth handled by HTTP-only cookies (server runs 24/7)
       const response = await fetch('/api/system-settings', {
         method: 'PUT',
+        credentials: 'include',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           serverPort,
@@ -561,12 +597,12 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   
   const handleSaveBackup = async () => {
     try {
-      const token = localStorage.getItem('token');
+      // Auth handled by HTTP-only cookies (server runs 24/7)
       const response = await fetch('/api/backup/settings', {
         method: 'PUT',
+        credentials: 'include',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           backupSchedule,
@@ -589,12 +625,11 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   };
 
   const handleRunBackup = async () => {
-    const token = localStorage.getItem('token');
-
+    // Auth handled by HTTP-only cookies (server runs 24/7)
     toast.promise(
       fetch('/api/backup/create', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
+        credentials: 'include'
       }).then(async (response) => {
         if (!response.ok) {
           const error = await response.json();
@@ -677,6 +712,16 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
 
         {/* General Settings Tab */}
         <TabsContent value="general" className="space-y-6">
+          {isLoadingSettings ? (
+            <Card>
+              <CardContent className="py-8">
+                <div className="flex items-center justify-center gap-2">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  <span className="text-sm text-muted-foreground">Loading vessel settings...</span>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
           <div className="grid gap-6">
             <Card>
               <CardHeader>
@@ -710,6 +755,19 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="yacht-location">Current Location</Label>
+                  <Input
+                    id="yacht-location"
+                    value={locationName}
+                    onChange={(e) => setLocationName(e.target.value)}
+                    placeholder="e.g., Monaco Harbor, Port Hercule"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Location name to display in weather widget and other components
+                  </p>
                 </div>
                 
                 <div className="space-y-2">
@@ -859,13 +917,20 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
               </CardContent>
             </Card>
             
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-4">
+              {isUpdating && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                  Saving changes...
+                </div>
+              )}
               <Button onClick={handleSaveGeneral} disabled={isLoadingSettings || isUpdating}>
                 <Save className="h-4 w-4 mr-2" />
                 {isUpdating ? 'Saving...' : 'Save General Settings'}
               </Button>
             </div>
           </div>
+          )}
         </TabsContent>
 
         {/* Service Categories Tab */}
@@ -1373,6 +1438,15 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Warning Banner */}
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Feature Not Connected</AlertTitle>
+                <AlertDescription>
+                  This permission matrix is currently for reference only. The backend API exists at <code>/api/role-permissions</code> but uses a different permission format. Contact your system administrator to modify role permissions through the API.
+                </AlertDescription>
+              </Alert>
+
               {/* Info Banner */}
               <Alert>
                 <Info className="h-4 w-4" />

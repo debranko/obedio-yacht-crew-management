@@ -133,7 +133,7 @@ export function WeatherWindyWidget({ className }: WeatherWindyWidgetProps) {
             <Cloud className="h-4 w-4 text-primary" />
             <h3 className="text-sm font-semibold">Current Weather</h3>
           </div>
-          <span className="text-xs text-muted-foreground">{settings.locationName || 'Current Location'}</span>
+          <span className="text-xs text-muted-foreground">{settings?.locationName || 'Current Location'}</span>
         </div>
 
         {loading ? (

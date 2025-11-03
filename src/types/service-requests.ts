@@ -1,11 +1,22 @@
 // Interior Department Teams
-export type InteriorTeam = 
-  | 'Galley' 
-  | 'Pantry' 
-  | 'Housekeeping' 
-  | 'Laundry' 
-  | 'Bar Service' 
+export type InteriorTeam =
+  | 'Galley'
+  | 'Pantry'
+  | 'Housekeeping'
+  | 'Laundry'
+  | 'Bar Service'
   | 'Deck Service';
+
+// Service Category Type
+export interface ServiceCategory {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  description?: string;
+  order: number;
+  isActive: boolean;
+}
 
 // Service Request Types (Guest Call Button System)
 export interface ServiceRequest {
@@ -21,6 +32,8 @@ export interface ServiceRequest {
   cabinImage?: string; // Cabin rendering/photo URL
   status: 'pending' | 'accepted' | 'completed' | 'delegated' | 'forwarded';
   assignedTo?: string; // Crew member name
+  categoryId?: string; // Service category ID (e.g., housekeeping, room-service)
+  category?: ServiceCategory; // Populated category details
   forwardedToTeam?: InteriorTeam; // Team this was forwarded to
   acceptedAt?: Date;
   completedAt?: Date;

@@ -26,10 +26,10 @@ export function useYachtSettingsApi() {
   const fetchSettings = async () => {
     try {
       setIsLoading(true);
-      const response = await api.get<any>('/yacht-settings');
+      // Response is now unwrapped by api client: { name, type, timezone, floors }
+      const data = await api.get<any>('/yacht-settings');
 
       // Map backend response fields to frontend format
-      const data = response.data;
       const mappedSettings: YachtSettingsData = {
         vesselName: data.name || '',
         vesselType: data.type || 'motor-yacht',
@@ -58,10 +58,10 @@ export function useYachtSettingsApi() {
         floors: data.floors,
       };
 
-      const response = await api.put<any>('/yacht-settings', backendData);
+      // Response is now unwrapped by api client: { name, type, timezone, floors }
+      const responseData = await api.put<any>('/yacht-settings', backendData);
 
       // Map response back to frontend format
-      const responseData = response.data;
       const mappedSettings: YachtSettingsData = {
         vesselName: responseData.name || data.vesselName,
         vesselType: responseData.type || data.vesselType,

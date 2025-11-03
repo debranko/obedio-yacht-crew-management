@@ -38,7 +38,7 @@ export function ActivityLogPage() {
 
   // Fetch ALL activity logs (we'll filter for service requests on frontend)
   const {
-    data: allActivityLogsForFiltering = [],
+    logs: allActivityLogsForFiltering = [],
     isLoading: isLoadingServiceRequestActivity,
     error: serviceRequestActivityError
   } = useActivityLogs({
@@ -60,7 +60,7 @@ export function ActivityLogPage() {
 
   // Fetch comprehensive activity logs from backend API
   const {
-    data: activityLogs = [],
+    logs: activityLogs = [],
     isLoading: isLoadingActivityLogs,
     error: activityLogsError
   } = useActivityLogs({
@@ -77,8 +77,12 @@ export function ActivityLogPage() {
     if (Array.isArray(deviceLogs)) {
       deviceLogs.forEach((log: any) => log.user && users.add(log.user));
     }
-    crewChangeLogs.forEach((log: any) => log.performedBy && users.add(log.performedBy));
-    activityLogs.forEach((log: any) => log.user?.username && users.add(log.user.username));
+    if (Array.isArray(crewChangeLogs)) {
+      crewChangeLogs.forEach((log: any) => log.performedBy && users.add(log.performedBy));
+    }
+    if (Array.isArray(activityLogs)) {
+      activityLogs.forEach((log: any) => log.user?.username && users.add(log.user.username));
+    }
     return Array.from(users);
   }, [deviceLogs, crewChangeLogs, activityLogs]);
 
@@ -95,6 +99,8 @@ export function ActivityLogPage() {
 
   // Filter service request related activity (Button Press, Request Accepted, Request Completed)
   const filteredServiceRequests = useMemo(() => {
+    if (!Array.isArray(allActivityLogsForFiltering)) return [];
+    
     // Filter for service request flow events
     const serviceRequestEvents = allActivityLogsForFiltering.filter((log: any) => {
       // Include: Button Press (type=device), Request Accepted, Request Completed (type=service_request)
@@ -112,6 +118,7 @@ export function ActivityLogPage() {
 
   // Filter crew change logs by user (search is handled by API)
   const filteredCrewChangeLogs = useMemo(() => {
+    if (!Array.isArray(crewChangeLogs)) return [];
     if (filterUser === "all") return crewChangeLogs;
     
     return crewChangeLogs.filter((log: any) => log.performedBy === filterUser);

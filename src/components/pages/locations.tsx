@@ -37,8 +37,8 @@ export function LocationsPage() {
   const { isConnected: wsConnected, on: wsOn, off: wsOff } = useWebSocket();
 
   // Use React Query for guests (real-time updates from database)
-  const { data: guestsData } = useGuests({ page: 1, limit: 1000 });
-  const guests = (guestsData as any)?.items || [];
+  const { data: guestsData, isLoading: isLoadingGuests } = useGuests({ page: 1, limit: 1000 });
+  const guests = guestsData?.items || [];
 
   // Use React Query mutations for database updates
   const { updateGuest: updateGuestMutation } = useGuestMutations();
@@ -47,7 +47,13 @@ export function LocationsPage() {
   const { data: smartButtons = [], isLoading: isLoadingButtons } = useDevices({ type: 'smart_button' });
   const { updateDevice: updateDeviceMutation } = useDeviceMutations();
   
-  const { addActivityLog, getGuestByLocationId } = useAppData();
+  // Get functions from AppData context - with null checks
+  const appData = useAppData();
+  const addActivityLog = appData?.addActivityLog || (() => {
+    console.warn('addActivityLog not available');
+  });
+  const getGuestByLocationId = appData?.getGuestByLocationId || (() => undefined);
+  
   const { user } = useAuth();
   
   // Get current user role from auth context
@@ -398,12 +404,10 @@ export function LocationsPage() {
         const formData = new FormData();
         formData.append('image', uploadedFile);
 
-        const token = localStorage.getItem('obedio-auth-token');
+        // Auth handled by HTTP-only cookies (server runs 24/7)
         const uploadResponse = await fetch('http://localhost:8080/api/upload/image', {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          },
+          credentials: 'include',
           body: formData
         });
 
@@ -476,10 +480,10 @@ export function LocationsPage() {
 
   // Note: dndLocations now comes from useDND() hook
 
-  if (isLoading) {
+  if (isLoading || isLoadingGuests) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Loading locations...</p>
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     );
   }

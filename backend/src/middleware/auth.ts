@@ -2,30 +2,43 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
-  const h = req.headers.authorization;
-  console.log('🔐 Auth middleware:', { 
-    hasHeader: !!h, 
-    headerPrefix: h?.substring(0, 20),
-    hasJwtSecret: !!process.env.JWT_SECRET,
-    jwtSecretLength: process.env.JWT_SECRET?.length 
+  // Try to get token from Authorization header OR HTTP-only cookie
+  const authHeader = req.headers.authorization;
+  const cookieToken = req.cookies?.['obedio-auth-token'];
+
+  let token: string | null = null;
+
+  // Priority 1: Authorization header (for backward compatibility)
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.slice(7);
+  }
+  // Priority 2: HTTP-only cookie (new approach - server runs 24/7)
+  else if (cookieToken) {
+    token = cookieToken;
+  }
+
+  console.log('🔐 Auth middleware:', {
+    hasAuthHeader: !!authHeader,
+    hasCookie: !!cookieToken,
+    tokenSource: token ? (authHeader ? 'header' : 'cookie') : 'none',
+    hasJwtSecret: !!process.env.JWT_SECRET
   });
-  
-  if (!h?.startsWith('Bearer ')) {
-    console.log('❌ No Bearer token found');
+
+  if (!token) {
+    console.log('❌ No auth token found in header or cookie');
     return res.status(401).json({ error: 'Auth required' });
   }
-  
+
   try {
-    const token = h.slice(7);
     console.log('🔑 Verifying token...');
     const payload = jwt.verify(token, process.env.JWT_SECRET as string) as any;
     console.log('✅ Token verified:', { userId: payload.sub || payload.userId, role: payload.role });
-    
+
     // Support both 'sub' (standard) and 'userId' (legacy)
-    (req as any).user = { 
-      id: payload.sub || payload.userId, 
-      role: payload.role, 
-      username: payload.username 
+    (req as any).user = {
+      id: payload.sub || payload.userId,
+      role: payload.role,
+      username: payload.username
     };
     return next();
   } catch (error) {

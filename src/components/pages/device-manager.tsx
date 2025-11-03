@@ -30,6 +30,7 @@ import {
   Trash2
 } from "lucide-react";
 import { useDevices } from "../../hooks/useDevices";
+import { useWebSocket } from "../../hooks/useWebSocket";
 import { Progress } from "../ui/progress";
 import {
   Dialog,
@@ -47,10 +48,11 @@ import { Alert, AlertDescription } from "../ui/alert";
 import { useLocations } from "../../hooks/useLocations";
 import { useAppData } from "../../contexts/AppDataContext";
 import type { Location } from "../../domain/locations";
+import { useQueryClient } from "@tanstack/react-query";
 
 // Device types
 type DeviceType = "smart_button" | "watch" | "repeater" | "mobile_app";
-type DeviceStatus = "online" | "offline" | "low_battery" | "error";
+type DeviceStatus = "online" | "offline" | "low_battery" | "error" | "alert";
 
 // Discovered device interface
 interface DiscoveredDevice {
@@ -96,8 +98,36 @@ const statusColors: Record<DeviceStatus, string> = {
   online: "bg-success/10 text-success border-success/20",
   offline: "bg-muted text-muted-foreground border-border",
   low_battery: "bg-warning/10 text-warning border-warning/20",
-  error: "bg-error/10 text-error border-error/20"
+  error: "bg-error/10 text-error border-error/20",
+  alert: "bg-orange-500/10 text-orange-500 border-orange-500/20"
 };
+
+// Get status icon
+function getStatusIcon(status: DeviceStatus) {
+  switch (status) {
+    case 'online':
+      return <Circle className="h-2 w-2 fill-current" />;
+    case 'offline':
+      return <Circle className="h-2 w-2" />;
+    case 'low_battery':
+      return <Battery className="h-2 w-2" />;
+    case 'error':
+      return <XCircle className="h-2 w-2" />;
+    case 'alert':
+      return <AlertCircle className="h-2 w-2" />;
+    default:
+      return <Circle className="h-2 w-2" />;
+  }
+}
+
+// Calculate device status based on battery and online state
+function calculateDeviceStatus(device: Device): DeviceStatus {
+  if (device.status === 'error') return 'error';
+  if (device.status === 'offline') return 'offline';
+  if (device.batteryLevel !== undefined && device.batteryLevel < 20) return 'low_battery';
+  if (device.status === 'alert') return 'alert';
+  return 'online';
+}
 
 export function DeviceManagerPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -117,12 +147,133 @@ export function DeviceManagerPage() {
   const [pairingError, setPairingError] = useState<string | null>(null);
   const scanIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Real-time updates
+  const queryClient = useQueryClient();
+  const { on, off, isConnected: wsConnected, connectionError } = useWebSocket();
+  
   // Fetch devices from API
   const { data: devices = [], isLoading, refetch } = useDevices();
+  
+  // Log WebSocket connection status
+  useEffect(() => {
+    console.log('🔌 WebSocket connection status:', wsConnected ? 'Connected' : 'Disconnected');
+    if (connectionError) {
+      console.error('🔌 WebSocket connection error:', connectionError);
+    }
+  }, [wsConnected, connectionError]);
   
   // Fetch locations and crew for assignment
   const { locations = [] } = useLocations();
   const { crewMembers } = useAppData();
+
+  // Setup WebSocket listeners for real-time device updates
+  useEffect(() => {
+    console.log('📡 Setting up WebSocket listeners for Device Manager');
+    
+    // Device created event
+    const handleDeviceCreated = (data: any) => {
+      console.log('🔄 [WS] Device created event received:', data);
+      refetch(); // Refresh device list
+      toast.success(`New device registered: ${data.name || data.deviceId}`);
+    };
+
+    // Device updated event
+    const handleDeviceUpdated = (data: any) => {
+      console.log('🔄 [WS] Device updated event received:', data);
+      refetch(); // Refresh device list
+    };
+
+    // Device deleted event
+    const handleDeviceDeleted = (data: any) => {
+      console.log('🔄 [WS] Device deleted event received:', data);
+      refetch(); // Refresh device list
+    };
+
+    // Device status changed event
+    const handleDeviceStatusChanged = (data: {
+      deviceId: string;
+      status: string;
+      batteryLevel?: number;
+      signalStrength?: number;
+    }) => {
+      console.log('🔄 [WS] Device status changed event received:', {
+        deviceId: data.deviceId,
+        status: data.status,
+        battery: data.batteryLevel,
+        signal: data.signalStrength,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Update the device in the query cache directly for instant UI update
+      queryClient.setQueryData(['devices'], (oldData: Device[] | undefined) => {
+        console.log('📝 Updating query cache - old data:', oldData?.length, 'devices');
+        
+        if (!oldData) {
+          console.warn('⚠️ No existing device data in cache');
+          return oldData;
+        }
+        
+        const updatedData = oldData.map(device => {
+          if (device.deviceId === data.deviceId) {
+            console.log(`✅ Found device to update: ${device.name} (${device.deviceId})`);
+            const updatedDevice = {
+              ...device,
+              status: data.status as DeviceStatus,
+              ...(data.batteryLevel !== undefined && { batteryLevel: data.batteryLevel }),
+              ...(data.signalStrength !== undefined && { signalStrength: data.signalStrength }),
+              lastSeen: new Date().toISOString()
+            };
+            console.log('📝 Updated device:', updatedDevice);
+            return updatedDevice;
+          }
+          return device;
+        });
+        
+        console.log('📝 Query cache updated - new data:', updatedData.length, 'devices');
+        return updatedData;
+      });
+
+      // Get current devices from cache to avoid stale closure
+      const currentDevices = queryClient.getQueryData(['devices']) as Device[] | undefined;
+      const device = currentDevices?.find(d => d.deviceId === data.deviceId);
+      
+      if (device) {
+        console.log(`🔔 Checking for notification - device: ${device.name}, old status: ${device.status}, new status: ${data.status}`);
+        
+        // Note: device.status here might be the updated status already
+        const previousDevice = devices.find(d => d.deviceId === data.deviceId);
+        if (previousDevice) {
+          if (data.status === 'offline' && previousDevice.status === 'online') {
+            toast.warning(`Device ${device.name} went offline`);
+          } else if (data.status === 'online' && previousDevice.status === 'offline') {
+            toast.success(`Device ${device.name} is back online`);
+          } else if (data.status === 'low_battery') {
+            toast.warning(`Device ${device.name} has low battery (${data.batteryLevel}%)`);
+          }
+        }
+      } else {
+        console.warn(`⚠️ Device not found in cache: ${data.deviceId}`);
+      }
+    };
+
+    // Subscribe to WebSocket events
+    console.log('📡 Subscribing to device events...');
+    const unsubscribeCreated = on('device:created', handleDeviceCreated);
+    const unsubscribeUpdated = on('device:updated', handleDeviceUpdated);
+    const unsubscribeDeleted = on('device:deleted', handleDeviceDeleted);
+    const unsubscribeStatusChanged = on('device:status-changed', handleDeviceStatusChanged);
+    
+    console.log('✅ WebSocket listeners registered');
+
+    // Cleanup on unmount
+    return () => {
+      console.log('🧹 Cleaning up WebSocket listeners');
+      unsubscribeCreated?.();
+      unsubscribeUpdated?.();
+      unsubscribeDeleted?.();
+      unsubscribeStatusChanged?.();
+    };
+  }, [on, off, refetch, queryClient, devices]);
 
   // Filter devices
   const filteredDevices = useMemo(() => {
@@ -158,11 +309,11 @@ export function DeviceManagerPage() {
     setPairingError(null);
     
     try {
-      const token = localStorage.getItem('token');
+      // Auth handled by HTTP-only cookies (server runs 24/7)
       const response = await fetch('/api/device-discovery/discover', {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
@@ -214,11 +365,11 @@ export function DeviceManagerPage() {
     setPairingError(null);
     
     try {
-      const token = localStorage.getItem('token');
+      // Auth handled by HTTP-only cookies (server runs 24/7)
       const response = await fetch(`/api/device-discovery/pair/${selectedDevice.deviceId}`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -254,12 +405,11 @@ export function DeviceManagerPage() {
   }, []);
 
   const handleTestDevice = async (device: Device) => {
-    const token = localStorage.getItem('token');
-    
+    // Auth handled by HTTP-only cookies (server runs 24/7)
     toast.promise(
       fetch(`/api/devices/${device.id}/test`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
+        credentials: 'include'
       }),
       {
         loading: `Testing ${device.name}...`,
@@ -271,15 +421,14 @@ export function DeviceManagerPage() {
 
   const handleSaveConfig = async () => {
     if (!configDevice) return;
-    
-    const token = localStorage.getItem('token');
-    
+
+    // Auth handled by HTTP-only cookies (server runs 24/7)
     try {
       const response = await fetch(`/api/devices/${configDevice.id}/config`, {
         method: 'PUT',
+        credentials: 'include',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           name: configDevice.name,
@@ -303,14 +452,13 @@ export function DeviceManagerPage() {
   const handleAssignDevice = async () => {
     if (!assignDevice) return;
 
-    const token = localStorage.getItem('token');
-
+    // Auth handled by HTTP-only cookies (server runs 24/7)
     try {
       const response = await fetch(`/api/devices/${assignDevice.id}`, {
         method: 'PUT',
+        credentials: 'include',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           locationId: assignDevice.location?.id || null,
@@ -335,14 +483,11 @@ export function DeviceManagerPage() {
     if (!deleteDevice) return;
 
     setIsDeleting(true);
-    const token = localStorage.getItem('token');
-
+    // Auth handled by HTTP-only cookies (server runs 24/7)
     try {
       const response = await fetch(`/api/devices/${deleteDevice.id}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        credentials: 'include'
       });
 
       if (!response.ok) {
@@ -1167,9 +1312,9 @@ function DeviceCard({
               <p className="text-xs text-muted-foreground">{device.deviceId}</p>
             </div>
           </div>
-          <Badge variant="outline" className={statusColors[device.status]}>
-            <Circle className="h-2 w-2 mr-1 fill-current" />
-            {device.status}
+          <Badge variant="outline" className={statusColors[calculateDeviceStatus(device)]}>
+            {getStatusIcon(calculateDeviceStatus(device))}
+            <span className="ml-1">{calculateDeviceStatus(device)}</span>
           </Badge>
         </div>
       </CardHeader>
@@ -1211,8 +1356,8 @@ function DeviceCard({
                 </span>
                 <span>{device.signalStrength}dBm</span>
               </div>
-              <Progress 
-                value={Math.min(100, (device.signalStrength + 120) * 100 / 120)} 
+              <Progress
+                value={Math.min(100, Math.max(0, (device.signalStrength + 120) * 100 / 120))}
                 className="h-1"
               />
             </div>
@@ -1221,9 +1366,19 @@ function DeviceCard({
 
         {/* Last Seen */}
         {device.lastSeen && (
-          <p className="text-xs text-muted-foreground">
-            Last seen: {new Date(device.lastSeen).toLocaleString()}
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              Last seen: {new Date(device.lastSeen).toLocaleString()}
+            </p>
+            {/* Show alert if device hasn't been seen in over 60 seconds and is supposed to be online */}
+            {device.status === 'online' &&
+             new Date().getTime() - new Date(device.lastSeen).getTime() > 60000 && (
+              <Badge variant="outline" className="text-xs bg-warning/10 text-warning border-warning/20">
+                <AlertCircle className="h-2 w-2 mr-1" />
+                No heartbeat
+              </Badge>
+            )}
+          </div>
         )}
 
         {/* Actions */}

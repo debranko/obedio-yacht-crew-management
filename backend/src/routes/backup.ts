@@ -12,6 +12,7 @@ import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import { apiSuccess, apiError } from '../utils/api-response';
 
 const execAsync = promisify(exec);
 const router = Router();
@@ -46,10 +47,7 @@ router.get('/settings', asyncHandler(async (_, res) => {
     cloudBackupEnabled: process.env.CLOUD_BACKUP_ENABLED === 'true'
   };
 
-  res.json({
-    success: true,
-    settings
-  });
+  res.json(apiSuccess({ settings }));
 }));
 
 /**
@@ -76,11 +74,10 @@ router.put('/settings', asyncHandler(async (req, res) => {
     cloudBackupEnabled
   };
 
-  res.json({
-    success: true,
+  res.json(apiSuccess({
     settings: updatedSettings,
     message: 'Backup settings updated successfully'
-  });
+  }));
 }));
 
 /**
@@ -119,8 +116,7 @@ router.get('/status', asyncHandler(async (_, res) => {
     // Get last backup time
     const lastBackup = backups.length > 0 ? backups[0].created : null;
 
-    res.json({
-      success: true,
+    res.json(apiSuccess({
       status: {
         lastBackup,
         totalSize,
@@ -128,10 +124,9 @@ router.get('/status', asyncHandler(async (_, res) => {
         availableSpace: diskInfo.free,
         backups: backups.slice(0, 10) // Return last 10 backups
       }
-    });
+    }));
   } catch (error) {
-    res.json({
-      success: true,
+    res.json(apiSuccess({
       status: {
         lastBackup: null,
         totalSize: 0,
@@ -139,7 +134,7 @@ router.get('/status', asyncHandler(async (_, res) => {
         availableSpace: 0,
         backups: []
       }
-    });
+    }));
   }
 }));
 
@@ -176,8 +171,7 @@ router.post('/create', asyncHandler(async (req, res) => {
     // Get file size
     const stats = await fs.stat(filePath);
 
-    res.json({
-      success: true,
+    res.json(apiSuccess({
       backup: {
         filename,
         size: stats.size,
@@ -185,7 +179,7 @@ router.post('/create', asyncHandler(async (req, res) => {
         path: filePath
       },
       message: 'Backup created successfully'
-    });
+    }));
   } catch (error: any) {
     // If backup failed, try to clean up
     try {
@@ -230,10 +224,9 @@ router.post('/restore/:filename', asyncHandler(async (req, res) => {
 
     await execAsync(command);
 
-    res.json({
-      success: true,
+    res.json(apiSuccess({
       message: 'Database restored successfully from backup'
-    });
+    }));
   } catch (error: any) {
     throw new Error(`Restore failed: ${error.message}`);
   }
@@ -250,10 +243,9 @@ router.delete('/:filename', asyncHandler(async (req, res) => {
   try {
     await fs.unlink(filePath);
 
-    res.json({
-      success: true,
+    res.json(apiSuccess({
       message: 'Backup file deleted successfully'
-    });
+    }));
   } catch (error: any) {
     throw new Error(`Failed to delete backup: ${error.message}`);
   }
@@ -271,10 +263,7 @@ router.get('/download/:filename', asyncHandler(async (req, res) => {
     await fs.access(filePath);
     res.download(filePath);
   } catch (error) {
-    res.status(404).json({
-      success: false,
-      error: 'Backup file not found'
-    });
+    res.status(404).json(apiError('Backup file not found', 'NOT_FOUND'));
   }
 }));
 

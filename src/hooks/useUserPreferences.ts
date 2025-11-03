@@ -92,6 +92,35 @@ export function useUserPreferences() {
     },
   });
 
+  // Update Service Requests preferences mutation
+  const updateServiceRequestsMutation = useMutation({
+    mutationFn: (data: {
+      serviceRequestDisplayMode?: string;
+      serviceRequestViewStyle?: string;
+      serviceRequestSortOrder?: string;
+      serviceRequestShowGuestPhotos?: boolean;
+      serviceRequestServingTimeout?: number;
+      serviceRequestSoundAlerts?: boolean;
+      serviceRequestVisualFlash?: boolean;
+      serviceRequestResponseWarning?: number;
+      serviceRequestAutoArchive?: number;
+      serviceRequestAutoPriorityVIP?: boolean;
+      serviceRequestAutoPriorityMaster?: boolean;
+      requestDialogRepeatInterval?: number;
+    }) => api.userPreferences.updateServiceRequests(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      console.log('✅ Service Requests preferences saved');
+      toast.success('Settings saved successfully');
+    },
+    onError: (error: any) => {
+      console.error('❌ Failed to save Service Requests preferences:', error);
+      toast.error('Failed to save settings', {
+        description: error.message || 'Please try again',
+      });
+    },
+  });
+
   return {
     preferences,
     isLoading,
@@ -107,11 +136,14 @@ export function useUserPreferences() {
     resetDashboardAsync: resetDashboardMutation.mutateAsync,
     updateNotifications: updateNotificationsMutation.mutate,
     updateNotificationsAsync: updateNotificationsMutation.mutateAsync,
+    updateServiceRequests: updateServiceRequestsMutation.mutate,
+    updateServiceRequestsAsync: updateServiceRequestsMutation.mutateAsync,
 
     // Loading states
     isUpdatingDashboard: updateDashboardMutation.isPending,
     isUpdatingTheme: updateThemeMutation.isPending,
     isResetting: resetDashboardMutation.isPending,
     isUpdatingNotifications: updateNotificationsMutation.isPending,
+    isUpdatingServiceRequests: updateServiceRequestsMutation.isPending,
   };
 }

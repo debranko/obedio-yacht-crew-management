@@ -291,9 +291,6 @@ function ShiftDropZone({
   const primaryCount = primaryAssignments.length;
   const backupCount = backupAssignments.length;
 
-  const canAddPrimary = primaryCount < shift.primaryCount;
-  const canAddBackup = backupCount < shift.backupCount;
-
   const [{ isOver, canDrop }, drop] = useDrop(() => ({
     accept: 'crew-member',
     canDrop: (item: { crewId: string }) => {
@@ -305,7 +302,7 @@ function ShiftDropZone({
           return false;
         }
       }
-      
+
       // Check if crew member is already assigned to this shift
       const isAlreadyAssigned = currentAssignments.some(
         (a) => a.crewId === item.crewId
@@ -313,8 +310,9 @@ function ShiftDropZone({
       if (isAlreadyAssigned) {
         return false;
       }
-      // Check capacity
-      return canAddPrimary || canAddBackup;
+
+      // Allow manual override - settings don't enforce hard limits
+      return true;
     },
     drop: (item: { crewId: string }) => {
       onAssign(item.crewId, date, shift.id);
@@ -323,7 +321,7 @@ function ShiftDropZone({
       isOver: monitor.isOver(),
       canDrop: monitor.canDrop(),
     }),
-  }), [currentAssignments, canAddPrimary, canAddBackup, date, shift.id, onAssign, crewMembers]);
+  }), [currentAssignments, date, shift.id, onAssign, crewMembers]);
 
   const getCrewById = (id: string) => crewMembers.find((c) => c.id === id);
 
@@ -491,7 +489,7 @@ function ShiftDropZone({
       </div>
 
       {/* Add Button / Drop Zone Hint */}
-      {(canAddPrimary || canAddBackup) && currentAssignments.length === 0 && (
+      {currentAssignments.length === 0 && (
         <div className="mt-1">
           <Popover
             open={popoverOpen}

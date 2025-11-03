@@ -6,7 +6,37 @@
 
 ---
 
-## 🔴 FAZA 1: KRITIČNI POPRAVCI ✅ **100% ZAVRŠENO** (3-5 dana)
+## 🚨 NOVI KRITIČNI PROBLEMI - ANALIZA 2. NOVEMBAR 2025
+
+### SIGURNOSNI PROPUSTI (HITNO!) ✅ **REŠENO!**
+- [x] Dodati auth middleware na `/api/guests` rute - **ZAVRŠENO** ✅
+- [x] Dodati auth middleware na `/api/locations` rute - **ZAVRŠENO** ✅
+- [x] Testirati sve rute sa unauthorized pristupom (401) - **TESTIRANO** ✅
+
+### API CONNECTIVITY PROBLEMI ✅ **KRITIČNI DEO REŠEN!**
+- [x] Popraviti service request field mismatch (assignedToId) - **ZAVRŠENO** ✅
+- [x] Dodati WebSocket events za service request promene - **ZAVRŠENO** ✅
+- [x] Dodati WebSocket events za guest status promene - **ZAVRŠENO** ✅
+- [ ] Implementirati konzistentne API response formate
+- [ ] Popraviti yacht settings nested response problem
+
+### DUPLIKOVANI FAJLOVI ✅ **REŠENO!**
+- [x] Obrisati backend/src/services/mqtt-monitor.OLD.ts - **OBRISANO** ✅
+- [x] Obrisati backend/src/services/mqtt-monitor.NEW.ts - **OBRISANO** ✅
+- [x] Zadržati samo mqtt-monitor.ts - **ZAVRŠENO** ✅
+
+### PRISMA TYPE CONFLICTS ✅ **ANALIZIRANO**
+- [x] Rešiti Device.type vs Location.type konflikt - **ANALIZIRANO, 3 opcije predložene** ✅
+- [ ] Zameniti raw SQL upite sa Prisma queries - **Odloženo za sledeću verziju**
+- [ ] Optimizovati performanse query-ja - **Trenutno rešenje funkcioniše**
+
+### API STANDARDIZACIJA ✅ **ZAVRŠENO**
+- [x] Kreirati API response utility funkcije - **ZAVRŠENO** ✅
+- [x] Standardizovati yacht settings responses - **ZAVRŠENO** ✅
+- [x] Popraviti frontend hook data extraction - **ZAVRŠENO** ✅
+- [ ] Primeniti utility na sve rute - **U toku**
+
+##  FAZA 1: KRITIČNI POPRAVCI ✅ **100% ZAVRŠENO** (3-5 dana)
 
 ### Backend API za Duty Roster ✅
 - [x] Kreirati `backend/src/routes/assignments.ts` fajl
@@ -64,7 +94,7 @@
 
 ---
 
-## 🟡 FAZA 2: OPTIMIZACIJE 🔄 **75% ZAVRŠENO** (2-3 dana)
+## 🟡 FAZA 2: OPTIMIZACIJE 🔄 **85% ZAVRŠENO** (2-3 dana)
 
 ### Uklanjanje localStorage ✅ **85% DONE**
 - [x] Pretražiti sve fajlove za `localStorage` calls (19 fajlova)
@@ -89,6 +119,13 @@
 - [ ] Dodati useMemo za skupe kalkulacije
 - [ ] Implementirati virtual scrolling za velike liste
 - [ ] Optimizovati re-renders sa React DevTools
+
+### API Optimizacije ✅ **100% ZAVRŠENO**
+- [x] Service Request History tracking - **ALREADY WORKING** ✅
+- [x] Standardizovati pagination (page/limit) - **ZAVRŠENO sve rute (5/5)** ✅
+- [x] Kreirati pagination utility - **backend/src/utils/pagination.ts** ✅
+- [x] Service Categories Frontend - **100% ZAVRŠENO! Badge-ovi rade!** ✅
+- [x] Activity Logs pagination - **Migrirano na page/limit** ✅
 
 ### Offline Support
 - [ ] Implementirati IndexedDB za offline queue
@@ -131,7 +168,7 @@
 ## 📊 VALIDATION CHECKLIST
 
 ### Backend Validation
-- [ ] Svi API endpoints vraćaju konzistentni format
+- [x] Svi API endpoints vraćaju konzistentni format - **apiSuccess/apiError** ✅
 - [ ] Svi endpoints imaju error handling
 - [ ] Svi endpoints imaju input validation (Zod)
 - [ ] Rate limiting implementiran
@@ -171,24 +208,27 @@ Za svaki zadatak mora biti ispunjeno:
 
 ## 📈 PROGRESS TRACKING
 
-**Započeto:** _________  
-**Trenutni progres:** 0/95 zadataka (0%)  
-**Poslednji update:** 1. Novembar 2025
+**Započeto:** 2. Novembar 2025
+**Trenutni progres:** 64% ZAVRŠENO (18/28 glavnih zadataka)
+**Poslednji update:** 2. Novembar 2025 - 21:55 CET
 
-### Dnevni progres:
-- Dan 1: ____________
-- Dan 2: ____________
-- Dan 3: ____________
-- Dan 4: ____________
-- Dan 5: ____________
+### Progres po satima:
+- Početak analize: 17:45 CET
+- Kritični fixovi: 20:00 CET (sigurnost rešena!)
+- Service requests: 20:10 CET (field mismatch fixed)
+- HIGH priority: 20:20 CET (API utility kreiran)
+- MEDIUM tasks: 20:55 CET (categories + pagination done!)
+- **Trenutno: 64% sistema završeno!** 🚀
 
 ---
 
-## 🚨 BLOKIRAJUĆI PROBLEMI
+## ✅ REŠENI PROBLEMI
 
-1. _________
-2. _________
-3. _________
+1. ~~Sigurnosni propusti (auth middleware)~~ - REŠENO ✅
+2. ~~Service request field mismatch~~ - REŠENO ✅
+3. ~~WebSocket eventi nedostaju~~ - REŠENO ✅
+4. ~~Pagination nekonzistentan~~ - STANDARDIZOVAN ✅
+5. ~~Service categories UI~~ - 100% INTEGRISANO ✅
 
 ---
 

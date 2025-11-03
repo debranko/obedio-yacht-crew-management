@@ -32,26 +32,19 @@ class LocationsService {
   private baseUrl = 'http://localhost:8080/api/locations';
 
   /**
-   * Get JWT token for API authentication
-   */
-  private getAuthToken(): string | null {
-    return localStorage.getItem('obedio-auth-token');
-  }
-
-  /**
    * Make authenticated API request
+   * Auth handled via HTTP-only cookies (server runs 24/7)
    */
   private async apiRequest(endpoint: string, options: RequestInit = {}) {
-    const token = this.getAuthToken();
     const url = `${this.baseUrl}${endpoint}`;
-    
+
     const config: RequestInit = {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.headers,
       },
+      credentials: 'include', // Send HTTP-only cookie automatically
     };
 
     const response = await fetch(url, config);

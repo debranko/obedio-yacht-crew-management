@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../middleware/error-handler';
 import { authMiddleware, requirePermission } from '../middleware/auth';
 import { prisma } from '../services/db';
+import { apiSuccess, apiError } from '../utils/api-response';
 
 const router = Router();
 
@@ -17,10 +18,7 @@ router.get('/', requirePermission('settings.view'), asyncHandler(async (req, res
     orderBy: { order: 'asc' }
   });
 
-  res.json({ 
-    success: true, 
-    data: categories 
-  });
+  res.json(apiSuccess(categories));
 }));
 
 /**
@@ -31,10 +29,7 @@ router.post('/', requirePermission('settings.edit'), asyncHandler(async (req, re
   const { name, icon, color, description } = req.body;
 
   if (!name) {
-    return res.status(400).json({
-      success: false,
-      error: 'Category name is required'
-    });
+    return res.status(400).json(apiError('Category name is required', 'VALIDATION_ERROR'));
   }
 
   // Get the highest order value
@@ -53,10 +48,7 @@ router.post('/', requirePermission('settings.edit'), asyncHandler(async (req, re
     }
   });
 
-  res.status(201).json({
-    success: true,
-    data: category
-  });
+  res.status(201).json(apiSuccess(category));
 }));
 
 /**
@@ -79,10 +71,7 @@ router.put('/:id', requirePermission('settings.edit'), asyncHandler(async (req, 
     }
   });
 
-  res.json({
-    success: true,
-    data: category
-  });
+  res.json(apiSuccess(category));
 }));
 
 /**
@@ -98,20 +87,17 @@ router.delete('/:id', requirePermission('settings.edit'), asyncHandler(async (re
   });
 
   if (requestsCount > 0) {
-    return res.status(400).json({
-      success: false,
-      error: `Cannot delete category. It is used by ${requestsCount} service requests.`
-    });
+    return res.status(400).json(apiError(
+      `Cannot delete category. It is used by ${requestsCount} service requests.`,
+      'VALIDATION_ERROR'
+    ));
   }
 
   await prisma.serviceCategory.delete({
     where: { id }
   });
 
-  res.json({
-    success: true,
-    message: 'Category deleted successfully'
-  });
+  res.json(apiSuccess({ message: 'Category deleted successfully' }));
 }));
 
 /**
@@ -122,15 +108,12 @@ router.put('/reorder', requirePermission('settings.edit'), asyncHandler(async (r
   const { categories } = req.body;
 
   if (!Array.isArray(categories)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Categories array is required'
-    });
+    return res.status(400).json(apiError('Categories array is required', 'VALIDATION_ERROR'));
   }
 
   // Update order for each category
   await Promise.all(
-    categories.map((cat, index) => 
+    categories.map((cat, index) =>
       prisma.serviceCategory.update({
         where: { id: cat.id },
         data: { order: index }
@@ -138,10 +121,7 @@ router.put('/reorder', requirePermission('settings.edit'), asyncHandler(async (r
     )
   );
 
-  res.json({
-    success: true,
-    message: 'Categories reordered successfully'
-  });
+  res.json(apiSuccess({ message: 'Categories reordered successfully' }));
 }));
 
 export default router;

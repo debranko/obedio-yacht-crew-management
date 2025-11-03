@@ -29,11 +29,13 @@ import {
 } from 'lucide-react';
 import { useAppData } from '../../contexts/AppDataContext';
 import { useWebSocket } from '../../hooks/useWebSocket';
+import { useAuth } from '../../contexts/AuthContext';
+import { useUserPreferences } from '../../hooks/useUserPreferences';
 import type { ServiceRequest, InteriorTeam } from '../../contexts/AppDataContext';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { ServiceRequestsSettingsDialog } from '../service-requests-settings-dialog';
 import { ServingRequestCard } from '../serving-request-card';
-import { useCreateServiceRequest } from '../../hooks/useServiceRequestsApi';
+import { useCreateServiceRequest, useAcceptServiceRequest, useCompleteServiceRequest, useUpdateServiceRequest } from '../../hooks/useServiceRequestsApi';
 import { useServiceCategories } from '../../hooks/useServiceCategories';
 import {
   Dialog,
@@ -62,20 +64,31 @@ export function ServiceRequestsPage({
   onToggleFullscreen: externalToggleFullscreen
 }: ServiceRequestsPageProps = {}) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { preferences } = useUserPreferences();
+
   const {
     serviceRequests,
-    acceptServiceRequest,
     delegateServiceRequest,
-    completeServiceRequest,
     // simulateNewRequest removed - using API directly
     // forwardServiceRequest removed - using service categories instead
     serviceRequestHistory,
     clearServiceRequestHistory,
     crewMembers,
-    userPreferences,
   } = useAppData();
 
+  // Get user preferences from backend API
+  const userPreferences = {
+    serviceRequestDisplayMode: (preferences?.serviceRequestDisplayMode || 'location') as 'guest-name' | 'location',
+    servingNowTimeout: preferences?.serviceRequestServingTimeout || 5,
+    requestDialogRepeatInterval: preferences?.requestDialogRepeatInterval || 60,
+    soundEnabled: preferences?.serviceRequestSoundAlerts !== false,
+  };
+
   const createServiceRequest = useCreateServiceRequest();
+  const { mutate: acceptRequest } = useAcceptServiceRequest();
+  const { mutate: completeRequest } = useCompleteServiceRequest();
+  const { mutate: updateRequest } = useUpdateServiceRequest();
 
   // WebSocket for real-time updates
   const { isConnected: wsConnected, on: wsOn, off: wsOff } = useWebSocket();
@@ -221,10 +234,27 @@ export function ServiceRequestsPage({
   );
 
   const handleAccept = (request: ServiceRequest) => {
-    // In production, get from auth context
-    const currentUser = 'Maria Lopez';
-    acceptServiceRequest(request.id, currentUser);
-    toast.success(`Now serving ${userPreferences.serviceRequestDisplayMode === 'guest-name' ? request.guestName : request.guestCabin}`);
+    // Get current crew member from authenticated user
+    const currentCrewMember = crewMembers.find(crew => crew.userId === user?.id);
+
+    if (!currentCrewMember) {
+      toast.error('You must be associated with a crew member to accept requests');
+      console.error('No crew member found for user:', user?.id);
+      return;
+    }
+
+    acceptRequest(
+      { id: request.id, crewId: currentCrewMember.id },
+      {
+        onSuccess: () => {
+          toast.success(`Now serving ${userPreferences.serviceRequestDisplayMode === 'guest-name' ? request.guestName : request.guestCabin}`);
+        },
+        onError: (error) => {
+          toast.error('Failed to accept request');
+          console.error(error);
+        }
+      }
+    );
   };
 
   const handleDelegateClick = (request: ServiceRequest) => {
@@ -254,24 +284,43 @@ export function ServiceRequestsPage({
     const selectedCategory = serviceCategories.find(cat => cat.id === selectedCategoryId);
     if (!selectedCategory) return;
 
-    // In production, this would update the service request with the categoryId
-    // For now, just show success message
-    toast.success(`Request forwarded to ${selectedCategory.name}`);
-
-    setForwardDialogOpen(false);
-    setSelectedRequest(null);
-    setSelectedCategoryId('');
+    // Update service request with categoryId
+    updateRequest(
+      {
+        id: selectedRequest.id,
+        data: {
+          categoryId: selectedCategoryId,
+          status: 'delegated', // Mark as delegated when forwarded to category
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success(`Request forwarded to ${selectedCategory.name}`);
+          setForwardDialogOpen(false);
+          setSelectedRequest(null);
+          setSelectedCategoryId('');
+        },
+        onError: (error: any) => {
+          toast.error(error.message || 'Failed to forward request');
+        },
+      }
+    );
   };
 
   const handleComplete = (request: ServiceRequest) => {
-    const currentUser = 'Maria Lopez'; // In production, get from auth context
-    completeServiceRequest(request.id, currentUser);
-    
-    // Start countdown timer
-    const timeoutSeconds = userPreferences.servingNowTimeout || 5;
-    setCompletingRequests(prev => ({ ...prev, [request.id]: timeoutSeconds }));
-    
-    toast.success(`Completed! Removing in ${timeoutSeconds}s...`);
+    completeRequest(request.id, {
+      onSuccess: () => {
+        // Start countdown timer
+        const timeoutSeconds = userPreferences.servingNowTimeout || 5;
+        setCompletingRequests(prev => ({ ...prev, [request.id]: timeoutSeconds }));
+
+        toast.success(`Completed! Removing in ${timeoutSeconds}s...`);
+      },
+      onError: (error) => {
+        toast.error('Failed to complete request');
+        console.error(error);
+      }
+    });
   };
 
   // Countdown timer effect
@@ -495,12 +544,22 @@ export function ServiceRequestsPage({
                                   ? request.guestName 
                                   : request.guestCabin}
                               </h4>
-                              <Badge 
+                              <Badge
                                 variant={getPriorityBadgeColor(request.priority) as any}
                                 className={`${isFullscreen ? 'text-sm px-3 py-1' : 'text-xs'} uppercase`}
                               >
                                 {request.priority}
                               </Badge>
+                              {request.category && (
+                                <Badge
+                                  variant="secondary"
+                                  className={`${isFullscreen ? 'text-sm px-3 py-1' : 'text-xs'}`}
+                                  style={{ backgroundColor: `${request.category.color}20`, color: request.category.color, borderColor: request.category.color }}
+                                >
+                                  <span className="mr-1">{request.category.icon}</span>
+                                  {request.category.name}
+                                </Badge>
+                              )}
                             </div>
                             <div className={`flex items-center gap-4 ${isFullscreen ? 'text-base' : 'text-sm'} text-muted-foreground`}>
                               {userPreferences.serviceRequestDisplayMode === 'guest-name' ? (
@@ -654,6 +713,16 @@ export function ServiceRequestsPage({
                                 <Badge variant="outline" className={`${isFullscreen ? 'text-sm' : 'text-xs'} bg-chart-3/10 border-chart-3`}>
                                   ✓ Complete
                                 </Badge>
+                                {request.category && (
+                                  <Badge
+                                    variant="secondary"
+                                    className={`${isFullscreen ? 'text-sm px-3 py-1' : 'text-xs'}`}
+                                    style={{ backgroundColor: `${request.category.color}20`, color: request.category.color, borderColor: request.category.color }}
+                                  >
+                                    <span className="mr-1">{request.category.icon}</span>
+                                    {request.category.name}
+                                  </Badge>
+                                )}
                               </div>
                               <div className={`flex items-center gap-3 ${isFullscreen ? 'text-base' : 'text-sm'} text-muted-foreground`}>
                                 <span className="flex items-center gap-1.5">

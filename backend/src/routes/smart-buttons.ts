@@ -4,6 +4,7 @@ import { requirePermission } from '../middleware/auth';
 import { DatabaseService } from '../services/database';
 import { mqttService } from '../services/mqtt.service';
 import { websocketService } from '../services/websocket';
+import { apiSuccess, apiError } from '../utils/api-response';
 
 const router = Router();
 const dbService = new DatabaseService();
@@ -39,7 +40,7 @@ router.post('/press', asyncHandler(async (req, res) => {
     status: 'received'
   });
   
-  res.json({ success: true, data: result });
+  res.json(apiSuccess(result));
 }));
 
 /**
@@ -52,7 +53,7 @@ router.post('/status/:deviceId', asyncHandler(async (req, res) => {
   // Publish status to MQTT
   mqttService.publish(`obedio/button/${deviceId}/status`, status);
   
-  res.json({ success: true, message: 'Status updated' });
+  res.json(apiSuccess({ message: 'Status updated' }));
 }));
 
 /**
@@ -65,7 +66,7 @@ router.post('/telemetry/:deviceId', asyncHandler(async (req, res) => {
   // Publish telemetry to MQTT
   mqttService.publish(`obedio/device/${deviceId}/telemetry`, telemetry);
   
-  res.json({ success: true, message: 'Telemetry received' });
+  res.json(apiSuccess({ message: 'Telemetry received' }));
 }));
 
 /**
@@ -82,18 +83,17 @@ router.post('/test/:deviceId', asyncHandler(async (req, res) => {
     vibration: true
   });
   
-  res.json({ success: true, message: 'Test command sent' });
+  res.json(apiSuccess({ message: 'Test command sent' }));
 }));
 
 /**
  * Get MQTT connection status
  */
 router.get('/mqtt-status', asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
+  res.json(apiSuccess({
     connected: mqttService.getConnectionStatus(),
     broker: process.env.MQTT_BROKER || 'mqtt://localhost:1883'
-  });
+  }));
 }));
 
 export default router;

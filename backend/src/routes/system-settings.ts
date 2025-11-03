@@ -8,6 +8,7 @@ import { asyncHandler } from '../middleware/error-handler';
 import { requirePermission } from '../middleware/auth';
 import os from 'os';
 import { prisma } from '../services/db';
+import { apiSuccess, apiError } from '../utils/api-response';
 
 const router = Router();
 
@@ -70,11 +71,7 @@ router.get('/', asyncHandler(async (_, res) => {
     enableDebugMode: process.env.NODE_ENV === 'development'
   };
 
-  res.json({
-    success: true,
-    status,
-    settings
-  });
+  res.json(apiSuccess({ status, settings }));
 }));
 
 /**
@@ -105,11 +102,10 @@ router.put('/', asyncHandler(async (req, res) => {
     enableDebugMode
   };
 
-  res.json({
-    success: true,
+  res.json(apiSuccess({
     settings: updatedSettings,
     message: 'System settings updated. Restart required for some changes to take effect.'
-  });
+  }));
 }));
 
 /**
@@ -124,8 +120,7 @@ router.get('/health', asyncHandler(async (_, res) => {
     dbStatus = 'disconnected';
   }
 
-  res.json({
-    success: true,
+  res.json(apiSuccess({
     status: 'ok',
     checks: {
       database: dbStatus,
@@ -133,7 +128,7 @@ router.get('/health', asyncHandler(async (_, res) => {
       memory: os.freemem() > 100 * 1024 * 1024 ? 'ok' : 'low',
       uptime: process.uptime()
     }
-  });
+  }));
 }));
 
 export default router;

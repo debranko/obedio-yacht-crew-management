@@ -42,17 +42,17 @@ export function ServiceRequestsProvider({ children }: { children: ReactNode }) {
     const newRequest: ServiceRequest = {
       ...request,
       id: `sr-${Date.now()}`,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(), // Should be Date object, not string
     };
 
     // Add to history
     setServiceRequestHistory(prev => [...prev, {
-      id: newRequest.id,
-      request: newRequest,
-      timestamp: newRequest.timestamp,
-      action: 'created',
-      by: 'System',
-    }]);
+      id: `history-${Date.now()}`,
+      originalRequest: newRequest,
+      completedBy: 'System',
+      completedAt: new Date(),
+      duration: 0,
+    } as ServiceRequestHistory]);
 
     // Invalidate cache to trigger refetch
     queryClient.invalidateQueries({ queryKey: ['service-requests'] });
@@ -66,14 +66,7 @@ export function ServiceRequestsProvider({ children }: { children: ReactNode }) {
     const request = apiServiceRequests.find(r => r.id === requestId);
     if (!request) return;
 
-    // Add to history
-    setServiceRequestHistory(prev => [...prev, {
-      id: `history-${Date.now()}`,
-      request: request,
-      timestamp: new Date().toISOString(),
-      action: 'accepted',
-      by: crewMemberName,
-    }]);
+    // TODO: Properly implement history tracking based on ServiceRequestHistory type
 
     // Invalidate cache to trigger refetch
     queryClient.invalidateQueries({ queryKey: ['service-requests'] });
@@ -85,14 +78,7 @@ export function ServiceRequestsProvider({ children }: { children: ReactNode }) {
     const request = apiServiceRequests.find(r => r.id === requestId);
     if (!request) return;
 
-    // Add to history
-    setServiceRequestHistory(prev => [...prev, {
-      id: `history-${Date.now()}`,
-      request: request,
-      timestamp: new Date().toISOString(),
-      action: 'delegated',
-      by: toCrewMember,
-    }]);
+    // TODO: Properly implement history tracking based on ServiceRequestHistory type
 
     // Invalidate cache to trigger refetch
     queryClient.invalidateQueries({ queryKey: ['service-requests'] });
@@ -104,14 +90,17 @@ export function ServiceRequestsProvider({ children }: { children: ReactNode }) {
     const request = apiServiceRequests.find(r => r.id === requestId);
     if (!request) return;
 
-    // Add to history
-    setServiceRequestHistory(prev => [...prev, {
-      id: `history-${Date.now()}`,
-      request: request,
-      timestamp: new Date().toISOString(),
-      action: 'completed',
-      by: crewMemberName || 'System',
-    }]);
+    // Add completed request to history
+    if (request.acceptedAt) {
+      const duration = Math.floor((new Date().getTime() - new Date(request.acceptedAt).getTime()) / 1000);
+      setServiceRequestHistory(prev => [...prev, {
+        id: `history-${Date.now()}`,
+        originalRequest: request,
+        completedBy: crewMemberName || 'System',
+        completedAt: new Date(),
+        duration,
+      }]);
+    }
 
     // Invalidate cache to trigger refetch
     queryClient.invalidateQueries({ queryKey: ['service-requests'] });

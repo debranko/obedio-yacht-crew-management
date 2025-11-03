@@ -40,6 +40,20 @@ model UserPreferences {
   notificationEmail   String?
   emergencyContacts   Json?    // Array of emergency contact strings
 
+  // Service Requests preferences
+  serviceRequestDisplayMode       String?  @default("location")  // 'guest-name' or 'location'
+  serviceRequestViewStyle         String?  @default("expanded")  // 'expanded' or 'compact'
+  serviceRequestSortOrder         String?  @default("newest")    // 'newest', 'priority', or 'location'
+  serviceRequestShowGuestPhotos   Boolean  @default(true)
+  serviceRequestServingTimeout    Int      @default(5)           // Minutes
+  serviceRequestSoundAlerts       Boolean  @default(true)
+  serviceRequestVisualFlash       Boolean  @default(false)
+  serviceRequestResponseWarning   Int      @default(5)           // Minutes
+  serviceRequestAutoArchive       Int      @default(30)          // Minutes
+  serviceRequestAutoPriorityVIP   Boolean  @default(true)
+  serviceRequestAutoPriorityMaster Boolean @default(false)
+  requestDialogRepeatInterval     Int      @default(60)          // Seconds
+
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -357,6 +371,7 @@ model YachtSettings {
   timeFormat        String    @default("24h")
   weatherUnits      String    @default("metric")
   windSpeedUnits    String    @default("knots")
+  weatherUpdateInterval Int   @default(30)
 
   // GPS Location fields
   latitude          Float?

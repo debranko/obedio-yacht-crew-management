@@ -91,6 +91,16 @@ export function ServingRequestCard({
                   <Badge variant="outline" className="text-xs bg-success/10 border-success flex-shrink-0">
                     In Progress
                   </Badge>
+                  {request.category && (
+                    <Badge
+                      variant="secondary"
+                      className="text-xs flex-shrink-0"
+                      style={{ backgroundColor: `${request.category.color}20`, color: request.category.color, borderColor: request.category.color }}
+                    >
+                      <span className="mr-1">{request.category.icon}</span>
+                      {request.category.name}
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                   {userPreferences.serviceRequestDisplayMode === 'guest-name' ? (
@@ -178,6 +188,16 @@ export function ServingRequestCard({
               <Badge variant="outline" className={`${isFullscreen ? 'text-sm' : 'text-xs'} bg-success/10 border-success`}>
                 In Progress
               </Badge>
+              {request.category && (
+                <Badge
+                  variant="secondary"
+                  className={`${isFullscreen ? 'text-sm px-3 py-1' : 'text-xs'}`}
+                  style={{ backgroundColor: `${request.category.color}20`, color: request.category.color, borderColor: request.category.color }}
+                >
+                  <span className="mr-1">{request.category.icon}</span>
+                  {request.category.name}
+                </Badge>
+              )}
             </div>
             <div className={`flex items-center gap-3 ${isFullscreen ? 'text-base' : 'text-sm'} text-muted-foreground`}>
               {userPreferences.serviceRequestDisplayMode === 'guest-name' ? (

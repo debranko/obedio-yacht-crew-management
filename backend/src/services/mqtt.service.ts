@@ -457,6 +457,19 @@ class MQTTService {
         });
 
         console.log(`✅ Device updated: ${device.name}`);
+
+        // Emit device update to WebSocket
+        if (this.io) {
+          console.log(`📡 Emitting device:updated for ${device.deviceId} to WebSocket clients`);
+          this.io.emit('device:updated', device);
+          this.io.emit('device:status-changed', {
+            deviceId: device.deviceId,
+            status: 'online',
+            batteryLevel: device.batteryLevel,
+            signalStrength: device.signalStrength
+          });
+          console.log(`✅ WebSocket events emitted to ${this.io.engine.clientsCount} connected clients`);
+        }
       } else {
         // Create new device
         console.log(`➕ Creating new device: ${deviceId}`);
@@ -512,7 +525,16 @@ class MQTTService {
 
       // Emit to WebSocket clients
       if (this.io) {
-        this.io.emit('device:registered', device);
+        const eventType = device ? 'device:updated' : 'device:created';
+        console.log(`📡 Emitting ${eventType} and device:status-changed for ${device.deviceId} to WebSocket clients`);
+        this.io.emit(eventType, device);
+        this.io.emit('device:status-changed', {
+          deviceId: device.deviceId,
+          status: 'online',
+          batteryLevel: device.batteryLevel,
+          signalStrength: device.signalStrength
+        });
+        console.log(`✅ Device registration events emitted to ${this.io.engine.clientsCount} connected clients`);
       }
 
       // Send confirmation back to device
@@ -557,7 +579,7 @@ class MQTTService {
       }
 
       // Update device
-      await prisma.device.update({
+      const updatedDevice = await prisma.device.update({
         where: { deviceId },
         data: {
           status: status || 'online',
@@ -565,6 +587,18 @@ class MQTTService {
           lastSeen: new Date(),
         }
       });
+
+      // Emit device status change to WebSocket
+      if (this.io) {
+        console.log(`📡 Emitting device:status-changed from heartbeat for ${updatedDevice.deviceId}`);
+        this.io.emit('device:status-changed', {
+          deviceId: updatedDevice.deviceId,
+          status: updatedDevice.status,
+          batteryLevel: updatedDevice.batteryLevel,
+          signalStrength: updatedDevice.signalStrength
+        });
+        console.log(`✅ Heartbeat event emitted to ${this.io.engine.clientsCount} connected clients`);
+      }
 
       // Update MQTT monitor
       mqttMonitor.updateDevice(deviceId, {
@@ -635,12 +669,19 @@ class MQTTService {
         type: 'smart_button'
       });
 
-      // Emit to WebSocket clients
+      // Emit to WebSocket clients using WebSocket service
       if (this.io) {
-        this.io.emit('device:status', {
+        console.log(`📡 Emitting device:status-changed for ${deviceId} to WebSocket clients`);
+        this.io.emit('device:status-changed', {
           deviceId,
+          status: message.online ? 'online' : 'offline',
+          batteryLevel: message.battery,
+          signalStrength: message.rssi,
           ...message
         });
+        console.log(`✅ WebSocket event emitted to ${this.io.engine.clientsCount} connected clients`);
+      } else {
+        console.error('❌ WebSocket IO not available for device status update');
       }
     } catch (error) {
       console.error('❌ Error updating device status:', error);
@@ -665,7 +706,7 @@ class MQTTService {
 
       // Update device metrics
       if (message.battery !== undefined || message.rssi !== undefined) {
-        await prisma.device.update({
+        const updatedDevice = await prisma.device.update({
           where: { deviceId },
           data: {
             ...(message.battery && { batteryLevel: message.battery }),
@@ -673,6 +714,18 @@ class MQTTService {
             lastSeen: new Date(),
           }
         });
+
+        // Emit telemetry update to WebSocket
+        if (this.io) {
+          console.log(`📡 Emitting device:status-changed from telemetry for ${updatedDevice.deviceId}`);
+          this.io.emit('device:status-changed', {
+            deviceId: updatedDevice.deviceId,
+            status: updatedDevice.status,
+            batteryLevel: updatedDevice.batteryLevel,
+            signalStrength: updatedDevice.signalStrength
+          });
+          console.log(`✅ Telemetry event emitted to ${this.io.engine.clientsCount} connected clients`);
+        }
       }
     } catch (error) {
       console.error('❌ Error handling telemetry:', error);

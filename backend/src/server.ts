@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { createServer } from 'http';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
 import { prisma } from './services/db';
@@ -96,6 +97,9 @@ const globalLimiter = rateLimit({
 
 // Apply global rate limiter to all API routes
 app.use('/api/', globalLimiter);
+
+// Parse cookies for HTTP-only token storage (server runs 24/7)
+app.use(cookieParser());
 
 app.use(express.json({ limit: '10mb' })); // Increase JSON payload limit for base64 images
 app.use(express.urlencoded({ extended: true, limit: '10mb' })); // Increase URL-encoded payload limit

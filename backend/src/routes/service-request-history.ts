@@ -1,36 +1,38 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../services/db';
 import { authMiddleware } from '../middleware/auth';
+import { calculatePagination, buildPaginationMeta } from '../utils/pagination';
+import { asyncHandler } from '../middleware/error-handler';
+import { apiSuccess, apiError } from '../utils/api-response';
 
 const router = Router();
 
 // Get service request history with filters
-router.get('/', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const { 
-      limit = 50, 
-      offset = 0, 
-      userId, 
+router.get('/', authMiddleware, asyncHandler(async (req: Request, res: Response) => {
+    const {
+      page = 1,
+      limit = 50,
+      userId,
       serviceRequestId,
       startDate,
       endDate,
       action
     } = req.query;
-    
+
     const where: any = {};
-    
+
     if (userId) {
       where.userId = userId as string;
     }
-    
+
     if (serviceRequestId) {
       where.serviceRequestId = serviceRequestId as string;
     }
-    
+
     if (action) {
       where.action = action as string;
     }
-    
+
     if (startDate || endDate) {
       where.createdAt = {};
       if (startDate) {
@@ -40,94 +42,77 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
         where.createdAt.lte = new Date(endDate as string);
       }
     }
-    
+
+    const { skip, take, page: pageNum, limit: limitNum } = calculatePagination(Number(page), Number(limit));
+
     const [history, total] = await Promise.all([
       prisma.serviceRequestHistory.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        take: Number(limit),
-        skip: Number(offset)
+        take,
+        skip
       }),
       prisma.serviceRequestHistory.count({ where })
     ]);
-    
-    res.json({
-      data: history,
-      pagination: {
-        total,
-        limit: Number(limit),
-        offset: Number(offset)
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching service request history:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+
+  res.json(apiSuccess(history, buildPaginationMeta(total, pageNum, limitNum)));
+}));
 
 // Create service request history entry
-router.post('/', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user.id;
-    const {
+router.post('/', authMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const userId = (req as any).user.id;
+  const {
+    serviceRequestId,
+    action,
+    previousStatus,
+    newStatus,
+    notes,
+    metadata
+  } = req.body;
+
+  if (!serviceRequestId || !action || !newStatus) {
+    return res.status(400).json(apiError(
+      'serviceRequestId, action, and newStatus are required',
+      'VALIDATION_ERROR'
+    ));
+  }
+
+  const historyEntry = await prisma.serviceRequestHistory.create({
+    data: {
       serviceRequestId,
       action,
       previousStatus,
       newStatus,
       notes,
-      metadata
-    } = req.body;
-    
-    if (!serviceRequestId || !action || !newStatus) {
-      return res.status(400).json({ 
-        error: 'serviceRequestId, action, and newStatus are required' 
-      });
+      userId,
+      metadata: metadata || {}
     }
-    
-    const historyEntry = await prisma.serviceRequestHistory.create({
-      data: {
-        serviceRequestId,
-        action,
-        previousStatus,
-        newStatus,
-        notes,
-        userId,
-        metadata: metadata || {}
-      }
-    });
-    
-    res.status(201).json(historyEntry);
-  } catch (error) {
-    console.error('Error creating service request history:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+  });
+
+  res.status(201).json(apiSuccess(historyEntry));
+}));
 
 // Get history for a specific service request
-router.get('/request/:serviceRequestId', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const { serviceRequestId } = req.params;
-    
-    const history = await prisma.serviceRequestHistory.findMany({
-      where: { serviceRequestId },
-      orderBy: { createdAt: 'desc' }
-    });
-    
-    res.json(history);
-  } catch (error) {
-    console.error('Error fetching service request history:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+router.get('/request/:serviceRequestId', authMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const { serviceRequestId } = req.params;
+
+  const history = await prisma.serviceRequestHistory.findMany({
+    where: { serviceRequestId },
+    orderBy: { createdAt: 'desc' }
+  });
+
+  res.json(apiSuccess(history));
+}));
 
 // Get completed service requests for activity log
-router.get('/completed', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const { limit = 50, offset = 0, search } = req.query;
-    
-    // Get completed service requests
+router.get('/completed', authMiddleware, asyncHandler(async (req: Request, res: Response) => {
+    const { page = 1, limit = 50, search } = req.query;
+
+    const { skip, take, page: pageNum, limit: limitNum } = calculatePagination(Number(page), Number(limit));
+
+    // Get completed service requests with full relations
     const completedRequests = await prisma.serviceRequest.findMany({
-      where: { 
+      where: {
         status: 'completed',
         OR: search ? [
           { notes: { contains: search as string, mode: 'insensitive' } },
@@ -138,20 +123,31 @@ router.get('/completed', authMiddleware, async (req: Request, res: Response) => 
       },
       include: {
         guest: true,
-        location: true
+        location: true,
+        category: true,
+        CrewMember: true  // Include crew member who completed the request
       },
       orderBy: { updatedAt: 'desc' },
-      take: Number(limit),
-      skip: Number(offset)
+      take,
+      skip
     });
     
     // Transform to match frontend expectations
     const transformedData = completedRequests.map(req => {
-      // Get completion time from history or use updatedAt
-      const completedAt = req.updatedAt;
+      // Calculate duration
+      const completedAt = req.completedAt || req.updatedAt;
       const createdAt = new Date(req.createdAt);
-      const duration = Math.floor((completedAt.getTime() - createdAt.getTime()) / 1000);
-      
+      const acceptedAt = req.acceptedAt ? new Date(req.acceptedAt) : createdAt;
+
+      // Duration from accepted to completed (or from created if not accepted)
+      const duration = Math.floor((completedAt.getTime() - acceptedAt.getTime()) / 1000);
+
+      // Get crew member name
+      const crewMemberName = req.CrewMember?.name || req.assignedTo || 'Staff';
+
+      // Map location name to cabin image
+      const cabinImage = req.location?.name ? `/images/locations/${req.location.name}.jpg` : undefined;
+
       return {
         id: req.id,
         originalRequest: {
@@ -159,15 +155,29 @@ router.get('/completed', authMiddleware, async (req: Request, res: Response) => 
           guestName: req.guest ? `${req.guest.firstName} ${req.guest.lastName}` : 'Unknown Guest',
           guestCabin: req.location?.name || 'Unknown Location',
           cabinId: req.locationId || '',
+          cabinImage,
           requestType: req.requestType,
           priority: req.priority,
           timestamp: createdAt,
-          voiceTranscript: req.notes,
+          voiceTranscript: req.voiceTranscript,
+          voiceAudioUrl: req.voiceAudioUrl,
           status: req.status,
-          assignedTo: 'Staff', // TODO: Get from crew assignment
+          assignedTo: crewMemberName,
+          categoryId: req.categoryId,
+          category: req.category ? {
+            id: req.category.id,
+            name: req.category.name,
+            icon: req.category.icon,
+            color: req.category.color,
+            description: req.category.description,
+            order: req.category.order,
+            isActive: req.category.isActive
+          } : undefined,
+          acceptedAt: req.acceptedAt,
+          completedAt: req.completedAt,
           notes: req.notes
         },
-        completedBy: 'Staff', // TODO: Get from history
+        completedBy: crewMemberName,
         completedAt,
         duration
       };
@@ -176,19 +186,8 @@ router.get('/completed', authMiddleware, async (req: Request, res: Response) => 
     const total = await prisma.serviceRequest.count({
       where: { status: 'completed' }
     });
-    
-    res.json({
-      data: transformedData,
-      pagination: {
-        total,
-        limit: Number(limit),
-        offset: Number(offset)
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching completed service requests:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+
+  res.json(apiSuccess(transformedData, buildPaginationMeta(total, pageNum, limitNum)));
+}));
 
 export default router;
