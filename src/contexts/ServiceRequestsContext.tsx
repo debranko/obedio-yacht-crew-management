@@ -74,17 +74,14 @@ export function ServiceRequestsProvider({ children }: { children: ReactNode }) {
     acceptMutation.mutate({ id: requestId, crewId: crewMemberId });
   }, [apiServiceRequests, acceptMutation]);
 
-  // Delegate service request
-  const delegateServiceRequest = useCallback((requestId: string, toCrewMember: string) => {
+  // Delegate service request (same as accept - assigns to crew member)
+  const delegateServiceRequest = useCallback((requestId: string, crewMemberId: string) => {
     const request = apiServiceRequests.find(r => r.id === requestId);
     if (!request) return;
 
-    // TODO: Properly implement history tracking based on ServiceRequestHistory type
-
-    // Invalidate cache to trigger refetch
-    queryClient.invalidateQueries({ queryKey: ['service-requests'] });
-    queryClient.invalidateQueries({ queryKey: ['service-requests-api'] });
-  }, [apiServiceRequests, queryClient]);
+    // Call backend API to accept/delegate the request (same endpoint)
+    acceptMutation.mutate({ id: requestId, crewId: crewMemberId });
+  }, [apiServiceRequests, acceptMutation]);
 
   // Complete service request
   const completeServiceRequest = useCallback((requestId: string, crewMemberName?: string) => {

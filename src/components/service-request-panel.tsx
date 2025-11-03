@@ -77,9 +77,13 @@ export function ServiceRequestPanel({ serviceName }: ServiceRequestPanelProps) {
   const confirmDelegate = () => {
     if (!selectedRequest || !selectedCrewMember) return;
 
+    // Find crew member name for toast message
+    const crewMember = onDutyCrewMembers.find(c => c.id === selectedCrewMember);
+    const crewName = crewMember?.name || 'crew member';
+
     delegateServiceRequest(selectedRequest.id, selectedCrewMember);
     toast.success(
-      `Request delegated to ${selectedCrewMember}`
+      `Request delegated to ${crewName}`
     );
 
     setDelegateDialogOpen(false);
@@ -371,7 +375,7 @@ export function ServiceRequestPanel({ serviceName }: ServiceRequestPanelProps) {
                 </SelectTrigger>
                 <SelectContent>
                   {onDutyCrewMembers.map((crew) => (
-                    <SelectItem key={crew.id} value={crew.name}>
+                    <SelectItem key={crew.id} value={crew.id}>
                       <div className="flex items-center gap-2">
                         <UserCheck className="h-3 w-3" />
                         <span>{crew.name}</span>

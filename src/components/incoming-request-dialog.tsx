@@ -123,10 +123,10 @@ export function IncomingRequestDialog({
     setShowDelegateDropdown(!showDelegateDropdown);
   };
 
-  const handleSelectCrew = (crewName: string) => {
+  const handleSelectCrew = (crewId: string, crewName: string) => {
     if (!request) return;
-    
-    delegateServiceRequest(request.id, crewName);
+
+    delegateServiceRequest(request.id, crewId);
     toast.success(`Request delegated to ${crewName}`);
     setShowDelegateDropdown(false);
     onClose();
@@ -392,7 +392,7 @@ export function IncomingRequestDialog({
                     {onDutyCrew.map((crew) => (
                       <button
                         key={crew.id}
-                        onClick={() => handleSelectCrew(crew.name)}
+                        onClick={() => handleSelectCrew(crew.id, crew.name)}
                         className="w-full px-3 py-2.5 flex items-center justify-between gap-2 hover:bg-muted/50 transition-colors text-left"
                       >
                         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -433,7 +433,7 @@ export function IncomingRequestDialog({
                       {availableCrew.map((crew) => (
                         <button
                           key={crew.id}
-                          onClick={() => handleSelectCrew(crew.name)}
+                          onClick={() => handleSelectCrew(crew.id, crew.name)}
                           className="w-full px-3 py-2.5 flex items-center gap-2 hover:bg-muted/50 transition-colors text-left"
                         >
                           <div className="flex items-center gap-2 flex-1 min-w-0">
