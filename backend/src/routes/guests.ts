@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../services/db';
 import type { Prisma } from '@prisma/client';
 import { asyncHandler, validate } from '../middleware/error-handler';
-import { requirePermission } from '../middleware/auth';
+import { authMiddleware, requirePermission } from '../middleware/auth';
 import { CreateGuestSchema, UpdateGuestSchema } from '../validators/schemas';
 import { websocketService } from '../services/websocket';
 import { apiSuccess, apiError } from '../utils/api-response';
@@ -10,8 +10,8 @@ import { calculatePagination, buildPaginationMeta } from '../utils/pagination';
 
 const router = Router();
 
-// Require authentication for all guest routes
-router.use(requirePermission('guests.view'));
+// Apply auth middleware to ALL guest routes
+router.use(authMiddleware);
 
 // GET /api/guests - List guests with filtering, sorting, and pagination
 router.get('/', asyncHandler(async (req, res) => {
