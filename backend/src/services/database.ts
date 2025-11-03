@@ -526,14 +526,13 @@ export class DatabaseService {
         data: {
           originalRequestId: request.id,
           action: 'completed',
-          previousStatus: 'IN_PROGRESS',
           newStatus: 'COMPLETED',
           completedBy: request.assignedTo || 'Unknown',
           completedAt: request.completedAt!,
           responseTime,
           completionTime,
           guestName: request.guestName,
-          location: request.guestCabin,
+          location: request.location?.name || request.guestCabin || null,
           requestType: request.requestType,
           priority: request.priority
         }
@@ -545,7 +544,7 @@ export class DatabaseService {
           type: 'service_request',
           action: 'Request Completed',
           details: `${request.assignedTo || 'Crew'} completed service request from ${request.guest ? request.guest.firstName + ' ' + request.guest.lastName : request.guestName || 'Guest'} at ${request.location?.name || request.guestCabin || 'Unknown'}`,
-          userId: request.assignedToId,
+          userId: request.CrewMember?.userId || null,
           locationId: request.locationId,
           guestId: request.guestId,
           metadata: JSON.stringify({
