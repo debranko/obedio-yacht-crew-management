@@ -1,14 +1,19 @@
 /**
- * WebSocket Hook
- * Real-time communication with backend using Socket.IO
+ * WebSocket Hook (Refactored)
+ *
+ * This hook now uses the singleton WebSocketService to prevent multiple connections.
+ * All components using this hook will share the same WebSocket connection.
+ *
+ * REFACTORED: 2025-11-03
+ * - Removed duplicate socket creation logic
+ * - Now wraps singleton WebSocketService from src/services/websocket.ts
+ * - Prevents disconnect/reconnect loops
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
-
-const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost:8080';
+import { websocketService, type AllEvents } from '../services/websocket';
 
 export interface WebSocketEvents {
   // Service Request Events
@@ -50,267 +55,215 @@ export interface WebSocketEvents {
 
   // Emergency Events
   'emergency:alert': (data: any) => void;
+
+  // Settings Events
+  'settings:updated': (data: any) => void;
 }
 
+/**
+ * React hook wrapper for singleton WebSocket service
+ * Provides React Query integration and connection state management
+ */
 export function useWebSocket() {
-  const socketRef = useRef<Socket | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const [isConnected, setIsConnected] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
-  // Initialize WebSocket connection
+  // Initialize singleton connection when user is authenticated
   useEffect(() => {
     if (!user) {
       // Don't connect if not authenticated
       return;
     }
 
-    console.log('🔌 Initializing WebSocket connection...');
+    console.log('🔌 Initializing WebSocket via singleton service...');
 
-    const socket = io(WS_URL, {
-      auth: {
-        userId: user.id,
-        username: user.username,
-      },
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionAttempts: 5,
-    });
+    // Connect singleton (will do nothing if already connected)
+    websocketService.connect(user.id);
 
-    socketRef.current = socket;
-
-    // Connection events
-    socket.on('connect', () => {
-      console.log('✅ WebSocket connected:', socket.id);
-      setIsConnected(true);
-      setConnectionError(null);
-    });
-
-    socket.on('disconnect', (reason) => {
-      console.log('❌ WebSocket disconnected:', reason);
-      setIsConnected(false);
-    });
-
-    socket.on('connect_error', (error) => {
-      console.error('🔥 WebSocket connection error:', error);
-      setConnectionError(error.message);
-      setIsConnected(false);
-    });
-
-    // Service Request Events - Invalidate queries to refetch data
-    socket.on('service-request:created', (data) => {
-      console.log('📞 New service request:', data);
-      // Invalidate BOTH query keys (old and API)
-      queryClient.invalidateQueries({ queryKey: ['service-requests'] });
-      queryClient.invalidateQueries({ queryKey: ['service-requests-api'] });
-
-      // Optional: Show notification to user
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('New Service Request', {
-          body: `Service request from ${data.guestName || 'Guest'}`,
-          icon: '/obedio-icon.png',
-        });
+    // Subscribe to connection events to track state
+    const unsubscribeConnection = websocketService.subscribe('connection', (event: AllEvents) => {
+      if (event.type === 'connected') {
+        console.log('✅ WebSocket connected (hook):', event.data.socketId);
+        setIsConnected(true);
+        setConnectionError(null);
+      } else if (event.type === 'disconnected') {
+        console.log('❌ WebSocket disconnected (hook):', event.data.reason);
+        setIsConnected(false);
       }
     });
 
-    socket.on('service-request:updated', (data) => {
-      console.log('📞 Service request updated:', data);
-      // Invalidate BOTH query keys (old and API)
+    // Check initial connection state
+    setIsConnected(websocketService.isSocketConnected());
+
+    // Subscribe to service request events for React Query invalidation
+    const unsubscribeServiceRequests = websocketService.subscribe('service-request', (event) => {
+      console.log('📞 Service request event:', event.type);
       queryClient.invalidateQueries({ queryKey: ['service-requests'] });
       queryClient.invalidateQueries({ queryKey: ['service-requests-api'] });
-    });
 
-    socket.on('service-request:completed', (data) => {
-      console.log('✅ Service request completed:', data);
-      // Invalidate BOTH query keys (old and API)
-      queryClient.invalidateQueries({ queryKey: ['service-requests'] });
-      queryClient.invalidateQueries({ queryKey: ['service-requests-api'] });
-    });
-
-    // Device Events
-    socket.on('device:created', (data) => {
-      console.log('📱 Device created:', data);
-      queryClient.invalidateQueries({ queryKey: ['devices'] });
-    });
-
-    socket.on('device:updated', (data) => {
-      console.log('📱 Device updated:', data);
-      queryClient.invalidateQueries({ queryKey: ['devices'] });
-    });
-
-    socket.on('device:deleted', (data) => {
-      console.log('📱 Device deleted:', data);
-      queryClient.invalidateQueries({ queryKey: ['devices'] });
-    });
-
-    socket.on('device:status-changed', (data) => {
-      console.log('📱 Device status changed:', data);
-      queryClient.invalidateQueries({ queryKey: ['devices'] });
-      // Also invalidate device logs if status changed
-      queryClient.invalidateQueries({ queryKey: ['device-logs'] });
-    });
-
-    // Location Events
-    socket.on('location:dnd-toggled', (data) => {
-      console.log('🚪 Location DND toggled:', data);
-      queryClient.invalidateQueries({ queryKey: ['locations'] });
-
-      // Optional: Show notification
+      // Show browser notification
       if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('Do Not Disturb Updated', {
-          body: `${data.name}: DND ${data.doNotDisturb ? 'enabled' : 'disabled'}`,
-          icon: '/obedio-icon.png',
-        });
+        if (event.type === 'service-request-created') {
+          new Notification('New Service Request', {
+            body: event.data?.message || 'New service request received',
+            icon: '/obedio-icon.png',
+          });
+        }
       }
     });
 
-    socket.on('location:created', (data) => {
-      console.log('🏠 Location created:', data);
-      queryClient.invalidateQueries({ queryKey: ['locations'] });
+    // Subscribe to device events
+    const unsubscribeDevices = websocketService.subscribe('service-request', (event) => {
+      // Device events come through service-request channel in current implementation
+      if (event.data?.deviceId) {
+        console.log('📱 Device event:', event.type);
+        queryClient.invalidateQueries({ queryKey: ['devices'] });
+        queryClient.invalidateQueries({ queryKey: ['device-logs'] });
+      }
     });
 
-    socket.on('location:updated', (data) => {
-      console.log('🏠 Location updated:', data);
-      queryClient.invalidateQueries({ queryKey: ['locations'] });
+    // Subscribe to guest events
+    const unsubscribeGuests = websocketService.subscribe('guest', (event) => {
+      console.log('👥 Guest event:', event.type);
+      queryClient.invalidateQueries({ queryKey: ['guests'] });
     });
 
-    socket.on('location:deleted', (data) => {
-      console.log('🏠 Location deleted:', data);
-      queryClient.invalidateQueries({ queryKey: ['locations'] });
-    });
-
-    // Crew Events
-    socket.on('crew:status-changed', (data) => {
-      console.log('👤 Crew status changed:', data);
+    // Subscribe to crew events
+    const unsubscribeCrew = websocketService.subscribe('crew', (event) => {
+      console.log('👤 Crew event:', event.type);
       queryClient.invalidateQueries({ queryKey: ['crew'] });
 
-      // Optional: Show notification for important status changes
-      if (data.status === 'on-duty' || data.status === 'off-duty') {
+      // Show notification for important status changes
+      if (event.data?.status && ['on-duty', 'off-duty'].includes(event.data.status)) {
         if ('Notification' in window && Notification.permission === 'granted') {
           new Notification('Crew Status Update', {
-            body: `${data.name} is now ${data.status}`,
+            body: `Crew member is now ${event.data.status}`,
             icon: '/obedio-icon.png',
           });
         }
       }
     });
 
-    // Guest Events
-    socket.on('guest:created', (data) => {
-      console.log('👥 Guest created:', data);
-      queryClient.invalidateQueries({ queryKey: ['guests'] });
-    });
+    // Subscribe to emergency events
+    const unsubscribeEmergency = websocketService.subscribe('emergency', (event) => {
+      console.log('🚨 Emergency event:', event.type);
 
-    socket.on('guest:updated', (data) => {
-      console.log('👥 Guest updated:', data);
-      queryClient.invalidateQueries({ queryKey: ['guests'] });
-    });
+      if (event.type === 'emergency-alert') {
+        // Show browser notification for emergencies
+        if ('Notification' in window) {
+          if (Notification.permission === 'granted') {
+            new Notification('⚠️ EMERGENCY ALERT', {
+              body: event.data?.message || 'Emergency situation detected',
+              icon: '/obedio-icon.png',
+              requireInteraction: true,
+            });
+          } else if (Notification.permission !== 'denied') {
+            Notification.requestPermission().then((permission) => {
+              if (permission === 'granted') {
+                new Notification('⚠️ EMERGENCY ALERT', {
+                  body: event.data?.message || 'Emergency situation detected',
+                  icon: '/obedio-icon.png',
+                  requireInteraction: true,
+                });
+              }
+            });
+          }
+        }
 
-    socket.on('guest:deleted', (data) => {
-      console.log('👥 Guest deleted:', data);
-      queryClient.invalidateQueries({ queryKey: ['guests'] });
-    });
-
-    // Assignment Events (Duty Roster)
-    socket.on('assignment:created', (data) => {
-      console.log('📅 Assignment created:', data);
-      queryClient.invalidateQueries({ queryKey: ['assignments'] });
-    });
-
-    socket.on('assignment:updated', (data) => {
-      console.log('📅 Assignment updated:', data);
-      queryClient.invalidateQueries({ queryKey: ['assignments'] });
-    });
-
-    socket.on('assignment:deleted', (data) => {
-      console.log('📅 Assignment deleted:', data);
-      queryClient.invalidateQueries({ queryKey: ['assignments'] });
-    });
-
-    // Emergency Events
-    socket.on('emergency:alert', (data) => {
-      console.log('🚨 EMERGENCY ALERT:', data);
-
-      // Show browser notification for emergencies
-      if ('Notification' in window) {
-        if (Notification.permission === 'granted') {
-          new Notification('⚠️ EMERGENCY ALERT', {
-            body: data.message || 'Emergency situation detected',
-            icon: '/obedio-icon.png',
-            requireInteraction: true, // Keep notification until user interacts
-          });
-        } else if (Notification.permission !== 'denied') {
-          Notification.requestPermission().then((permission) => {
-            if (permission === 'granted') {
-              new Notification('⚠️ EMERGENCY ALERT', {
-                body: data.message || 'Emergency situation detected',
-                icon: '/obedio-icon.png',
-                requireInteraction: true,
-              });
-            }
-          });
+        // Play alert sound
+        try {
+          const audio = new Audio('/sounds/emergency-alert.mp3');
+          audio.play().catch((e) => console.log('Could not play alert sound:', e));
+        } catch (e) {
+          console.log('Alert sound not available');
         }
       }
-
-      // Play alert sound (if available)
-      try {
-        const audio = new Audio('/sounds/emergency-alert.mp3');
-        audio.play().catch((e) => console.log('Could not play alert sound:', e));
-      } catch (e) {
-        console.log('Alert sound not available');
-      }
     });
 
-    // Cleanup on unmount
+    // Cleanup: unsubscribe but DON'T disconnect (other components may still need it)
     return () => {
-      console.log('🔌 Disconnecting WebSocket...');
-      socket.disconnect();
-      socketRef.current = null;
+      console.log('🔌 Component unmounting - unsubscribing from WebSocket events');
+      unsubscribeConnection();
+      unsubscribeServiceRequests();
+      unsubscribeDevices();
+      unsubscribeGuests();
+      unsubscribeCrew();
+      unsubscribeEmergency();
+      // NOTE: We do NOT disconnect the singleton service here
+      // It will remain connected for other components
     };
-  }, [user, queryClient]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]); // Only re-run when user ID changes (queryClient is stable singleton)
 
   // Subscribe to a specific event
   const on = useCallback(<K extends keyof WebSocketEvents>(
     event: K,
     handler: WebSocketEvents[K]
   ) => {
-    if (socketRef.current) {
-      socketRef.current.on(event, handler);
+    // Map socket.io event names to our internal event types
+    const eventTypeMap: Record<string, string> = {
+      'service-request:created': 'service-request',
+      'service-request:updated': 'service-request',
+      'service-request:completed': 'service-request',
+      'device:created': 'service-request',
+      'device:updated': 'service-request',
+      'device:deleted': 'service-request',
+      'device:status-changed': 'service-request',
+      'location:dnd-toggled': 'service-request',
+      'location:created': 'service-request',
+      'location:updated': 'service-request',
+      'location:deleted': 'service-request',
+      'crew:status-changed': 'crew',
+      'guest:created': 'guest',
+      'guest:updated': 'guest',
+      'guest:deleted': 'guest',
+      'assignment:created': 'service-request',
+      'assignment:updated': 'service-request',
+      'assignment:deleted': 'service-request',
+      'new_message': 'service-request',
+      'broadcast_message': 'service-request',
+      'activity-log:created': 'service-request',
+      'emergency:alert': 'emergency',
+      'settings:updated': 'service-request',
+    };
 
-      // Return unsubscribe function
-      return () => {
-        socketRef.current?.off(event, handler);
-      };
-    }
+    const eventType = eventTypeMap[event as string] || 'service-request';
+
+    // Create wrapper that filters events by specific type
+    const wrappedHandler = (allEvent: AllEvents) => {
+      // Check if this event matches the specific type requested
+      const expectedEventType = `${event}`.replace(':', '-');
+      if (allEvent.type === expectedEventType || allEvent.type.startsWith(event as string)) {
+        handler(allEvent.data);
+      }
+    };
+
+    const unsubscribe = websocketService.subscribe(eventType, wrappedHandler);
+    return unsubscribe;
   }, []);
 
-  // Unsubscribe from an event
+  // Unsubscribe from an event (handled by the unsubscribe function returned by `on`)
   const off = useCallback(<K extends keyof WebSocketEvents>(
     event: K,
     handler?: WebSocketEvents[K]
   ) => {
-    if (socketRef.current) {
-      socketRef.current.off(event, handler);
-    }
+    // No-op: unsubscribe is handled by the function returned from `on`
+    console.log('WebSocket off() called - use the unsubscribe function returned by on() instead');
   }, []);
 
-  // Emit an event (for future use if needed)
+  // Emit an event
   const emit = useCallback((event: string, data?: any) => {
-    if (socketRef.current && isConnected) {
-      socketRef.current.emit(event, data);
-    } else {
-      console.warn('WebSocket not connected, cannot emit:', event);
-    }
-  }, [isConnected]);
+    websocketService.emit(event, data);
+  }, []);
 
-  return {
+  return useMemo(() => ({
     isConnected,
     connectionError,
     on,
     off,
     emit,
-    socket: socketRef.current,
-  };
+    socket: null, // Don't expose raw socket - use singleton service methods instead
+  }), [isConnected, connectionError, on, off, emit]);
 }

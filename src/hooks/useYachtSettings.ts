@@ -62,6 +62,24 @@ export function useYachtSettings() {
   const queryClient = useQueryClient();
   const { on, off } = useWebSocket();
 
+  // Default yacht settings fallback
+  const DEFAULT_SETTINGS: YachtSettings = {
+    name: 'My Yacht',
+    type: 'motor-yacht',
+    timezone: 'Europe/Monaco',
+    floors: [],
+    dateFormat: 'DD/MM/YYYY',
+    timeFormat: '24h',
+    weatherUnits: 'metric',
+    windSpeedUnits: 'knots',
+    weatherUpdateInterval: 30,
+    latitude: null,
+    longitude: null,
+    accuracy: null,
+    locationName: null,
+    locationUpdatedAt: null,
+  };
+
   // Fetch settings
   const {
     data: settings,
@@ -73,7 +91,9 @@ export function useYachtSettings() {
     queryFn: async () => {
       const response = await api.get<{ success: boolean; data: YachtSettings }>('/yacht-settings');
       // Response structure is { success: boolean, data: YachtSettings }
-      return response.data?.data || response.data;
+      const data = response.data?.data || response.data;
+      // Never return undefined - use default settings as fallback
+      return data || DEFAULT_SETTINGS;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1,

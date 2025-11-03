@@ -35,7 +35,7 @@ export function WindyWidget({ className }: WindyWidgetProps) {
         <div className="flex items-center gap-2">
           <Wind className="h-4 w-4 text-primary" />
           <h3 className="text-sm font-semibold">Wind & Weather</h3>
-          <span className="text-xs text-muted-foreground">{settings.locationName || 'Current Location'}</span>
+          <span className="text-xs text-muted-foreground">{settings?.locationName || 'Current Location'}</span>
         </div>
         
         <Button

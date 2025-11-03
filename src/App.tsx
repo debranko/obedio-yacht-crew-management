@@ -18,7 +18,6 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { IncomingRequestDialog, useIncomingRequests } from "./components/incoming-request-dialog";
 import { EmergencyShakeDialog } from "./components/emergency-shake-dialog";
 import { LoginPage } from "./components/pages/login";
-import { useWebSocket } from "./services/websocket";
 import { toast } from "sonner";
 import { ErrorBoundary, PageErrorBoundary } from "./components/ErrorBoundary";
 
@@ -86,10 +85,7 @@ function AppContent() {
   // Global incoming request handling
   const { getCurrentDutyStatus, assignments, shifts, acceptServiceRequest, crewMembers, guests, locations, getGuestByLocationId } = useAppData();
   const { showDialog, currentRequest, closeDialog } = useIncomingRequests();
-  
-  // WebSocket integration
-  const ws = useWebSocket();
-  
+
   // Emergency shake-to-call state
   const [showEmergencyDialog, setShowEmergencyDialog] = useState(false);
   const [emergencyRequest, setEmergencyRequest] = useState<any>(null);
@@ -97,72 +93,10 @@ function AppContent() {
   
   // Track processed emergency requests to prevent re-opening
   const processedEmergencyIds = useRef<Set<string>>(new Set());
-  
-  // Initialize WebSocket connection
-  useEffect(() => {
-    const initWebSocket = async () => {
-      try {
-        // Connect to WebSocket server with real user ID
-        if (user?.id) {
-          ws.connect(user.id);
-        }
-        
-        // Subscribe to real-time events
-        const unsubscribeServiceRequests = ws.subscribe('service-request', (event) => {
-          console.log('Service request event:', event);
-          toast.info(`Service Request ${event.type.replace('service-request-', '')}`);
-        });
-        
-        const unsubscribeEmergency = ws.subscribe('emergency', (event) => {
-          console.log('Emergency event:', event);
-          if (event.type === 'emergency-alert') {
-            toast.error(`🚨 Emergency Alert: ${event.data.message}`);
-          }
-        });
-        
-        const unsubscribeCrew = ws.subscribe('crew', (event) => {
-          console.log('Crew event:', event);
-          toast.info(`Crew status updated`);
-        });
-        
-        const unsubscribeGuests = ws.subscribe('guest', (event) => {
-          console.log('Guest event:', event);
-          toast.info(`Guest ${event.type.replace('guest-', '')}`);
-        });
-        
-        const unsubscribeConnection = ws.subscribe('connection', (event) => {
-          if (event.type === 'connected') {
-            console.log('WebSocket connected');
-            toast.success('🔗 Connected to server');
-          } else if (event.type === 'disconnected') {
-            console.log('WebSocket disconnected');
-            toast.warning('⚠️ Connection lost');
-          }
-        });
-        
-        // Cleanup function
-        return () => {
-          unsubscribeServiceRequests();
-          unsubscribeEmergency();
-          unsubscribeCrew();
-          unsubscribeGuests();
-          unsubscribeConnection();
-        };
-      } catch (error) {
-        console.error('Failed to initialize WebSocket:', error);
-        toast.error('Failed to connect to server');
-      }
-    };
-    
-    const cleanup = initWebSocket();
-    
-    // Cleanup on component unmount
-    return () => {
-      cleanup.then(cleanupFn => cleanupFn?.());
-      ws.disconnect();
-    };
-  }, [ws]);
-  
+
+  // NOTE: WebSocket connection is now handled by useWebSocket hook in child components
+  // No need for manual WebSocket initialization in App.tsx
+
   // Get real-time duty status
   const dutyStatus = useMemo(() => getCurrentDutyStatus(), [assignments, shifts, crewMembers, getCurrentDutyStatus]);
   

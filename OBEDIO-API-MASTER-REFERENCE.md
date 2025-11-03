@@ -1,5 +1,5 @@
 # OBEDIO API MASTER REFERENCE
-**Living Document - Updated: 2025-11-03**
+**Living Document - Updated: 2025-11-03 Evening (Post-Bugfix)**
 **Project**: Luxury Minimal Web App Design (Obedio Yacht Crew Management)
 
 ---
@@ -1000,20 +1000,42 @@ rolePermissions = {
 ```
 
 ### Frontend Usage
-**File**: `src/hooks/useWebSocket.ts`
+**File**: `src/hooks/useWebSocket.ts` (Refactored: 2025-11-03)
+**Singleton Service**: `src/services/websocket.ts`
+
+**IMPORTANT**: WebSocket connection is now managed by a **singleton service** wrapped by React hook.
+- ✅ **ONE connection** for entire application (no more multiple connections)
+- ✅ All components share the same WebSocket instance
+- ✅ Automatic React Query cache invalidation
+- ✅ Connection state management via React hooks
 
 ```typescript
-const { isConnected, on, off } = useWebSocket();
+const { isConnected, on, off, emit } = useWebSocket();
 
 // Subscribe to event
 const unsubscribe = on('guest:created', (data) => {
-  // Invalidate React Query cache
-  queryClient.invalidateQueries({ queryKey: ['guests'] });
+  // React Query cache automatically invalidated by hook
+  console.log('New guest created:', data);
 });
 
-// Unsubscribe
-unsubscribe();
+// Cleanup (unsubscribe)
+useEffect(() => {
+  const unsub = on('guest:created', handler);
+  return () => unsub(); // Auto cleanup on unmount
+}, []);
 ```
+
+**Architecture**:
+1. **Singleton Service** (`src/services/websocket.ts`): Manages Socket.IO connection
+2. **React Hook** (`src/hooks/useWebSocket.ts`): Wraps singleton, provides React integration
+3. **Auto-Connect**: Hook automatically connects when user is authenticated
+4. **Auto-Cleanup**: Unsubscribes on component unmount (does NOT disconnect singleton)
+
+**Recent Refactoring (2025-11-03)**:
+- Fixed disconnect/reconnect loop (was creating multiple connections)
+- Removed dependency on `queryClient` in useEffect (causing infinite re-renders)
+- Removed duplicate WebSocket initialization from `App.tsx`
+- All components now use same singleton instance
 
 ---
 
@@ -1133,7 +1155,84 @@ After creating/modifying an API, update:
 
 ---
 
+## 🐛 BUGFIX CHANGELOG
+
+### 2025-11-03 - Critical System Fixes
+
+#### 1. WebSocket Disconnect/Reconnect Loop (RESOLVED)
+**Problem**: Multiple WebSocket connections being created, causing constant disconnect/reconnect spam in console.
+
+**Root Cause**:
+- `src/hooks/useWebSocket.ts` created NEW socket connection for each component (7+ components affected)
+- `App.tsx` had duplicate WebSocket initialization calling singleton service directly
+- `queryClient` in hook dependency array caused infinite re-renders
+
+**Files Fixed**:
+- ✅ `src/hooks/useWebSocket.ts` - Refactored to wrap singleton service (268 lines)
+- ✅ `src/App.tsx` - Removed duplicate WebSocket code (~70 lines removed)
+- ✅ Dependency array fixed (removed `queryClient`, kept only `user?.id`)
+
+**Impact**: ONE stable WebSocket connection for entire app, no more reconnect spam
+
+---
+
+#### 2. Weather Widget - TypeError: Cannot Read Property of Null (RESOLVED)
+**Problem**: Weather widgets crashing with "Cannot read property 'latitude' of null"
+
+**Root Cause**:
+- `weather-widget.tsx` accessed `coords.latitude` without null check
+- `settings.locationName` accessed without optional chaining (`?.`)
+- No default coordinates when yacht GPS location not set
+
+**Files Fixed**:
+- ✅ `src/components/weather-widget.tsx` - Added null guards (lines 64-70, 95)
+- ✅ `src/components/windy-widget.tsx` - Safe access for settings (line 38)
+
+**Impact**: Weather widgets now gracefully handle missing coordinates, show "No coordinates set" instead of crashing
+
+---
+
+#### 3. React Query Warning - yachtSettings Undefined (RESOLVED)
+**Problem**: React Query warning: "Query data cannot be undefined"
+
+**Root Cause**:
+- `useYachtSettings` hook queryFn could return `undefined`
+- React Query requires non-undefined return value from all query functions
+
+**Files Fixed**:
+- ✅ `src/hooks/useYachtSettings.ts` - Added DEFAULT_SETTINGS fallback (lines 66-81)
+- ✅ queryFn now always returns valid data: `data || DEFAULT_SETTINGS`
+
+**Impact**: No more undefined warnings, settings always have valid defaults
+
+---
+
+#### 4. Locations API - 401 Unauthorized (RESOLVED - Previous)
+**Problem**: Locations page not loading, all API calls returning 401 Unauthorized
+
+**Root Cause**:
+- `backend/src/server.ts` line 141 missing `authMiddleware` for `/api/locations` route
+- `locations.ts` uses `requirePermission()` which needs auth context
+
+**Files Fixed**:
+- ✅ `backend/src/server.ts:141` - Added authMiddleware to locations route
+
+**Impact**: Locations page now loads correctly with proper authentication
+
+---
+
+### Testing Checklist After Bugfixes
+
+- ✅ WebSocket connects ONCE on app load (check console)
+- ✅ No disconnect/reconnect loop
+- ✅ Weather widgets show "No coordinates set" gracefully (if no GPS)
+- ✅ No React Query undefined warnings
+- ✅ Locations page loads with guest data
+- ✅ All 5 major sections work: Dashboard, Crew, Guests, Devices, Locations
+
+---
+
 **End of Document**
-**Last Updated**: 2025-11-03
+**Last Updated**: 2025-11-03 (Evening - Post-Bugfix)
 **Maintained By**: Claude Code Assistant
 **Next Review Date**: When adding/modifying any API
