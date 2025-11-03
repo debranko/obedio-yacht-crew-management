@@ -206,7 +206,8 @@ export interface ServiceRequestDTO {
   id: string;
   guestId: string;
   locationId?: string | null;
-  status: 'pending' | 'in-progress' | 'completed' | 'cancelled' | 'serving' | 'accepted' | 'delegated';
+  // Changed to match actual backend values (IN_PROGRESS with underscore)
+  status: 'pending' | 'in_progress' | 'IN_PROGRESS' | 'completed' | 'cancelled' | 'serving' | 'accepted' | 'delegated';
   priority: 'low' | 'normal' | 'urgent' | 'emergency';
   message?: string | null;
   voiceTranscript?: string | null;

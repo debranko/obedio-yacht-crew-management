@@ -387,6 +387,94 @@ npx prisma studio
 
 **Do NOT say "done" until you've verified it works!**
 
+### Rule #9: API NAME CHANGES → REPLACE ALL REFERENCES
+
+```
+🚨 CRITICAL: If you find an API is incorrectly named or uses wrong format,
+you MUST search the ENTIRE codebase and replace ALL references!
+```
+
+**Why This Rule Exists:**
+- Wrong API names spread across multiple files
+- One fix isn't enough - must fix ALL usages
+- Prevents future bugs from inconsistent naming
+
+**Example - Service Request Status Bug:**
+```
+❌ Problem Found:
+- Backend database uses: 'IN_PROGRESS' (uppercase, underscore)
+- Backend validator allowed: 'in-progress' (lowercase, dash)
+- Frontend types defined: 'in-progress' (lowercase, dash)
+- Frontend mapping had: only 'in-progress' → caused bugs!
+
+✅ Correct Fix Process:
+1. Search ENTIRE codebase: grep -r "in-progress" backend/ src/
+2. Found 4 files using wrong format
+3. Replace ALL instances:
+   - backend/src/validators/schemas.ts - Validator enum
+   - src/services/api.ts - TypeScript types
+   - src/hooks/useServiceRequestsApi.ts - Status mapping
+   - src/types/activity-logs.ts - Activity types
+4. Add BOTH formats to mapping for compatibility
+5. Document the fix in API Master Reference
+```
+
+**Mandatory Steps When Fixing API Names:**
+
+```markdown
+1. IDENTIFY THE PROBLEM:
+   - What is the CORRECT API format? (check backend database/actual usage)
+   - What is the WRONG format being used?
+
+2. SEARCH ENTIRE CODEBASE:
+   ```bash
+   # Search backend
+   grep -r "wrong-api-name" backend/
+
+   # Search frontend
+   grep -r "wrong-api-name" src/
+
+   # Use Grep tool for pattern matching
+   Grep pattern: "wrong-api-name" in src/ and backend/
+   ```
+
+3. CREATE REPLACEMENT PLAN:
+   | File | Line | Current Value | New Value | Risk |
+   |------|------|---------------|-----------|------|
+   | validators/schemas.ts | 113 | 'in-progress' | 'in_progress' + both | LOW |
+   | api.ts | 209 | 'in-progress' | 'in_progress' | LOW |
+
+4. REPLACE ALL INSTANCES:
+   - Update validators first (backend)
+   - Update TypeScript types (frontend)
+   - Update mapping functions (add compatibility for both)
+   - Keep backward compatibility when possible
+
+5. TEST THOROUGHLY:
+   - Test with OLD format (should still work for compatibility)
+   - Test with NEW format (should work correctly)
+   - Verify all components using the API still function
+
+6. DOCUMENT THE CHANGE:
+   - Update API Master Reference
+   - Add note about the bug fix and correct format
+   - Document which format is now canonical
+```
+
+**Checklist for API Name Changes:**
+- [ ] Identified correct API format from backend database/actual usage
+- [ ] Searched ENTIRE codebase for ALL occurrences (backend + frontend)
+- [ ] Listed ALL files that need changes (created table)
+- [ ] Updated backend validators/schemas
+- [ ] Updated frontend TypeScript types
+- [ ] Updated mapping/transformation functions
+- [ ] Added backward compatibility (both formats) when possible
+- [ ] Tested with both old and new formats
+- [ ] Updated API Master Reference documentation
+- [ ] Created git commit explaining the fix
+
+**This rule saves hours of debugging! One wrong API name can cause bugs in 10+ places.**
+
 ---
 
 ## 🔍 QUICK REFERENCE COMMANDS
@@ -635,7 +723,7 @@ This is how you will work on OBEDIO.
 
 ---
 
-**Document Version:** 2.0
-**Last Updated:** 2025-11-03
+**Document Version:** 2.1
+**Last Updated:** 2025-11-03 Night
 **Status:** ACTIVE - MANDATORY FOR ALL TASKS
-**Combines:** User's INVENTORY-FIRST workflow + OBEDIO technical rules
+**Combines:** User's INVENTORY-FIRST workflow + OBEDIO technical rules + API consistency enforcement (Rule #9)

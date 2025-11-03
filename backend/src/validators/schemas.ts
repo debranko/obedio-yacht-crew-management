@@ -110,7 +110,10 @@ export const CreateServiceRequestSchema = z.object({
   cabinId: z.string().optional().nullable(),
   categoryId: z.string().optional().nullable(),
   priority: z.enum(['low', 'normal', 'urgent', 'emergency']).default('normal'),
-  status: z.enum(['open', 'pending', 'in-progress', 'completed', 'cancelled']).default('open'),
+  // Changed to match actual database values (uppercase with underscore)
+  // Backend database uses: PENDING, IN_PROGRESS, COMPLETED, CANCELLED
+  // Also allowing lowercase for backward compatibility
+  status: z.enum(['open', 'pending', 'PENDING', 'in_progress', 'IN_PROGRESS', 'completed', 'COMPLETED', 'cancelled', 'CANCELLED']).default('pending'),
   notes: z.string().max(2000).optional().nullable(),
   voiceTranscript: z.string().max(5000).optional().nullable(),
   assignedTo: z.string().max(100).optional().nullable(),
