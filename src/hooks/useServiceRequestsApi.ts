@@ -55,7 +55,7 @@ function transformServiceRequest(dto: ServiceRequestDTOWithRelations): ServiceRe
     guestName,
     guestCabin,
     cabinId: dto.locationId || '',
-    requestType: 'service', // Default type
+    requestType: dto.requestType,
     priority: dto.priority as 'normal' | 'urgent' | 'emergency',
     timestamp: new Date(dto.createdAt), // Convert string to Date
     voiceTranscript: dto.voiceTranscript || undefined,

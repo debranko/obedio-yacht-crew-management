@@ -64,7 +64,6 @@ router.post('/', authMiddleware, asyncHandler(async (req: Request, res: Response
   const {
     serviceRequestId,
     action,
-    previousStatus,
     newStatus,
     notes,
     metadata
@@ -81,7 +80,6 @@ router.post('/', authMiddleware, asyncHandler(async (req: Request, res: Response
     data: {
       serviceRequestId,
       action,
-      previousStatus,
       newStatus,
       notes,
       userId,

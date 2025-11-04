@@ -206,14 +206,17 @@ export interface ServiceRequestDTO {
   id: string;
   guestId: string;
   locationId?: string | null;
+  requestType: 'call' | 'service' | 'emergency' | 'voice' | 'dnd' | 'lights' | 'prepare_food' | 'bring_drinks';
   // Changed to match actual backend values (IN_PROGRESS with underscore)
   status: 'pending' | 'in_progress' | 'IN_PROGRESS' | 'completed' | 'cancelled' | 'serving' | 'accepted' | 'delegated';
   priority: 'low' | 'normal' | 'urgent' | 'emergency';
   message?: string | null;
+  notes?: string | null;
   voiceTranscript?: string | null;
   voiceAudioUrl?: string | null;
   assignedToId?: string | null; // Backend uses assignedToId, not assignedCrewId
   assignedTo?: string | null; // Crew member name
+  categoryId?: string | null;
   acceptedAt?: string | null; // When request was accepted
   createdAt: string;
   updatedAt: string;

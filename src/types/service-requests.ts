@@ -24,7 +24,7 @@ export interface ServiceRequest {
   guestName: string;
   guestCabin: string;
   cabinId: string;
-  requestType: 'call' | 'service' | 'emergency';
+  requestType: 'call' | 'service' | 'emergency' | 'voice' | 'dnd' | 'lights' | 'prepare_food' | 'bring_drinks';
   priority: 'normal' | 'urgent' | 'emergency';
   timestamp: Date;
   voiceTranscript?: string; // Voice-to-text transcript

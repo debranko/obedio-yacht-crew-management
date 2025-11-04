@@ -490,4 +490,9 @@ enum ServiceRequestType {
   call
   service
   emergency
+  voice
+  dnd
+  lights
+  prepare_food
+  bring_drinks
 }
