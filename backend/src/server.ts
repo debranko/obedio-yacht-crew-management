@@ -149,7 +149,7 @@ app.use('/api/permissions', rolePermissionsRoutes);
 app.use('/api/notification-settings', notificationSettingsRoutes);
 app.use('/api/messages', messagesRoutes);
 app.use('/api/service-request-history', serviceRequestHistoryRoutes);
-app.use('/api/crew-change-logs', crewChangeLogsRoutes);
+app.use('/api/crew-change-logs', authMiddleware, crewChangeLogsRoutes);
 app.use('/api/activity-logs', authMiddleware, activityLogsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/smart-buttons', smartButtonsRoutes);
