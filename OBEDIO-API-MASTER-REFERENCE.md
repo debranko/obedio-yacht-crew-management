@@ -1443,6 +1443,57 @@ cd backend && npx prisma db push
 
 ---
 
+#### 11. Activity Log and Crew Change Log Not Loading (RESOLVED)
+**Problem**: Activity Log page shows 0 service requests and 0 crew changes - both features completely broken
+
+**User Report**: "service requests treba da se nalaze u service requests. Također pogledaj i da li radi crew changes. Mislim da ne radi, ali pošto vidim 0 i na service requests, a vidim i crew changes 0, provijeli API koji može da koristi jer odgleda da ne vodi do pravog."
+
+**Root Cause Analysis:**
+Two separate but similar authentication/permission issues:
+
+1. **Activity Logs API** (`/api/activity-logs`):
+   - Backend route used: `requirePermission('system.view-logs')`
+   - Admin user doesn't have this specific permission
+   - Results in 403 Forbidden - no data returned
+   - ActivityLog records ARE being created (MQTT creates them for button presses, request accepted, completed)
+   - Problem is only with READ access, not data creation
+
+2. **Crew Change Logs API** (`/api/crew-change-logs`):
+   - server.ts route registration: Missing `authMiddleware`
+   - Route expects authMiddleware (uses `(req as any).user.id`)
+   - Without middleware, user object doesn't exist
+   - Results in errors when trying to access user ID
+
+**Files Fixed (Rule #9 - Both Auth Issues)**:
+- ✅ `backend/src/server.ts:152` - Added authMiddleware: `app.use('/api/crew-change-logs', authMiddleware, crewChangeLogsRoutes);`
+- ✅ `backend/src/routes/activity-logs.ts:3,11,18` - Removed requirePermission, now uses only authMiddleware (applied at route level in server.ts)
+
+**How It Works Now:**
+1. **Activity Logs**:
+   - server.ts applies authMiddleware at route level (line 153)
+   - Route handlers NO LONGER check for 'system.view-logs' permission
+   - All authenticated users can view activity logs
+   - Returns: Button Press, Request Accepted, Request Completed, Crew Status Changes, DND toggles
+
+2. **Crew Change Logs**:
+   - server.ts NOW applies authMiddleware (was missing)
+   - Routes correctly receive authenticated user
+   - Can access `req.user.id` for logging changes
+   - Returns: crew assignments, status changes, duty roster changes
+
+**Impact:**
+- ✅ Activity Log page now shows ALL service request events
+- ✅ Activity Log page now shows crew changes and status updates
+- ✅ Crew Changes tab loads correctly with data
+- ✅ All activity properly logged and visible to admin users
+- ✅ Consistent auth pattern: server.ts applies authMiddleware, routes handle business logic
+
+**Similar to Previous Bugs:**
+- Section 4: Locations API also had missing authMiddleware (fixed 2025-11-03)
+- This is a recurring pattern - routes need authMiddleware in server.ts
+
+---
+
 ### Testing Checklist After Bugfixes
 
 #### Core Functionality
@@ -1464,9 +1515,15 @@ cd backend && npx prisma db push
 - ✅ **Auxiliary buttons work** (aux1-4: DND, lights, food, drinks)
 - ✅ **Press-and-hold works** (voice recording)
 
+#### Activity Log (Latest Fixes - 2025-11-04)
+- ✅ **Activity Log shows service request events** (Button Press, Request Accepted, Request Completed)
+- ✅ **Activity Log shows crew status changes**
+- ✅ **Crew Changes tab loads correctly** (was showing 0)
+- ✅ **All activity properly logged and visible**
+
 ---
 
 **End of Document**
-**Last Updated**: 2025-11-04 (Service Requests: Auxiliary Button Types Fix)
+**Last Updated**: 2025-11-04 (Activity Log & Crew Changes Fix)
 **Maintained By**: Claude Code Assistant
 **Next Review Date**: When adding/modifying any API
