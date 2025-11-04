@@ -137,10 +137,10 @@ app.get('/api-docs/swagger.json', (req, res) => {
 
 // Routes - Apply strict rate limiting to auth endpoints
 app.use('/api/auth', authRoutes);
-app.use('/api/crew', crewRoutes);
+app.use('/api/crew', authMiddleware, crewRoutes);
 app.use('/api/locations', authMiddleware, locationRoutes);
 app.use('/api/guests', guestRoutes);
-app.use('/api/transcribe', transcribeRoutes);
+app.use('/api/transcribe', authMiddleware, transcribeRoutes);
 app.use('/api/devices', deviceRoutes);
 app.use('/api/user-preferences', userPreferencesRoutes);
 app.use('/api/service-requests', authMiddleware, serviceRequestRoutes);
