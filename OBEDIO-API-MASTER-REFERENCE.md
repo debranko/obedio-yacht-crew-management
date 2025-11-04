@@ -1,5 +1,5 @@
 # OBEDIO API MASTER REFERENCE
-**Living Document - Updated: 2025-11-04 (Service Requests: Finish/Delegate/Forward Fixes)**
+**Living Document - Updated: 2025-11-04 (Service Requests: Auxiliary Button Types Fix)**
 **Project**: Luxury Minimal Web App Design (Obedio Yacht Crew Management)
 
 ---
@@ -1375,6 +1375,74 @@ at: backend/src/services/database.ts:547
 
 ---
 
+#### 10. Service Requests - Auxiliary Button Types Not Supported (RESOLVED)
+**Problem**: Auxiliary buttons (drinks, laundry, lights, DND) and press-and-hold (voice) fail with Prisma validation error
+
+**Error Message**:
+```
+Invalid `prisma.serviceRequest.create()` invocation
+Invalid value for argument `requestType`. Expected ServiceRequestType.
+requestType: "bring_drinks",
+```
+
+**Root Cause Analysis**:
+- Prisma `ServiceRequestType` enum only had 3 values: `call`, `service`, `emergency`
+- MQTT service derives 8 types from ESP32 button presses:
+  - `call` - main button single press ✅
+  - `service` - general service ✅
+  - `emergency` - shake detection ✅
+  - `voice` - main button long press (voice recording) ❌
+  - `dnd` - aux1 button (do not disturb) ❌
+  - `lights` - aux2 button (lights control) ❌
+  - `prepare_food` - aux3 button (food service) ❌
+  - `bring_drinks` - aux4 button (drink service) ❌
+- Frontend `ServiceRequestDTO` was missing `requestType` field entirely!
+- Transform function hardcoded `requestType: 'service'` instead of using DTO value
+
+**Files Fixed (Rule #9 - Entire Codebase Search)**:
+- ✅ `backend/prisma/schema.prisma:489-498` - Added 5 new types to `ServiceRequestType` enum
+- ✅ `src/types/service-requests.ts:27` - Updated `ServiceRequest.requestType` union type to include all 8 types
+- ✅ `src/services/api.ts:209` - Added missing `requestType` field to `ServiceRequestDTO` (was completely missing!)
+- ✅ `src/services/api.ts:214,219` - Also added missing `notes` and `categoryId` fields
+- ✅ `src/hooks/useServiceRequestsApi.ts:58` - Changed from hardcoded `'service'` to `dto.requestType`
+- ✅ `src/guidelines/API-Ready-Pattern.md:94` - Updated example enum to include all 8 types
+
+**Database Update**:
+```bash
+cd backend && npx prisma db push
+# ✅ PostgreSQL enum updated to accept all 8 button types
+```
+
+**How It Works Now**:
+1. ESP32 button press → MQTT service receives: `{ button: 'aux4', pressType: 'single' }`
+2. MQTT service derives: `requestType: 'bring_drinks'` (based on button mapping)
+3. Prisma creates ServiceRequest with `requestType: 'bring_drinks'` ✅ (now valid!)
+4. Backend returns request with all fields including `requestType`
+5. Frontend receives DTO with `requestType` and transforms to ServiceRequest object
+6. Request appears in UI with proper type classification
+
+**Button Type Mapping** (from ESP32 spec):
+| Button | Press Type | requestType | Priority | Description |
+|--------|------------|-------------|----------|-------------|
+| main | single | `call` | normal | Standard service call |
+| main | double | `call` | urgent | Urgent service call |
+| main | long | `voice` | normal | Voice recording |
+| shake | any | `emergency` | emergency | Emergency alert |
+| aux1 | any | `dnd` | normal | Do Not Disturb |
+| aux2 | any | `lights` | normal | Lights control |
+| aux3 | any | `prepare_food` | normal | Food preparation |
+| aux4 | any | `bring_drinks` | normal | Bring drinks |
+
+**Impact**:
+- ✅ Main call button works (already working)
+- ✅ Auxiliary buttons (drinks, food, lights, DND) now work
+- ✅ Press and hold (voice) now works
+- ✅ All 8 button types properly validated by Prisma
+- ✅ Frontend displays correct requestType from backend
+- 📝 Note: UI icons only defined for call/service/emergency (auxiliary types show no icon, but work correctly)
+
+---
+
 ### Testing Checklist After Bugfixes
 
 #### Core Functionality
@@ -1392,10 +1460,13 @@ at: backend/src/services/database.ts:547
 - ✅ **Completed requests disappear from "Serving Now" widget**
 - ✅ **"Delegate" button assigns request and shows in "Serving Now"** (Uses accept API)
 - ✅ **Forward updates category without breaking status**
+- ✅ **Main call button works** (single press, double press)
+- ✅ **Auxiliary buttons work** (aux1-4: DND, lights, food, drinks)
+- ✅ **Press-and-hold works** (voice recording)
 
 ---
 
 **End of Document**
-**Last Updated**: 2025-11-04 (Service Requests: Finish/Delegate/Forward Fixes)
+**Last Updated**: 2025-11-04 (Service Requests: Auxiliary Button Types Fix)
 **Maintained By**: Claude Code Assistant
 **Next Review Date**: When adding/modifying any API

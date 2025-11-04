@@ -91,7 +91,7 @@ export const ServiceRequestSchema = z.object({
   guestName: z.string(),
   guestCabin: z.string(),
   cabinId: z.string(),
-  requestType: z.enum(['call', 'service', 'emergency']),
+  requestType: z.enum(['call', 'service', 'emergency', 'voice', 'dnd', 'lights', 'prepare_food', 'bring_drinks']),
   priority: z.enum(['normal', 'urgent', 'emergency']),
   timestamp: z.string().datetime(),
   voiceTranscript: z.string().optional(),
