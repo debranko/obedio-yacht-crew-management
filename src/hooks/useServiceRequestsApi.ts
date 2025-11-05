@@ -4,9 +4,11 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { api, ServiceRequestDTO } from '../services/api';
 import { ServiceRequest } from '../types/service-requests';
 import { toast } from 'sonner';
+import { websocketService } from '../services/websocket';
 
 const QUERY_KEY = ['service-requests-api'];
 
@@ -93,8 +95,11 @@ function mapBackendStatusToFrontend(backendStatus: string): ServiceRequest['stat
 
 /**
  * Get all service requests from backend API
+ * Includes WebSocket integration for real-time updates
  */
 export function useServiceRequestsApi() {
+  const queryClient = useQueryClient();
+
   const query = useQuery({
     queryKey: QUERY_KEY,
     queryFn: async () => {
@@ -105,6 +110,24 @@ export function useServiceRequestsApi() {
     staleTime: 1000 * 30, // 30 seconds (more frequent for real-time data)
     refetchInterval: 1000 * 60, // Refetch every minute
   });
+
+  // WebSocket integration - single subscription for all service request events
+  useEffect(() => {
+    console.log('🔌 Setting up WebSocket subscription for service requests');
+
+    const unsubscribe = websocketService.subscribe('service-request', (event) => {
+      console.log('📞 Service request WebSocket event:', event.type);
+
+      // Invalidate queries to trigger refetch
+      queryClient.invalidateQueries({ queryKey: ['service-requests'] });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+    });
+
+    return () => {
+      console.log('🔌 Cleaning up WebSocket subscription for service requests');
+      unsubscribe();
+    };
+  }, [queryClient]);
 
   return {
     serviceRequests: query.data || [],
@@ -138,12 +161,10 @@ export function useServiceRequestApi(id: string | null) {
  * Create service request
  */
 export function useCreateServiceRequest() {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: (data: Partial<ServiceRequestDTO>) => api.serviceRequests.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      // NOTE: No invalidation needed - WebSocket will handle sync automatically
       toast.success('Service request created');
     },
     onError: (error: any) => {
@@ -156,13 +177,11 @@ export function useCreateServiceRequest() {
  * Update service request
  */
 export function useUpdateServiceRequest() {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<ServiceRequestDTO> }) =>
       api.serviceRequests.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      // NOTE: No invalidation needed - WebSocket will handle sync automatically
       toast.success('Service request updated');
     },
     onError: (error: any) => {
@@ -175,13 +194,11 @@ export function useUpdateServiceRequest() {
  * Accept service request (assign to crew member)
  */
 export function useAcceptServiceRequest() {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: ({ id, crewId }: { id: string; crewId: string }) =>
       api.serviceRequests.accept(id, crewId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      // NOTE: No invalidation needed - WebSocket will handle sync automatically
       toast.success('Service request accepted');
     },
     onError: (error: any) => {
@@ -194,12 +211,10 @@ export function useAcceptServiceRequest() {
  * Complete service request
  */
 export function useCompleteServiceRequest() {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: (id: string) => api.serviceRequests.complete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      // NOTE: No invalidation needed - WebSocket will handle sync automatically
       toast.success('Service request completed');
     },
     onError: (error: any) => {
@@ -212,12 +227,10 @@ export function useCompleteServiceRequest() {
  * Cancel service request
  */
 export function useCancelServiceRequest() {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: (id: string) => api.serviceRequests.cancel(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      // NOTE: No invalidation needed - WebSocket will handle sync automatically
       toast.success('Service request cancelled');
     },
     onError: (error: any) => {

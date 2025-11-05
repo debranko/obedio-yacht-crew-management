@@ -122,20 +122,17 @@ export function ServiceRequestsPage({
     return () => clearInterval(interval);
   }, []);
 
-  // WebSocket listeners for real-time service request updates
+  // WebSocket listeners for sound notifications only
+  // NOTE: Query invalidation is handled in useServiceRequestsApi hook to prevent duplicate fetches
   useEffect(() => {
     if (!wsOn || !wsOff) return;
 
-    // Handle service request events - invalidate queries to refetch
-    const handleServiceRequestEvent = (data: any) => {
-      console.log('📞 Service request event received:', data);
-
-      // Invalidate service request queries
-      queryClient.invalidateQueries({ queryKey: ['service-requests'] });
-      queryClient.invalidateQueries({ queryKey: ['service-requests-api'] });
+    // Handle new service request sound notification
+    const handleServiceRequestCreated = (data: any) => {
+      console.log('📞 New service request - playing sound');
 
       // Play notification sound for new requests
-      if (data.type === 'created' && userPreferences?.soundEnabled !== false) {
+      if (userPreferences?.soundEnabled !== false) {
         try {
           const audio = new Audio('/sounds/notification.mp3');
           audio.play().catch((e) => console.log('Could not play notification sound:', e));
@@ -145,17 +142,13 @@ export function ServiceRequestsPage({
       }
     };
 
-    const unsubscribeCreated = wsOn('service-request:created', handleServiceRequestEvent);
-    const unsubscribeUpdated = wsOn('service-request:updated', handleServiceRequestEvent);
-    const unsubscribeCompleted = wsOn('service-request:completed', handleServiceRequestEvent);
+    const unsubscribeCreated = wsOn('service-request:created', handleServiceRequestCreated);
 
     // Cleanup
     return () => {
       if (unsubscribeCreated) unsubscribeCreated();
-      if (unsubscribeUpdated) unsubscribeUpdated();
-      if (unsubscribeCompleted) unsubscribeCompleted();
     };
-  }, [wsOn, wsOff, queryClient, userPreferences]);
+  }, [wsOn, wsOff, userPreferences]);
 
   const [delegateDialogOpen, setDelegateDialogOpen] = useState(false);
   const [forwardDialogOpen, setForwardDialogOpen] = useState(false);

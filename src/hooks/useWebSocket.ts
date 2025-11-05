@@ -97,22 +97,8 @@ export function useWebSocket() {
     // Check initial connection state
     setIsConnected(websocketService.isSocketConnected());
 
-    // Subscribe to service request events for React Query invalidation
-    const unsubscribeServiceRequests = websocketService.subscribe('service-request', (event) => {
-      console.log('📞 Service request event:', event.type);
-      queryClient.invalidateQueries({ queryKey: ['service-requests'] });
-      queryClient.invalidateQueries({ queryKey: ['service-requests-api'] });
-
-      // Show browser notification
-      if ('Notification' in window && Notification.permission === 'granted') {
-        if (event.type === 'service-request-created') {
-          new Notification('New Service Request', {
-            body: event.data?.message || 'New service request received',
-            icon: '/obedio-icon.png',
-          });
-        }
-      }
-    });
+    // NOTE: Service request invalidation moved to useServiceRequestsApi hook
+    // to prevent duplicate invalidations when multiple components use this hook
 
     // Subscribe to device events
     const unsubscribeDevices = websocketService.subscribe('service-request', (event) => {
@@ -186,7 +172,6 @@ export function useWebSocket() {
     return () => {
       console.log('🔌 Component unmounting - unsubscribing from WebSocket events');
       unsubscribeConnection();
-      unsubscribeServiceRequests();
       unsubscribeDevices();
       unsubscribeGuests();
       unsubscribeCrew();

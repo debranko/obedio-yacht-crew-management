@@ -58,9 +58,8 @@ export function ServiceRequestsProvider({ children }: { children: ReactNode }) {
       duration: 0,
     } as ServiceRequestHistory]);
 
-    // Invalidate cache to trigger refetch
-    queryClient.invalidateQueries({ queryKey: ['service-requests'] });
-    queryClient.invalidateQueries({ queryKey: ['service-requests-api'] });
+    // NOTE: No need to invalidate queries here - WebSocket will handle sync when backend creates the request
+    // This prevents duplicate invalidations (local + WebSocket)
 
     return newRequest;
   }, [queryClient]);
