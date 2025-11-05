@@ -147,14 +147,15 @@ router.post('/refresh', asyncHandler(async (req, res) => {
   }
 }));
 
-// Verify token endpoint
+// Verify token endpoint - reads from HTTP-only cookie
 router.get('/verify', asyncHandler(async (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json(apiError('No token provided', 'UNAUTHORIZED'));
+  // Check for token in cookie (primary method for session persistence)
+  const token = req.cookies['obedio-auth-token'];
+
+  if (!token) {
+    return res.status(401).json(apiError('No token provided', 'UNAUTHORIZED', { valid: false }));
   }
 
-  const token = authHeader.substring(7);
   const JWT_SECRET = process.env.JWT_SECRET;
 
   if (!JWT_SECRET) {
@@ -169,7 +170,7 @@ router.get('/verify', asyncHandler(async (req, res) => {
     });
 
     if (!user) {
-      return res.status(401).json(apiError('Invalid token', 'UNAUTHORIZED'));
+      return res.status(401).json(apiError('Invalid token', 'UNAUTHORIZED', { valid: false }));
     }
 
     res.json(apiSuccess({
