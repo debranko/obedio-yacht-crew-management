@@ -79,6 +79,7 @@ export class WebSocketService {
   private maxReconnectAttempts = 10;
   private reconnectDelay = 1000;
   private isConnected = false;
+  private isConnecting = false; // Track if connection is in progress to prevent multiple simultaneous connections
   private reconnectTimer: NodeJS.Timeout | null = null;
   private isIntentionalDisconnect = false;
 
@@ -95,15 +96,25 @@ export class WebSocketService {
    * Connect to WebSocket server
    */
   connect(userId?: string): void {
+    // Prevent multiple connection attempts - check both connected and connecting states
     if (this.socket?.connected) {
       console.log('WebSocket already connected');
       return;
     }
 
+    if (this.isConnecting) {
+      console.log('WebSocket connection already in progress, skipping duplicate attempt');
+      return;
+    }
+
     try {
+      // Mark as connecting to prevent race conditions from multiple components
+      this.isConnecting = true;
+      console.log('WebSocket connection initiated');
+
       // Connect to Socket.IO server
       const serverUrl = import.meta.env.VITE_WS_URL || 'http://localhost:8080';
-      
+
       this.socket = io(serverUrl, {
         auth: { userId },
         reconnection: true,
@@ -115,10 +126,9 @@ export class WebSocketService {
       });
 
       this.setupEventHandlers();
-      
-      console.log('WebSocket connection initiated');
     } catch (error) {
       console.error('Failed to connect to WebSocket:', error);
+      this.isConnecting = false; // Reset flag on error
       this.handleReconnect();
     }
   }
@@ -128,6 +138,7 @@ export class WebSocketService {
    */
   disconnect(): void {
     this.isIntentionalDisconnect = true;
+    this.isConnecting = false; // Reset flag on manual disconnect
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -157,6 +168,7 @@ export class WebSocketService {
     this.socket.on('connect', () => {
       console.log('WebSocket connected:', this.socket?.id);
       this.isConnected = true;
+      this.isConnecting = false; // Connection established, reset flag
       this.reconnectAttempts = 0;
       this.notifyListeners('connection', { type: 'connected', data: { socketId: this.socket?.id }, timestamp: new Date().toISOString() } as ConnectionEvent);
     });
@@ -164,8 +176,9 @@ export class WebSocketService {
     this.socket.on('disconnect', (reason: string) => {
       console.log('WebSocket disconnected:', reason);
       this.isConnected = false;
+      this.isConnecting = false; // Disconnected, reset flag
       this.notifyListeners('connection', { type: 'disconnected', data: { reason }, timestamp: new Date().toISOString() } as ConnectionEvent);
-      
+
       // Auto-reconnect unless it was intentional
       if (!this.isIntentionalDisconnect && reason !== 'io client disconnect') {
         this.handleReconnect();
@@ -175,6 +188,7 @@ export class WebSocketService {
     this.socket.on('reconnect', (attemptNumber: number) => {
       console.log('WebSocket reconnected after', attemptNumber, 'attempts');
       this.isConnected = true;
+      this.isConnecting = false; // Reconnected successfully, reset flag
       this.reconnectAttempts = 0;
     });
 
@@ -194,6 +208,7 @@ export class WebSocketService {
     this.socket.on('connect_error', (error: any) => {
       console.log('WebSocket connection error - server may not be ready yet');
       this.isConnected = false;
+      this.isConnecting = false; // Connection failed, reset flag to allow retry
       this.handleReconnect();
     });
 
