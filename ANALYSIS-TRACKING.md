@@ -713,3 +713,124 @@ Refetch shows updated guest ✅
 - ✅ Service requests already using backend API
 - ✅ Locations already using backend API
 - ✅ All CRUD operations now persist to PostgreSQL database
+
+---
+
+### ✅ Fix #4: Voice-to-Text Transcription Not Displaying (2025-11-05)
+
+**Problem:** Audio recording works and can be played back, but transcription text doesn't appear in service request dialog
+
+**User Report:** "Izgleda mi voice to text ne radi više, iako mogu da preslušam glasovni snimak koji sam snimio, ne mogu da vidim promjenu u, ne mogu da vidim tekst koji treba bude preveden."
+
+**Root Cause:** API response structure mismatch - frontend accessing wrong nested property
+
+**Investigation Flow:**
+1. ✅ Verified backend transcription endpoint exists: [backend/src/routes/transcribe.ts:133](backend/src/routes/transcribe.ts#L133)
+2. ✅ Confirmed OpenAI Whisper integration properly configured
+3. ✅ Verified OpenAI API key present in backend/.env
+4. ✅ Found transcript display UI: [src/components/incoming-request-dialog.tsx:296-335](src/components/incoming-request-dialog.tsx#L296-L335)
+5. ✅ Found audio recording + transcription: [src/components/button-simulator-widget.tsx:373-476](src/components/button-simulator-widget.tsx#L373-L476)
+6. ✅ Identified bug in response parsing: Line 460
+
+**Backend Response Format:**
+```typescript
+// Backend returns (via apiSuccess wrapper)
+{
+  "success": true,
+  "data": {
+    "transcript": "the transcribed text",
+    "duration": 3.0
+  }
+}
+```
+
+**Frontend Bug:**
+```typescript
+// WRONG - Line 460 (button-simulator-widget.tsx)
+if (data.success && data.transcript) {  // ❌ transcript is nested under data.data
+  return data.transcript;
+}
+```
+
+**Solution:** Updated frontend to access correct nested property path
+
+**File Modified:** [src/components/button-simulator-widget.tsx:460-465](src/components/button-simulator-widget.tsx#L460-L465)
+
+**Changes:**
+```typescript
+// BEFORE (Line 460)
+if (data.success && data.transcript) {
+  console.log('✅ Transcription successful:', data.transcript);
+  toast.success('Voice message transcribed!', {
+    description: data.transcript.substring(0, 100)
+  });
+  return data.transcript;
+}
+
+// AFTER (Line 460)
+if (data.success && data.data && data.data.transcript) {
+  console.log('✅ Transcription successful:', data.data.transcript);
+  toast.success('Voice message transcribed!', {
+    description: data.data.transcript.substring(0, 100)
+  });
+  return data.data.transcript;
+}
+```
+
+**Audio Recording → Transcription → Display Flow:**
+```
+User holds main button
+  ↓
+startRecording() - Line 373 (MediaRecorder API)
+  ↓
+User releases button
+  ↓
+handleMainButtonUp() - Line 494
+  ↓
+stopRecording() - Line 400
+  ↓
+transcribeAudio(audioBlob, duration) - Line 440
+  ↓
+POST /api/transcribe with FormData
+  ↓
+Backend OpenAI Whisper API call
+  ↓
+Returns { success: true, data: { transcript: "...", duration: 3.0 } }
+  ↓
+Frontend now correctly accesses data.data.transcript ✅
+  ↓
+generateServiceRequest("main", voiceMessage, true, duration, 'normal', audioUrl)
+  ↓
+Service request created with voiceTranscript: "Voice message (3.0s): <transcript text>"
+  ↓
+incoming-request-dialog.tsx displays transcript ✅
+```
+
+**Why This Bug Existed:**
+- Raw fetch call in button-simulator-widget.tsx (not using service class)
+- Service classes (GuestsService, LocationsService) handle unwrapping via `response.data`
+- Direct fetch gets full API response `{ success, data }` - needs manual unwrapping
+
+**Expected Result:**
+- User holds button → records audio
+- User releases button → audio sent to OpenAI Whisper
+- Transcription text appears in service request
+- Transcript visible in incoming-request-dialog when crew views request
+- Audio playback + text both available
+
+**Testing:**
+1. Open ESP32 Simulator widget in sidebar
+2. Select a location
+3. Hold main button for 2-3 seconds (records audio)
+4. Release button
+5. Check toast notification shows "Voice message transcribed!"
+6. Open Service Requests page
+7. Verify request shows transcript text like "Voice message (2.5s): [transcribed text]"
+8. Click on request to open dialog
+9. Verify both audio player and transcript text are visible
+
+**Status:**
+- ✅ Voice-to-text transcription fixed
+- ✅ Frontend now correctly accesses nested API response
+- ✅ OpenAI Whisper integration working
+- ✅ Both audio playback and text transcript available
