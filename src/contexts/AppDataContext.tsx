@@ -340,39 +340,38 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
   
   // Sync service requests from API when data arrives
+  // IMPORTANT: Always sync, even when array is empty (for "Clear All" to work)
   useEffect(() => {
-    if (apiServiceRequests.length > 0) {
-      // Map API DTO to app ServiceRequest type with all required fields
-      const mappedRequests: ServiceRequest[] = apiServiceRequests.map(apiReq => {
-        // Find guest to get name
-        const guest = guests.find(g => g.id === apiReq.guestId);
-        const guestName = guest ? `${guest.firstName} ${guest.lastName}` : apiReq.guestName;
+    // Map API DTO to app ServiceRequest type with all required fields
+    const mappedRequests: ServiceRequest[] = apiServiceRequests.map(apiReq => {
+      // Find guest to get name
+      const guest = guests.find(g => g.id === apiReq.guestId);
+      const guestName = guest ? `${guest.firstName} ${guest.lastName}` : apiReq.guestName;
 
-        // Find location/cabin
-        const location = locations.find(l => l.id === apiReq.locationId);
-        const cabinName = location?.name ?? apiReq.guestCabin;
-        
-        return {
-          id: apiReq.id,
-          guestName,
-          guestCabin: cabinName,
-          cabinId: apiReq.locationId || '',
-          requestType: apiReq.priority === 'emergency' ? 'emergency' : 'call',
-          priority: apiReq.priority === 'low' ? 'normal' : apiReq.priority,
-          timestamp: new Date(apiReq.createdAt),
-          voiceTranscript: apiReq.voiceTranscript || undefined,
-          voiceAudioUrl: apiReq.voiceAudioUrl || undefined,
-          cabinImage: location?.image || undefined,
-          status: apiReq.status as any,
-          assignedTo: apiReq.assignedTo || undefined, // Use backend's assignedTo field directly
-          acceptedAt: apiReq.acceptedAt ? new Date(apiReq.acceptedAt) : undefined,
-          completedAt: apiReq.completedAt ? new Date(apiReq.completedAt) : undefined,
-          notes: apiReq.message || undefined,
-        };
-      });
-      
-      setServiceRequests(mappedRequests);
-    }
+      // Find location/cabin
+      const location = locations.find(l => l.id === apiReq.locationId);
+      const cabinName = location?.name ?? apiReq.guestCabin;
+
+      return {
+        id: apiReq.id,
+        guestName,
+        guestCabin: cabinName,
+        cabinId: apiReq.locationId || '',
+        requestType: apiReq.priority === 'emergency' ? 'emergency' : 'call',
+        priority: apiReq.priority === 'low' ? 'normal' : apiReq.priority,
+        timestamp: new Date(apiReq.createdAt),
+        voiceTranscript: apiReq.voiceTranscript || undefined,
+        voiceAudioUrl: apiReq.voiceAudioUrl || undefined,
+        cabinImage: location?.image || undefined,
+        status: apiReq.status as any,
+        assignedTo: apiReq.assignedTo || undefined, // Use backend's assignedTo field directly
+        acceptedAt: apiReq.acceptedAt ? new Date(apiReq.acceptedAt) : undefined,
+        completedAt: apiReq.completedAt ? new Date(apiReq.completedAt) : undefined,
+        notes: apiReq.message || undefined,
+      };
+    });
+
+    setServiceRequests(mappedRequests);
   }, [apiServiceRequests, guests, locations, crewMembers]);
 
   // Activity logs state

@@ -834,3 +834,126 @@ incoming-request-dialog.tsx displays transcript ✅
 - ✅ Frontend now correctly accesses nested API response
 - ✅ OpenAI Whisper integration working
 - ✅ Both audio playback and text transcript available
+
+---
+
+### ✅ Fix #5: "Clear All" Button Not Clearing Service Requests from UI (2025-11-05)
+
+**Problem:** Clicking "Clear All" button shows success notification but service requests remain visible in UI
+
+**User Report:** "In service requests page, clear now button is not working. It says notification that is cleared the calls, but I can still see them."
+
+**Root Cause:** AppDataContext useEffect had conditional sync that prevented updating when array became empty
+
+**Investigation Flow:**
+1. ✅ Found "Clear All" button in service-requests.tsx:475-484
+2. ✅ Verified mutation calls api.serviceRequests.clearAll() (api.ts:283-286)
+3. ✅ Confirmed backend endpoint exists: DELETE /service-requests/clear-all (backend/src/routes/service-requests.ts:53-56)
+4. ✅ Backend deletes from database via dbService.deleteAllServiceRequests()
+5. ✅ Frontend mutation invalidates React Query cache (lines 99-100)
+6. ✅ Identified bug: AppDataContext useEffect only syncs when apiServiceRequests.length > 0
+
+**The Bug:**
+```typescript
+// BEFORE - AppDataContext.tsx:343-376
+useEffect(() => {
+  if (apiServiceRequests.length > 0) {  // ❌ NEVER SYNCS EMPTY ARRAY!
+    const mappedRequests = apiServiceRequests.map(...);
+    setServiceRequests(mappedRequests);
+  }
+}, [apiServiceRequests, guests, locations, crewMembers]);
+```
+
+**Why This Caused the Problem:**
+1. User clicks "Clear All"
+2. Backend deletes all requests ✅
+3. React Query refetches → `apiServiceRequests = []` ✅
+4. useEffect runs but condition `apiServiceRequests.length > 0` is FALSE ❌
+5. `setServiceRequests` is NEVER called ❌
+6. Local state still has old requests → UI shows stale data ❌
+
+**Solution:** Remove conditional - always sync, even when array is empty
+
+**File Modified:** [src/contexts/AppDataContext.tsx:343-375](src/contexts/AppDataContext.tsx#L343-L375)
+
+**Changes:**
+```typescript
+// AFTER - Always sync, even empty arrays
+useEffect(() => {
+  // Map API DTO to app ServiceRequest type
+  const mappedRequests: ServiceRequest[] = apiServiceRequests.map(apiReq => {
+    // ... mapping logic
+  });
+
+  setServiceRequests(mappedRequests);  // ✅ ALWAYS updates, even when empty
+}, [apiServiceRequests, guests, locations, crewMembers]);
+```
+
+**Data Flow:**
+```
+User clicks "Clear All" button
+  ↓
+clearAllMutation.mutate()
+  ↓
+DELETE /api/service-requests/clear-all
+  ↓
+Backend: dbService.deleteAllServiceRequests()
+  ↓
+Database: All service requests deleted ✅
+  ↓
+Backend response: { success: true, message: "All service requests deleted" }
+  ↓
+Frontend mutation onSuccess:
+  - queryClient.invalidateQueries(['service-requests'])
+  - queryClient.invalidateQueries(['service-requests-api'])
+  - Shows toast: "All service requests cleared"
+  ↓
+React Query refetches /api/service-requests
+  ↓
+Returns empty array: apiServiceRequests = []
+  ↓
+AppDataContext useEffect triggers (dependency changed)
+  ↓
+mappedRequests = [].map(...) = []
+  ↓
+setServiceRequests([]) - NOW CALLED! ✅
+  ↓
+serviceRequests state updated to []
+  ↓
+service-requests.tsx re-renders with empty list
+  ↓
+Shows "No Active Requests" empty state ✅
+```
+
+**Why This Bug Existed:**
+- Optimization attempt to prevent unnecessary re-renders
+- Assumption: "If no requests, don't bother updating"
+- Oversight: Forgot that "no requests" is ALSO a valid state that needs to sync
+
+**Expected Result:**
+- User clicks "Clear All"
+- Confirmation dialog appears
+- After confirming, all service requests disappear from UI
+- "No Active Requests" empty state shown
+- Backend database cleared
+- Change syncs across all connected clients
+
+**Testing:**
+1. Create a few test service requests
+2. Click "Clear All" button
+3. Confirm in dialog
+4. Verify requests immediately disappear
+5. Check backend logs show DELETE /service-requests/clear-all
+6. Refresh page - requests still gone (database cleared)
+7. Open in another browser tab - also shows empty (WebSocket sync)
+
+**Additional Notes:**
+- Backend does NOT emit WebSocket event for clear-all (could be added for real-time sync)
+- React Query invalidation ensures local client updates immediately
+- Other clients will sync on next manual refresh or WebSocket event
+
+**Status:**
+- ✅ "Clear All" button now properly clears UI
+- ✅ useEffect always syncs, even for empty arrays
+- ✅ Backend properly deletes from database
+- ✅ React Query cache invalidation working
