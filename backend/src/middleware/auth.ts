@@ -90,6 +90,7 @@ export function requirePermission(permission: string) {
         'guests.view'
       ],
       'eto': [
+        'service-requests.view', // ✅ ETO can see service requests (all roles should see calls)
         'devices.view',
         'devices.add',
         'devices.edit',

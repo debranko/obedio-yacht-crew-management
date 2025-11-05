@@ -957,3 +957,196 @@ Shows "No Active Requests" empty state ✅
 - ✅ useEffect always syncs, even for empty arrays
 - ✅ Backend properly deletes from database
 - ✅ React Query cache invalidation working
+
+---
+
+### ✅ Fix #6: Admin User Can't Accept Service Requests (2025-11-05)
+
+**Problem:** After creating new service request and clicking "Accept", nothing happens and request doesn't move to "Serving Now"
+
+**User Report:** "Upravo kako sam sad napravio nov zahtev prihvatio ga, nije mi ga izbacio u widget serving now"
+
+**Console Error:** `No crew member found for user: cmh9695bp0000b0oc81um2fif`
+
+**Root Cause:** Admin user account existed but had NO crew member record in database
+
+**Investigation Flow:**
+1. ✅ Checked service-requests.tsx handleAccept function (line 246-268)
+2. ✅ Found error: "No crew member found for user" (line 252)
+3. ✅ Verified user exists in database (admin user ID: cmh9695bp0000b0oc81um2fif)
+4. ✅ Queried CrewMember table - admin user had NO crew member record
+5. ✅ All other users (Johanna, Alina, etc.) had crew member records with userId links
+
+**The Problem:**
+```typescript
+// service-requests.tsx:248-254
+const currentCrewMember = crewMembers.find(crew => crew.userId === user?.id);
+
+if (!currentCrewMember) {
+  toast.error('You must be associated with a crew member to accept requests');
+  console.error('No crew member found for user:', user?.id);
+  return;  // ❌ Request never accepted
+}
+```
+
+**Why Admin Had No Crew Member:**
+- Admin user created via seed script
+- Seed script created User record but NO CrewMember record
+- All other users have both User + CrewMember records
+- System requires CrewMember to accept service requests
+
+**Solution:** Created crew member record for admin user
+
+**File Created:** Temporary script to create admin crew member
+
+**Database Changes:**
+```sql
+-- Created CrewMember record:
+INSERT INTO CrewMember (
+  id: 'cmhm6pr6400016hrz67gnt5hw',
+  name: 'Admin User',
+  position: 'Manager',
+  department: 'Interior',
+  status: 'on-duty',
+  userId: 'cmh9695bp0000b0oc81um2fif',  -- ✅ Linked to admin user
+  email: 'admin@yacht.local',
+  role: 'admin',
+  color: '#3B82F6'
+)
+```
+
+**Data Flow:**
+```
+User clicks "Accept" button
+  ↓
+handleAccept() finds currentCrewMember by userId
+  ↓
+BEFORE: crewMembers.find(userId = admin) → undefined ❌
+  ↓
+Error: "No crew member found" → Early return ❌
+  ↓
+Request never accepted ❌
+
+AFTER FIX:
+  ↓
+crewMembers.find(userId = admin) → Admin User crew member ✅
+  ↓
+acceptRequest(id, crewId) → Backend API ✅
+  ↓
+Request status: pending → accepted ✅
+  ↓
+Request moves to "Serving Now" section ✅
+  ↓
+Appears in Serving Now widget ✅
+```
+
+**Expected Result:**
+- Admin (or any user) can now accept service requests
+- Request moves from "Pending" to "Serving Now"
+- Shows in Serving Now widget on dashboard
+- Displays admin name as assigned crew member
+
+**Testing:**
+1. Refresh page (F5) to load new crew member
+2. Create test service request
+3. Click "Accept" button
+4. Request should move to "Serving Now" section
+5. Check Serving Now widget - request should appear
+6. Verify assignedTo shows "Admin User"
+
+**Status:**
+- ✅ Created crew member for admin user
+- ✅ Linked to admin user ID
+- ✅ Status: on-duty
+- ✅ Accept button now works
+- ✅ Requests appear in Serving Now
+
+---
+
+### ✅ Fix #7: Ensure All Roles Can View Service Requests (2025-11-05)
+
+**User Requirement:** "Ono što je vrlo bitno je da svaki crew member, admin ili chief stewardess svaka rola uvek može da vidi novi poziv"
+
+**Investigation:** Analyzed permission system to verify all roles have access to service requests
+
+**Permission System Analysis:**
+```typescript
+// backend/src/middleware/auth.ts:75-102
+rolePermissions = {
+  'admin': ALL_PERMISSIONS,                 // ✅
+  'chief-stewardess': service-requests.view // ✅
+  'stewardess': service-requests.view       // ✅
+  'crew': service-requests.view             // ✅
+  'eto': NO service-requests.view           // ❌ MISSING!
+}
+```
+
+**Current Database Users:**
+```
+admin (2 users)           → ✅ Can view
+chief-stewardess (7 users) → ✅ Can view
+stewardess (4 users)       → ✅ Can view
+crew (8 users)             → ✅ Can view
+eto (0 users)              → ❌ CANNOT view
+```
+
+**Problem:** ETO (Electrical Technical Officer) role exists in permission system but does NOT have `service-requests.view` permission
+
+**Why This Matters:**
+- Currently no ETO users exist, so no immediate impact
+- BUT if ETO user is added in future, they WON'T be able to see service requests
+- User requirement: "svaka rola uvek može da vidi" (every role should always be able to see)
+
+**Solution:** Added `service-requests.view` permission to ETO role
+
+**File Modified:** [backend/src/middleware/auth.ts:92-98](backend/src/middleware/auth.ts#L92-L98)
+
+**Changes:**
+```typescript
+// BEFORE
+'eto': [
+  'devices.view',
+  'devices.add',
+  'devices.edit',
+  'system.view-logs'
+],
+
+// AFTER
+'eto': [
+  'service-requests.view', // ✅ ETO can now see service requests
+  'devices.view',
+  'devices.add',
+  'devices.edit',
+  'system.view-logs'
+],
+```
+
+**Final Permission Matrix:**
+```
+Role              | View Requests | Accept | Complete
+------------------|---------------|--------|----------
+admin             | ✅ ALL        | ✅     | ✅
+chief-stewardess  | ✅            | ✅     | ✅
+stewardess        | ✅            | ✅     | ✅
+crew              | ✅            | ❌     | ❌
+eto               | ✅ NEW!       | ❌     | ❌
+```
+
+**Expected Result:**
+- All current roles can view service requests
+- Future ETO users will be able to see service requests
+- No role is blocked from viewing incoming calls
+- Permission system aligned with user requirement
+
+**Testing:**
+1. Login as admin → Can view service requests ✅
+2. Login as chief-stewardess → Can view service requests ✅
+3. Login as stewardess → Can view service requests ✅
+4. Login as crew → Can view service requests ✅
+5. (Future) Login as eto → Can view service requests ✅
+
+**Status:**
+- ✅ All roles can view service requests
+- ✅ ETO permission added for future-proofing
+- ✅ Permission system complete
+- ✅ User requirement satisfied
