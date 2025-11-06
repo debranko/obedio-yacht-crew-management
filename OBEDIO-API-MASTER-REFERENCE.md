@@ -1,5 +1,5 @@
 # OBEDIO API MASTER REFERENCE
-**Living Document - Updated: 2025-11-04 (Service Requests: Auxiliary Button Types Fix)**
+**Living Document - Updated: 2025-11-06 (Guests API: Type/Status Enums Fix, Date Format Fix)**
 **Project**: Luxury Minimal Web App Design (Obedio Yacht Crew Management)
 
 ---
@@ -77,6 +77,32 @@
 **Pagination**: Returns `{ data, pagination: { total, page, limit, totalPages } }`
 **WebSocket Events**: `guest:created`, `guest:updated`, `guest:deleted`
 **Used By**: `guests-list.tsx`, `guest-form-dialog.tsx`, `guest-details-dialog.tsx`, `GuestsContext.tsx`
+
+**Validation & Enums** (Updated 2025-11-06):
+
+**Guest Type** (backend enum):
+- `owner` | `vip` | `guest` | `partner` | `family`
+- ⚠️ Frontend previously used invalid types: `'primary'`, `'child'`, `'charter'` (FIXED in commits 1-2)
+
+**Guest Status** (backend enum):
+- Backend supports: `expected` | `onboard` | `ashore` | `departed`
+- Frontend uses: `expected` | `onboard` | `departed` (excludes 'ashore' - overkill for yacht management)
+- ✅ Backend remains compatible if mobile/other systems send 'ashore'
+
+**Date Format Requirements**:
+- Backend expects: ISO 8601 datetime `"2025-11-06T00:00:00.000Z"`
+- Frontend sends: Date-only `"2025-11-06"` → Transformed to ISO in `handleSubmit()`
+- Fields: `checkInDate`, `checkOutDate`, `specialOccasionDate`
+
+**Optional Fields (null handling)**:
+- Empty strings are converted to `undefined` before sending
+- Applies to: `locationId`, `specialOccasionDate`, `contactPerson.email`
+- Prevents PostgreSQL foreign key constraint violations
+
+**Recent Fixes (2025-11-06)**:
+1. ✅ Commit 1: Fixed invalid guest type enums (`'charter'` → `'guest'`, etc.)
+2. ✅ Commit 2: Fixed date format conversion and null handling
+3. ✅ Commit 3: Removed 'ashore' status from frontend UI (backend still supports it)
 
 ---
 
