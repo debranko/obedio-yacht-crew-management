@@ -98,8 +98,13 @@ router.get('/', authMiddleware, asyncHandler(async (req: Request, res: Response)
         notified: true // Assume all logged changes were notified
       };
     }));
-    
-  res.json(apiSuccess(transformedLogs, buildPaginationMeta(total, pageNum, limitNum)));
+
+  // Wrap data + pagination in a single object so API wrapper returns both fields
+  const response = {
+    data: transformedLogs,
+    pagination: buildPaginationMeta(total, pageNum, limitNum)
+  };
+  res.json(apiSuccess(response));
 }));
 
 // Create crew change log entry

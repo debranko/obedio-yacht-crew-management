@@ -97,6 +97,111 @@ useEffect(() => {
 
 ---
 
+## 🔧 SYSTEMATIC CHANGE PROCEDURE FOR API FIXES
+
+**KADA OTKRIJEŠ DA JE NEŠTO POKVARENO:**
+
+### KORAK 1: IDENTIFIKACIJA PROBLEMA
+```
+1. Pronađi tačan fajl i liniju gde je problem
+2. Razumi šta je OČEKIVANO ponašanje
+3. Razumi šta je STVARNO ponašanje
+4. Dokumentuj razliku
+```
+
+### KORAK 2: MAPIRANJE SVIH POVEZANIH DELOVA
+```
+□ Backend route (npr. backend/src/routes/activity-logs.ts)
+□ Database service (npr. backend/src/services/database.ts)
+□ API wrapper (npr. src/services/api.ts ili src/lib/api.ts)
+□ Frontend hook (npr. src/hooks/useActivityLogs.ts)
+□ UI komponenta (npr. src/components/pages/activity-log.tsx)
+□ WebSocket listener (ako postoji)
+□ TypeScript interfaces (DTO-ovi)
+```
+
+### KORAK 3: ANALIZA BEZBEDONSTI PROMENE
+```
+Za svaki povezan deo, proveri:
+1. Da li DRUGI delovi koda zavise od njega?
+2. Da li će promena POKVARITI nešto drugo?
+3. Šta je SIGURNIJE promeniti - backend ili frontend?
+```
+
+**PRAVILO SIGURNOSTI:**
+```typescript
+✅ SIGURNIJE: Promeniti backend daWRAUJE podatke u objekat
+// Backend: apiSuccess({ items: [...], pagination: {...} })
+// Frontend prima: { items: [...], pagination: {...} }
+
+❌ OPASNIJE: Promeniti API wrapper da ne unwrapuje
+// Može pokvariti 50+ drugih endpoint-a koji rade ispravno
+```
+
+### KORAK 4: KREIRANJE TODO LISTE
+```
+1. Napravi listu SVIH promena koje treba uraditi
+2. Sortiraj po prioritetu (broken > pagination lost > optimization)
+3. Grupiši povezane promene
+4. Označi dependencies (X mora pre Y)
+```
+
+**Primer TODO liste:**
+```
+□ Fix Activity Logs backend (BROKEN - priority 1)
+□ Test Activity Logs frontend
+□ Fix Messages backend (BROKEN - priority 1)
+□ Test Messages frontend
+□ Analyze Crew Changes (potentially broken)
+□ IF broken: Fix Crew Changes backend
+□ Review remaining endpoints (priority 2)
+```
+
+### KORAK 5: IMPLEMENTACIJA - JEDNO PO JEDNO
+```
+Za SVAKU promenu:
+1. Pročitaj fajl
+2. Napravi promenu
+3. Testiraj backend (curl)
+4. Testiraj frontend (UI)
+5. Commit sa detaljnom porukom
+6. Označi TODO kao completed
+7. Nastavi na sledeći
+```
+
+**VAŽNO:**
+```
+❌ NEMOJ: Menjati 5 endpoint-a odjednom
+✅ RADI: Jedan endpoint, testiraj, commit, sledeći
+```
+
+### KORAK 6: DOKUMENTACIJA
+```
+Nakon što završiš SVE promene:
+1. Napravi ili update audit dokument
+2. Dokumentuj šta je bilo pokvareno
+3. Dokumentuj šta je ispravljeno
+4. Dokumentuj šta JE OSTALO kao što je bilo (i zašto)
+```
+
+**Primer:**
+- API-RESPONSE-STRUCTURE-AUDIT.md
+- API-WRAPPER-ANALYSIS.md
+- SERVICE-REQUESTS-MASTER-PLAN.md
+
+### ⚠️ ZLATNO PRAVILO:
+```
+"Ako nisi 100% siguran da li nešto treba menjati,
+ PRVO napravi audit, dokumentuj, i PITAJ."
+```
+
+**NE KVARI ŠTO RADI!**
+- Service Requests ne koristi pagination → NE DIRAJ (čak i ako backend šalje)
+- Crew Members ne koristi pagination → NE DIRAJ
+- Ako UI ne prikazuje pagination → pagination nije potreban
+
+---
+
 ## 🚫 STRIKTNO ZABRANJENO
 
 1. **Hardcoded data** - SVE mora iz baze
