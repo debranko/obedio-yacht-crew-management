@@ -44,12 +44,13 @@ export interface CrewChange {
 
 export interface CrewChangeLog {
   id: string;
-  timestamp: Date;
-  crewMember: string;
-  changeType: 'added' | 'removed' | 'moved_to_backup' | 'moved_to_primary';
+  crewMemberId: string;
+  crewMemberName: string;
+  action: 'added' | 'removed' | 'moved_to_backup' | 'moved_to_primary' | 'status_changed' | 'duty_started' | 'duty_ended';
   date: string;
   shift: string;
+  details: string;
   performedBy: string;
+  timestamp: Date;
   notified: boolean;
-  details?: string;
 }

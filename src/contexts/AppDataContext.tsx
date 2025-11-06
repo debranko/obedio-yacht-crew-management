@@ -516,14 +516,18 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   // Mark changes as notified
   const markChangesAsNotified = (changes: CrewChange[]) => {
     changes.forEach(change => {
+      // Find crew member ID from name
+      const crewMember = crewMembers.find(c => c.name === change.crewMember);
+
       addCrewChangeLog({
-        crewMember: change.crewMember,
-        changeType: change.changeType,
+        crewMemberId: crewMember?.id || '',
+        crewMemberName: change.crewMember,
+        action: change.changeType,
         date: change.date,
         shift: change.shift,
+        details: change.details || '',
         performedBy: 'Chief Steward', // In production, get from auth context
         notified: true,
-        details: change.details,
       });
     });
   };
