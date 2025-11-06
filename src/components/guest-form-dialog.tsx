@@ -82,7 +82,7 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
     nationality: '',
     languages: [],
     passportNumber: '',
-    locationId: '',
+    locationId: undefined,
     checkInDate: new Date().toISOString().split('T')[0],
     checkInTime: '14:00',
     checkOutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -94,7 +94,7 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
     favoriteFoods: [],
     favoriteDrinks: [],
     specialOccasion: '',
-    specialOccasionDate: '',
+    specialOccasionDate: undefined,
     specialRequests: '',
     vipNotes: '',
     crewNotes: '',
@@ -125,12 +125,12 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
         lastName: '',
         preferredName: '',
         photo: undefined,
-        type: 'charter',
+        type: 'guest',
         status: 'expected',
         nationality: '',
         languages: [],
         passportNumber: '',
-        locationId: '',
+        locationId: undefined,
         checkInDate: new Date().toISOString().split('T')[0],
         checkInTime: '14:00',
         checkOutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -142,7 +142,7 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
         favoriteFoods: [],
         favoriteDrinks: [],
         specialOccasion: '',
-        specialOccasionDate: '',
+        specialOccasionDate: undefined,
         specialRequests: '',
         vipNotes: '',
         crewNotes: '',
@@ -208,10 +208,29 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
       return;
     }
 
+    // Transform data for backend validation
+    const dataToSend = {
+      ...formData,
+      // Convert date-only strings to ISO datetime format
+      checkInDate: formData.checkInDate ? `${formData.checkInDate}T00:00:00.000Z` : undefined,
+      checkOutDate: formData.checkOutDate ? `${formData.checkOutDate}T00:00:00.000Z` : undefined,
+      specialOccasionDate: formData.specialOccasionDate ? `${formData.specialOccasionDate}T00:00:00.000Z` : undefined,
+      // Convert empty contactPerson.email to undefined for validation
+      contactPerson: formData.contactPerson && (
+        formData.contactPerson.name ||
+        formData.contactPerson.phone ||
+        formData.contactPerson.email ||
+        formData.contactPerson.role
+      ) ? {
+        ...formData.contactPerson,
+        email: formData.contactPerson.email || undefined,
+      } : undefined,
+    };
+
     if (guest) {
       // Update existing guest via backend API
       updateGuest(
-        { id: guest.id, data: formData },
+        { id: guest.id, data: dataToSend },
         {
           onSuccess: () => {
             onOpenChange(false);
@@ -221,7 +240,7 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
     } else {
       // Add new guest via backend API
       createGuest(
-        formData as Omit<Guest, 'id' | 'createdAt' | 'updatedAt'>,
+        dataToSend as Omit<Guest, 'id' | 'createdAt' | 'updatedAt'>,
         {
           onSuccess: () => {
             onOpenChange(false);
