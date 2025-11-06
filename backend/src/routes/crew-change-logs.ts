@@ -214,9 +214,10 @@ router.post('/bulk', authMiddleware, asyncHandler(async (req: Request, res: Resp
         }
       });
     }));
-    
+
   const createdLogs = logs.filter(log => log !== null);
-  res.status(201).json(apiSuccess(createdLogs));
+  // Return count instead of array to match hook expectation
+  res.status(201).json(apiSuccess({ count: createdLogs.length }));
 }));
 
 // Get recent changes for dashboard
