@@ -88,8 +88,9 @@ router.get('/', authMiddleware, asyncHandler(async (req: Request, res: Response)
       
       return {
         id: log.id,
-        crewMember: crewMember?.name || 'Unknown',
-        changeType: mappedChangeType,
+        crewMemberId: log.crewMemberId,
+        crewMemberName: crewMember?.name || 'Unknown',
+        action: mappedChangeType,
         date,
         shift,
         details: log.reason || `${log.fieldName}: ${log.oldValue} → ${log.newValue}`,
