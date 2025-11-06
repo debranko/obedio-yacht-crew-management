@@ -50,7 +50,7 @@ import { formatDate, parseDate, formatDateDisplay, getDayName } from './duty-ros
 import { toast } from 'sonner';
 import { useAppData } from '../contexts/AppDataContext';
 import { CameraDialog } from './camera-dialog';
-import { useDevices, useDeviceMutations } from '../hooks/useDevices';
+import { useDevices } from '../hooks/useDevices';
 
 interface CrewMemberDetailsDialogProps {
   open: boolean;
@@ -83,7 +83,6 @@ export function CrewMemberDetailsDialog({
 
   // Fetch real devices from database
   const { data: allDevices = [], isLoading: devicesLoading, refetch: refetchDevices } = useDevices();
-  const { updateDevice } = useDeviceMutations();
 
   // Find device assigned to this crew member from real database
   const assignedDevice = allDevices.find(device => device.crewMemberId === crewMember.id);
@@ -122,13 +121,21 @@ export function CrewMemberDetailsDialog({
     if (!device) return;
 
     try {
-      // Update device in database with crewMemberId
-      await updateDevice.mutateAsync({
-        id: device.id,
-        data: {
+      // Update device in database with crewMemberId (same pattern as Device Manager)
+      const response = await fetch(`/api/devices/${device.id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
           crewMemberId: crewMember.id
-        }
+        })
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to assign device');
+      }
 
       toast.success(`${device.name} assigned to ${crewMember.name.split(' ')[0]}`);
       setSelectedDeviceId('');
@@ -153,13 +160,21 @@ export function CrewMemberDetailsDialog({
         return;
       }
 
-      // Update device in database - set crewMemberId to null
-      await updateDevice.mutateAsync({
-        id: device.id,
-        data: {
+      // Update device in database - set crewMemberId to null (same pattern as Device Manager)
+      const response = await fetch(`/api/devices/${device.id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
           crewMemberId: null
-        }
+        })
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to remove device');
+      }
 
       toast.success(`${currentDevice.deviceName} removed from ${crewMember.name.split(' ')[0]}`);
 

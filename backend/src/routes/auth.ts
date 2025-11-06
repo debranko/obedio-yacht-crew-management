@@ -149,10 +149,15 @@ router.post('/refresh', asyncHandler(async (req, res) => {
 
 // Verify token endpoint - reads from HTTP-only cookie
 router.get('/verify', asyncHandler(async (req, res) => {
+  console.log('🔍 [Backend] /auth/verify called');
+  console.log('🔍 [Backend] Cookies received:', req.cookies);
+
   // Check for token in cookie (primary method for session persistence)
   const token = req.cookies['obedio-auth-token'];
+  console.log('🔍 [Backend] Token from cookie:', token ? 'EXISTS (length: ' + token.length + ')' : 'NOT FOUND');
 
   if (!token) {
+    console.warn('⚠️ [Backend] No token in cookie - returning 401');
     return res.status(401).json(apiError('No token provided', 'UNAUTHORIZED', { valid: false }));
   }
 
@@ -170,10 +175,14 @@ router.get('/verify', asyncHandler(async (req, res) => {
     });
 
     if (!user) {
+      console.warn('⚠️ [Backend] User not found in DB for token');
       return res.status(401).json(apiError('Invalid token', 'UNAUTHORIZED', { valid: false }));
     }
 
-    res.json(apiSuccess({
+    console.log('✅ [Backend] Token VALID - user:', user.username);
+    // Don't use apiSuccess wrapper here - return direct structure for frontend simplicity
+    const responseData = {
+      success: true,
       valid: true,
       user: {
         id: user.id,
@@ -184,8 +193,11 @@ router.get('/verify', asyncHandler(async (req, res) => {
         avatar: null,
         department: null,
       }
-    }));
+    };
+    console.log('✅ [Backend] Sending response:', JSON.stringify(responseData).substring(0, 150));
+    res.json(responseData);
   } catch (err) {
+    console.error('❌ [Backend] Token verification error:', err);
     return res.status(401).json(apiError('Invalid or expired token', 'UNAUTHORIZED', { valid: false }));
   }
 }));

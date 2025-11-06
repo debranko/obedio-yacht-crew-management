@@ -87,10 +87,12 @@ router.post('/', upload.single('audio'), async (req, res) => {
 
     console.log('✅ Transcription successful:', transcription.text);
 
-    res.json(apiSuccess({
+    // Don't use apiSuccess wrapper - return direct structure for frontend simplicity
+    res.json({
+      success: true,
       transcript: transcription.text,
       duration: req.body.duration ? parseFloat(req.body.duration) : null
-    }));
+    });
 
   } catch (error: any) {
     console.error('❌ Transcription error:', error);
@@ -119,14 +121,16 @@ router.post('/', upload.single('audio'), async (req, res) => {
  */
 router.get('/test', (req, res) => {
   const hasApiKey = !!process.env.OPENAI_API_KEY;
-  
-  res.json(apiSuccess({
+
+  // Don't use apiSuccess wrapper - return direct structure
+  res.json({
+    success: true,
     message: 'Transcription service is ready',
     openai: {
       configured: hasApiKey,
       keyPreview: hasApiKey ? `${process.env.OPENAI_API_KEY?.substring(0, 10)}...` : 'not configured'
     }
-  }));
+  });
 });
 
 export default router;

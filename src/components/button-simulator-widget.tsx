@@ -457,12 +457,13 @@ export function ButtonSimulatorWidget() {
 
       const data = await response.json();
 
-      if (data.success && data.data && data.data.transcript) {
-        console.log('✅ Transcription successful:', data.data.transcript);
+      // Backend returns { success, transcript, duration } directly (no wrapper)
+      if (data.success && data.transcript) {
+        console.log('✅ Transcription successful:', data.transcript);
         toast.success('Voice message transcribed!', {
-          description: data.data.transcript.substring(0, 100)
+          description: data.transcript.substring(0, 100)
         });
-        return data.data.transcript;
+        return data.transcript;
       }
 
       return null;

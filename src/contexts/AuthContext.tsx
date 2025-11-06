@@ -25,7 +25,8 @@ interface AuthContextType {
   updateUser: (updates: Partial<User>) => void;
 }
 
-const API_BASE_URL = 'http://localhost:8080/api';
+// Use relative path - Vite proxy forwards /api to backend automatically
+const API_BASE_URL = '/api';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -54,8 +55,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Auth token stored in cookie (server runs 24/7), no localStorage needed
   useEffect(() => {
     const checkAuth = async () => {
+      console.log('🔍 [Auth] Starting session check...');
+      console.log('🔍 [Auth] API_BASE_URL:', API_BASE_URL);
+
       try {
         // Verify session with backend - cookie sent automatically
+        console.log('🔍 [Auth] Calling /auth/verify endpoint...');
         const response = await fetch(`${API_BASE_URL}/auth/verify`, {
           method: 'GET',
           headers: {
@@ -64,10 +69,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
           credentials: 'include', // Send HTTP-only cookie
         });
 
+        console.log('🔍 [Auth] Response status:', response.status, response.ok);
+
         if (response.ok) {
           const data = await response.json();
+          console.log('✅ [Auth] Verify response data:', data);
+
+          // Backend returns { success, valid, user } directly (no wrapper)
           if (data.success && data.valid && data.user) {
             // Session is valid, set user from server
+            console.log('✅ [Auth] Session VALID - restoring user:', data.user.username);
             const user: User = {
               id: data.user.id,
               name: data.user.name,
@@ -80,16 +91,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
             setUser(user);
           } else {
             // Invalid session
+            console.warn('⚠️ [Auth] Session INVALID - data structure wrong:', data);
             setUser(null);
           }
         } else {
           // No valid session
+          console.warn('⚠️ [Auth] No valid session - status:', response.status);
+          const errorData = await response.json().catch(() => null);
+          console.warn('⚠️ [Auth] Error data:', errorData);
           setUser(null);
         }
       } catch (error) {
-        console.error('[Auth] Session check failed:', error);
+        console.error('❌ [Auth] Session check failed:', error);
         setUser(null);
       } finally {
+        console.log('🏁 [Auth] Session check complete. isLoading = false');
         setIsLoading(false);
       }
     };
