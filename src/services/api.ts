@@ -131,7 +131,7 @@ export interface GuestDTO {
   preferredName?: string | null;
   photo?: string | null;
   type: 'owner' | 'vip' | 'guest' | 'partner' | 'family';
-  status: 'expected' | 'onboard' | 'ashore' | 'departed';
+  status: 'expected' | 'onboard' | 'departed';
   nationality?: string | null;
   languages?: string[];
   passportNumber?: string | null;

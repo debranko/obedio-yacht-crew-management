@@ -54,7 +54,6 @@ import { Skeleton, SkeletonTable, SkeletonStat } from '../ui/skeleton';
 import { toast } from 'sonner';
 import type { Guest } from '../../contexts/AppDataContext';
 import { KpiCard } from '../kpi-card';
-import { GuestStatusWidget } from '../guest-status-widget';
 
 export function GuestsListPage() {
   const queryClient = useQueryClient();
@@ -361,36 +360,28 @@ export function GuestsListPage() {
         </Card>
       )}
 
-      {/* Compact Status Row: Guest Status (75%) + Dietary Alerts (25%) */}
-      <div className="grid grid-cols-4 gap-4">
-        {/* Guest Status Widget - 3/4 width */}
-        <div className="col-span-3">
-          <GuestStatusWidget />
-        </div>
-        
-        {/* Dietary Alerts - 1/4 width */}
-        <div className="col-span-1">
-          <KpiCard
-            title="Dietary Alerts"
-            value={isLoadingStats ? "..." : stats?.dietaryAlerts.toString() || "0"}
-            icon={AlertTriangle}
-            iconColor="text-destructive"
-            inlineValue={true}
-            onClick={() => {
-              reset();
-              set({ status: 'onboard', allergy: 'has-allergies' });
-            }}
-            details={
-              stats && stats.dietaryAlerts > 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  Active allergy alerts
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">No active allergies</p>
-              )
-            }
-          />
-        </div>
+      {/* Dietary Alerts */}
+      <div className="max-w-xs">
+        <KpiCard
+          title="Dietary Alerts"
+          value={isLoadingStats ? "..." : stats?.dietaryAlerts.toString() || "0"}
+          icon={AlertTriangle}
+          iconColor="text-destructive"
+          inlineValue={true}
+          onClick={() => {
+            reset();
+            set({ status: 'onboard', allergy: 'has-allergies' });
+          }}
+          details={
+            stats && stats.dietaryAlerts > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Active allergy alerts
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">No active allergies</p>
+            )
+          }
+        />
       </div>
 
       {/* New GuestsToolbar Component */}
