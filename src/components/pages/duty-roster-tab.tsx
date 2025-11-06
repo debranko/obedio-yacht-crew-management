@@ -556,9 +556,15 @@ export function DutyRosterTab() {
     setNotifyDialogOpen(true);
   };
 
-  const handleConfirmNotify = () => {
-    markChangesAsNotified(pendingChanges);
-    setPendingChanges([]);
+  const handleConfirmNotify = async () => {
+    try {
+      await markChangesAsNotified(pendingChanges);
+      setPendingChanges([]);
+      toast.success(`Crew change logs created successfully`);
+    } catch (error) {
+      console.error('Failed to create crew change logs:', error);
+      toast.error('Failed to create crew change logs');
+    }
   };
 
   // Handle export to CSV

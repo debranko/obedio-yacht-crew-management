@@ -513,23 +513,22 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return changes;
   };
 
-  // Mark changes as notified
-  const markChangesAsNotified = (changes: CrewChange[]) => {
-    changes.forEach(change => {
-      // Find crew member ID from name
-      const crewMember = crewMembers.find(c => c.name === change.crewMember);
+  // Mark changes as notified - sends to backend API
+  const markChangesAsNotified = async (changes: CrewChange[]) => {
+    if (changes.length === 0) return;
 
-      addCrewChangeLog({
-        crewMemberId: crewMember?.id || '',
-        crewMemberName: change.crewMember,
-        action: change.changeType,
-        date: change.date,
-        shift: change.shift,
-        details: change.details || '',
-        performedBy: 'Chief Steward', // In production, get from auth context
-        notified: true,
-      });
-    });
+    try {
+      // Call backend API to create crew change logs
+      await api.post('/crew-change-logs/bulk', { changes });
+
+      // Invalidate crew change logs cache to trigger re-fetch
+      queryClient.invalidateQueries({ queryKey: ['crew-change-logs'] });
+
+      console.log(`✅ Created ${changes.length} crew change logs`);
+    } catch (error) {
+      console.error('❌ Failed to create crew change logs:', error);
+      throw error;
+    }
   };
 
   // Save assignments to database
