@@ -449,7 +449,7 @@ export class DatabaseService {
   }
 
   async createServiceRequest(data: any) {
-    return this.prisma.serviceRequest.create({
+    const newRequest = await this.prisma.serviceRequest.create({
       data,
       include: {
         guest: true,
@@ -458,6 +458,32 @@ export class DatabaseService {
         CrewMember: true  // Include assigned crew member details
       }
     });
+
+    // Log to activity log
+    const priorityLabel = newRequest.priority.toLowerCase();
+    const guestName = newRequest.guest
+      ? `${newRequest.guest.firstName} ${newRequest.guest.lastName}`
+      : newRequest.guestName || 'Guest';
+    const locationName = newRequest.location?.name || newRequest.guestCabin || 'Unknown location';
+
+    await this.prisma.activityLog.create({
+      data: {
+        type: 'service_request',
+        action: 'Request Created',
+        details: `Service request created: ${priorityLabel} priority from ${guestName} at ${locationName}`,
+        userId: newRequest.CrewMember?.userId || null,
+        locationId: newRequest.locationId,
+        guestId: newRequest.guestId,
+        metadata: JSON.stringify({
+          requestId: newRequest.id,
+          requestType: newRequest.requestType,
+          priority: newRequest.priority,
+          category: newRequest.categoryId
+        })
+      }
+    });
+
+    return newRequest;
   }
 
   async acceptServiceRequest(requestId: string, crewMemberId: string) {
@@ -483,7 +509,7 @@ export class DatabaseService {
       throw new Error('Service request not found');
     }
 
-    return this.prisma.serviceRequest.update({
+    const updatedRequest = await this.prisma.serviceRequest.update({
       where: { id: requestId },
       data: {
         status: 'IN_PROGRESS',
@@ -500,6 +526,32 @@ export class DatabaseService {
         CrewMember: true  // Include assigned crew member details
       }
     });
+
+    // Log to activity log
+    const guestName = request.guest
+      ? `${request.guest.firstName} ${request.guest.lastName}`
+      : request.guestName || 'Guest';
+    const locationName = request.location?.name || request.guestCabin || 'Unknown location';
+
+    await this.prisma.activityLog.create({
+      data: {
+        type: 'service_request',
+        action: 'Request Accepted',
+        details: `${crewMember.name} accepted service request from ${guestName} at ${locationName}`,
+        userId: crewMember.userId || null,
+        locationId: request.locationId,
+        guestId: request.guestId,
+        metadata: JSON.stringify({
+          requestId: updatedRequest.id,
+          crewMemberId: crewMember.id,
+          crewMemberName: crewMember.name,
+          priority: updatedRequest.priority,
+          requestType: updatedRequest.requestType
+        })
+      }
+    });
+
+    return updatedRequest;
   }
 
   async completeServiceRequest(requestId: string) {
