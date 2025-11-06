@@ -333,7 +333,7 @@ const getGuestTypeLabel = (type: Guest['type']) => {
 
 ## ✅ IMPLEMENTIRANO
 
-### Izmene napravljene:
+### Izmene napravljene (Commit 1 - Guest Type Enum):
 
 1. ✅ **`src/types/guests.ts:10`** - TypeScript type usklađen sa bazom
 2. ✅ **`src/components/pages/guests-list.tsx:215`** - `'primary'` → `'guest'`
@@ -346,7 +346,219 @@ const getGuestTypeLabel = (type: Guest['type']) => {
 
 **Ukupno:** 5 frontend fajlova, ~20 linija koda, NULA backend izmena
 
+### Izmene napravljene (Commit 2 - Date Format & Null Handling):
+
+**GLAVNI BUG:** Linija 128 u `useEffect` hook-u je postavljala `type: 'charter'` umesto `'guest'` kada se otvara Add Guest dialog!
+
+**Root Cause Analysis:**
+- `useEffect` se pokreće kada `open` postane true
+- Resetuje formData i override-uje inicijalnu state vrednost sa linija 75-108
+- Rezultat: Svaki put kada otvoriš "Add Guest", type se postavlja na 'charter' (invalid)
+
+**Dodatni problemi pronađeni:**
+
+9. ✅ **`src/components/guest-form-dialog.tsx:85, 133`** - `locationId: ''` → `locationId: undefined`
+   - Problem: PostgreSQL foreign key odbija empty string, traži null ili valid ID
+
+10. ✅ **`src/components/guest-form-dialog.tsx:97, 145`** - `specialOccasionDate: ''` → `specialOccasionDate: undefined`
+    - Problem: Zod validator odbija empty string za datetime field
+
+11. ✅ **`src/components/guest-form-dialog.tsx:128`** - `type: 'charter'` → `type: 'guest'` (useEffect reset)
+    - **GLAVNI BUG** - override-ovao inicijalnu state vrednost!
+
+12. ✅ **`src/components/guest-form-dialog.tsx:211-228`** - Dodao data transformation u handleSubmit:
+    - **Date format conversion:** `"2025-11-06"` → `"2025-11-06T00:00:00.000Z"`
+    - **Email validation:** `contactPerson.email: ''` → `undefined`
+    - **ContactPerson logic:** Šalje samo ako je bar jedno polje popunjeno
+
+**Ukupno (Commit 2):** 1 fajl, 4 lokacije, ~30 linija izmena
+
+**Backend Validation Errors Resolved:**
+- ❌ Invalid guest type "charter" → ✅ Now sends "guest"
+- ❌ Invalid datetime for checkInDate → ✅ ISO format "2025-11-06T00:00:00.000Z"
+- ❌ Invalid datetime for checkOutDate → ✅ ISO format
+- ❌ Invalid datetime for specialOccasionDate → ✅ ISO format or undefined
+- ❌ Invalid email for contactPerson.email → ✅ undefined if empty
+- ❌ Foreign key constraint (locationId) → ✅ undefined instead of empty string
+
 ### Test plan:
-- [ ] Toggle VIP (zvezda) - Trebalo bi da radi
-- [ ] Add New Guest - Trebalo bi da kreira sa `type: 'guest'`
-- [ ] Edit Guest - Trebalo bi da update-uje bez greške
+- [x] Toggle VIP (zvezda) - ✅ RADI (Commit 1)
+- [x] Edit Guest - ✅ RADI (Commit 1)
+- [x] Add New Guest - ✅ RADI (Commit 2)
+- [x] Add Guest sa cabin-om - ✅ RADI (locationId fix)
+- [x] Add Guest bez cabin-a - ✅ RADI (undefined umesto empty string)
+
+---
+
+## 🔍 DODATNA ANALIZA CELOG CODEBASE-a
+
+**Datum:** 2025-11-06 (nakon fixa)
+**Cilj:** Detaljno ispitivanje celog koda da nađemo slične probleme
+
+### PRONAĐENI PROBLEMI (nakon temeljnog ispitivanja)
+
+#### 🔴 HIGH PRIORITY - Treba rešiti uskoro
+
+##### 1. Guest status 'ashore' nedostaje u frontend-u
+
+**Backend (Prisma schema):**
+```prisma
+enum GuestStatus {
+  expected
+  onboard
+  ashore      // ← POSTOJI u bazi
+  departed
+}
+```
+
+**Backend validator (schemas.ts line 20):**
+```typescript
+status: z.enum(['expected', 'onboard', 'ashore', 'departed'])  // ← Podržava 'ashore'
+```
+
+**Frontend (src/types/guests.ts line 11):**
+```typescript
+status: 'expected' | 'onboard' | 'departed';  // ← NEDOSTAJE 'ashore'
+```
+
+**Frontend (guest-form-dialog.tsx lines 367-371):**
+```tsx
+<SelectContent>
+  <SelectItem value="expected">Expected</SelectItem>
+  <SelectItem value="onboard">Onboard</SelectItem>
+  <SelectItem value="departed">Departed</SelectItem>
+  <!-- NEDOSTAJE opcija za 'ashore' -->
+</SelectContent>
+```
+
+**RIZIK:** MEDIUM
+**Problem:** Ako se guest postavi na 'ashore' status (možda sa mobile app-a), frontend ga neće prepoznati.
+
+**FIX:**
+1. Dodati 'ashore' u `src/types/guests.ts` Guest interface
+2. Dodati `<SelectItem value="ashore">Ashore</SelectItem>` u guest-form-dialog.tsx
+
+---
+
+##### 2. ServiceRequest priority mismatch (Web vs Mobile)
+
+**Backend (Prisma schema):**
+```prisma
+enum ServiceRequestPriority {
+  low       // ← Postoji u bazi
+  normal
+  urgent
+  emergency
+}
+```
+
+**Frontend Web (src/types/service-requests.ts line 28):**
+```typescript
+priority: 'normal' | 'urgent' | 'emergency';  // ← NEDOSTAJE 'low'
+```
+
+**Mobile iOS (Models.swift lines 27-30):**
+```swift
+enum ServiceRequestPriority: String, Codable {
+    case normal = "normal"
+    case high = "high"         // ← Koristi 'high' umesto 'urgent'!
+    case emergency = "emergency"
+}
+```
+
+**RIZIK:** MEDIUM
+**Problem:**
+- Frontend Web ne može da kreira 'low' priority zahteve
+- Mobile iOS koristi 'high' ali backend očekuje 'urgent'
+- Sync problemi između Web i Mobile aplikacija
+
+**FIX:**
+1. Dodati 'low' u frontend Web ServiceRequest type
+2. Poravnati Mobile iOS da koristi 'urgent' umesto 'high'
+3. ILI update-ovati backend da prihvata oba ('urgent' i 'high')
+
+---
+
+#### 🟡 MEDIUM PRIORITY - Razmotriti
+
+##### 3. Email validacija u Crew forms
+
+**Backend (schemas.ts line 89):**
+```typescript
+email: z.string().email('Invalid email').max(100).optional().nullable(),
+```
+
+**Frontend (crew-list.tsx line 238):**
+```typescript
+email: formData.email || null,  // ← Konvertuje empty string u null ✅
+                                // ALI ne validira email format pre slanja
+```
+
+**RIZIK:** LOW-MEDIUM
+**Problem:** Ako korisnik unese nevalidan email, backend će odbaciti request.
+**User Experience:** Greška se prikazuje tek nakon slanja, nije user-friendly.
+
+**FIX:** Dodati email validaciju u frontend pre slanja (npr. koristi Zod na frontend-u)
+
+---
+
+##### 4. 'low' priority opcija ne postoji u UI
+
+**Backend:** Podržava 'low' priority
+**Frontend:** Ne prikazuje opciju za 'low' priority u forms
+
+**RIZIK:** LOW
+**Problem:** Korisnici ne mogu da kreiraju low priority service requests sa Web app-a.
+
+**FIX:** Dodati 'low' opciju u ServiceRequest forms
+
+---
+
+#### ✅ VERIFIKOVANO - Nema problema
+
+##### CrewMember date handling
+- ✅ `joinDate` koristi ISO datetime format (correct)
+- ✅ `leaveStart/leaveEnd` koriste YYYY-MM-DD format (correct - stored as String)
+- ✅ Backend validator matches database schema
+
+##### Location optional fields handling
+- ✅ Backend route koristi `!== undefined` checks
+- ✅ Neće slučajno poslati empty strings
+
+##### WebSocket real-time updates
+- ✅ Guest events properly emitted (created/updated/deleted)
+- ✅ Real-time sync funkcioniše
+
+---
+
+### PREPORUKE PO PRIORITETU
+
+#### ODMAH (Pre production):
+- Ništa KRITIČNO - Guest fix je bio glavni problem ✅
+
+#### USKORO (Sledeći sprint):
+1. **Dodati 'ashore' status** - Guest može biti ashore, frontend mora to podržati
+2. **Poravnati ServiceRequest priority** - Web vs Mobile sync problem
+
+#### RAZMOTRITI (Nice to have):
+1. **Email validacija na frontend-u** - Bolja UX
+2. **Dodati 'low' priority opciju** - Kompletna funkcionalnost
+
+---
+
+### ZAKLJUČAK ANALIZE
+
+✅ **Guest form bug je bio GLAVNI problem u codebase-u**
+
+Našao sam 2 HIGH priority problema i 2 MEDIUM priority problema, ali **nijedan nije kritičan** kao Guest enum/date/validation bug koji smo fixovali.
+
+Codebase je generalno **dobro strukturiran** sa pravilnom validacijom, ali postoji nekoliko enum mismatch-eva između frontend types i backend schemas koje bi trebalo rešiti pre production deploya.
+
+**Kompletan spisak fajlova pregledanih:**
+- ✅ Svi Guest-related komponenti (8 frontend files)
+- ✅ Svi backend routes (guests, crew, service-requests, locations)
+- ✅ Svi validators i schemas
+- ✅ Prisma schema (svi enums pregledani)
+- ✅ Mobile iOS Models (za cross-platform sync)
+- ✅ WebSocket handlers
+- ✅ All hooks and services
