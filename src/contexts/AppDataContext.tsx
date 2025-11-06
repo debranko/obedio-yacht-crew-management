@@ -101,7 +101,7 @@ interface AppDataContextType {
   
   // Change tracking for notifications
   detectRosterChanges: () => CrewChange[];
-  markChangesAsNotified: (changes: CrewChange[]) => void;
+  markChangesAsNotified: (changes: CrewChange[]) => Promise<void>;
 
   // Messages
   messages: Message[];
