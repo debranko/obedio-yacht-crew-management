@@ -61,7 +61,12 @@ router.get('/', authMiddleware, asyncHandler(async (req: Request, res: Response)
 
   const total = await prisma.message.count({ where });
 
-  res.json(apiSuccess(messages, buildPaginationMeta(total, pageNum, limitNum)));
+  // Wrap messages + pagination in a single object so fetchApi returns both fields
+  const response = {
+    messages: messages,
+    pagination: buildPaginationMeta(total, pageNum, limitNum)
+  };
+  res.json(apiSuccess(response));
 }));
 
 // Get conversation between two users
