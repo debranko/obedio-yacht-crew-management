@@ -77,7 +77,7 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
     lastName: '',
     preferredName: '',
     photo: undefined,
-    type: 'charter',
+    type: 'guest',
     status: 'expected',
     nationality: '',
     languages: [],
@@ -346,13 +346,11 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="primary">Primary Guest</SelectItem>
+                      <SelectItem value="guest">Guest</SelectItem>
                       <SelectItem value="partner">Partner</SelectItem>
                       <SelectItem value="family">Family</SelectItem>
-                      <SelectItem value="child">Child</SelectItem>
                       <SelectItem value="vip">VIP</SelectItem>
                       <SelectItem value="owner">Owner</SelectItem>
-                      <SelectItem value="charter">Charter</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

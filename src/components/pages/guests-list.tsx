@@ -212,7 +212,7 @@ export function GuestsListPage() {
 
   const toggleVip = (guest: Guest, e: React.MouseEvent) => {
     e.stopPropagation();
-    const newType = (guest.type === 'vip' || guest.type === 'owner') ? 'primary' : 'vip';
+    const newType = (guest.type === 'vip' || guest.type === 'owner') ? 'guest' : 'vip';
     updateGuest(guest.id, { type: newType });
     
     // Invalidate queries to refresh data

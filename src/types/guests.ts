@@ -7,7 +7,7 @@ export interface Guest {
   lastName: string;
   preferredName?: string;
   photo?: string;
-  type: 'primary' | 'partner' | 'family' | 'child' | 'vip' | 'owner' | 'charter';
+  type: 'owner' | 'vip' | 'guest' | 'partner' | 'family';
   status: 'expected' | 'onboard' | 'departed';
   nationality?: string;
   languages: string[];

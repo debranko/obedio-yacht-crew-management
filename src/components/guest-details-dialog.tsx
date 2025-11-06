@@ -56,20 +56,16 @@ export function GuestDetailsDialog({ open, onOpenChange, guest, onEdit }: GuestD
 
   const getGuestTypeLabel = (type: Guest['type']) => {
     switch (type) {
-      case 'primary':
-        return 'Primary Guest';
+      case 'guest':
+        return 'Guest';
       case 'partner':
         return 'Partner';
       case 'family':
         return 'Family';
-      case 'child':
-        return 'Child';
       case 'vip':
         return 'VIP';
       case 'owner':
         return 'Owner';
-      case 'charter':
-        return 'Charter';
     }
   };
 
