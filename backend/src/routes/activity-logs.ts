@@ -12,7 +12,12 @@ router.get('/', asyncHandler(async (req, res) => {
   const { type, userId, locationId, page, limit } = req.query;
   const filters = { type: type as string, userId: userId as string, locationId: locationId as string, page: page ? parseInt(page as string) : 1, limit: limit ? parseInt(limit as string) : 50 };
   const result = await dbService.getActivityLogs(filters);
-  res.json(apiSuccess(result.items, buildPaginationMeta(result.total, result.page, result.limit)));
+  // Wrap items + pagination in a single object so fetchApi returns both fields
+  const response = {
+    items: result.items,
+    pagination: buildPaginationMeta(result.total, result.page, result.limit)
+  };
+  res.json(apiSuccess(response));
 }));
 
 router.post('/', asyncHandler(async (req, res) => {

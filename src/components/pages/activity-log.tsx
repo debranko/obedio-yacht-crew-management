@@ -100,7 +100,7 @@ export function ActivityLogPage() {
   // Filter service request related activity (Button Press, Request Accepted, Request Completed)
   const filteredServiceRequests = useMemo(() => {
     if (!Array.isArray(allActivityLogsForFiltering)) return [];
-    
+
     // Filter for service request flow events
     const serviceRequestEvents = allActivityLogsForFiltering.filter((log: any) => {
       // Include: Button Press (type=device), Request Accepted, Request Completed (type=service_request)
