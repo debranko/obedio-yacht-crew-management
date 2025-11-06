@@ -88,7 +88,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 | Endpoint | Backend Pattern | Hook Expectation | Status | Notes |
 |----------|----------------|------------------|--------|-------|
-| **Crew Change Logs** | `apiSuccess(array, pagination)` | `{ data, total, page, limit }` | ❌ **BROKEN!** | Hook expects wrapped object but receives array! |
+| **Crew Change Logs** | `apiSuccess({ data, pagination })` | `{ data, pagination }` | ✅ **FIXED!** | Fixed in commit d62d532 |
 
 ---
 
@@ -134,7 +134,7 @@ const crewChangeLogs = crewChangeLogsResponse?.data || [];
 // Falls back to []
 ```
 
-**VERDICT:** ❌ **BROKEN** - Component receives `[array]` but expects `{ data: [...], total, page, limit }`
+**VERDICT:** ✅ **FIXED** (commit d62d532) - Backend now wraps data + pagination in object, frontend hook interface updated
 
 ---
 
@@ -191,7 +191,8 @@ Still need to check:
 ## ✅ WHAT WE'VE FIXED SO FAR
 
 1. ✅ **Activity Logs** - Backend wraps `{ items, pagination }` (commit c53f3f6)
-2. ✅ **Messages** - Backend wraps `{ messages, pagination }` (pending commit)
+2. ✅ **Messages** - Backend wraps `{ messages, pagination }` (commit 82495f9)
+3. ✅ **Crew Change Logs** - Backend wraps `{ data, pagination }` (commit d62d532)
 
 ---
 
@@ -211,18 +212,26 @@ Before fixing more endpoints:
 
 ---
 
-## 📝 NEXT STEPS
+## 📝 COMPLETED WORK
 
-1. ✅ Commit Messages fix
-2. ❌ **STOP** - Don't fix Crew Change Logs yet
-3. Review: Does Activity Log page actually WORK with Crew Change Logs?
-4. Test: Open Activity Log page → Crew Changes tab
-5. If broken: Fix Crew Change Logs backend
-6. If works: Document why and move on
+1. ✅ Committed Messages fix (82495f9)
+2. ✅ Fixed Crew Change Logs backend (d62d532)
+3. ✅ Updated frontend hook interface (d62d532)
+4. ✅ Tested via curl - API returns correct structure
+5. ✅ Added systematic change procedure to RULES document (d62d532)
 
-**User Feedback:** "pregledaj i api listu svoju da ne menjas nesto sto ne bi smeo" ← **GOOD ADVICE!**
+## 📝 REMAINING WORK
+
+As per user feedback: "pregledaj i api listu svoju da ne menjas nesto sto ne bi smeo" ← **GOOD ADVICE!**
+
+**Endpoints to Review (NOT FIX YET):**
+- ❓ Device Logs (`devices.ts:118`)
+- ❓ Guests paginated (`guests.ts:129`)
+- ❓ Service Request History (`service-request-history.ts:58`, `service-request-history.ts:188`)
+
+**Before fixing:** Check if they are actually BROKEN and if UI uses pagination!
 
 ---
 
-**Last Updated:** 2025-11-06
-**Status:** Analysis Complete - Awaiting Decision on Crew Change Logs Fix
+**Last Updated:** 2025-11-06 19:30
+**Status:** Crew Change Logs FIXED - 3 endpoints fixed, 3 pending review
