@@ -498,6 +498,30 @@ res.json(apiSuccess(response));
 
 ---
 
+### 🔍 ADDITIONAL DISCOVERY: API Response Structure Inconsistency
+
+**During Phase 1 implementation, discovered SYSTEMATIC API pattern inconsistency:**
+
+**Root Cause:**
+- `apiSuccess(array, pagination)` sends: `{ success: true, data: [array], pagination: {...} }`
+- `fetchApi()` unwraps by returning only `result.data` = `[array]`
+- **Pagination field is LOST across multiple endpoints!**
+
+**Findings:**
+- ✅ **Activity Logs:** FIXED (commit c53f3f6)
+- ❌ **Messages endpoint:** BROKEN (hook expects `{ messages, pagination }` but receives `[array]`)
+- ⚠️ **Service Requests:** Works but loses pagination data
+- ✅ **Crew, Locations, Guests:** Work correctly (no pagination)
+
+**Created Comprehensive Audit:**
+- Full documentation: [API-RESPONSE-STRUCTURE-AUDIT.md](./API-RESPONSE-STRUCTURE-AUDIT.md)
+- Impact: 2 endpoints need fixes (Messages is broken, Service Requests loses data)
+- Recommendation: Fix Messages ASAP, decide on Service Requests pagination strategy
+
+**This discovery shows importance of systematic code review after fixing issues!**
+
+---
+
 **STATUS:** ✅ FAZA 1 COMPLETE | Faze 2-4 READY
 
 **NEXT STEP:** Start Faza 2 (Voice Transcript Parsing) when ready.
