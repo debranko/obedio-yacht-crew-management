@@ -110,23 +110,38 @@ export function IncomingRequestDialog({
   const handleAccept = () => {
     if (!request) return;
 
+    // DEBUG: Log current state
+    console.log('🔍 DEBUG Accept button clicked:');
+    console.log('  - Current user ID:', user?.id);
+    console.log('  - All crew members:', crewMembers.map(c => ({ id: c.id, name: c.name, userId: c.userId })));
+    console.log('  - Looking for crew with userId:', user?.id);
+
     // Get current crew member from authenticated user
     const currentCrewMember = crewMembers.find(crew => crew.userId === user?.id);
 
+    console.log('  - Found crew member:', currentCrewMember);
+
     if (!currentCrewMember) {
+      console.error('❌ No crew member found for user:', user?.id);
       toast.error('You must be associated with a crew member to accept requests');
       return;
     }
+
+    console.log('✅ Calling backend API to accept request');
+    console.log('  - Request ID:', request.id);
+    console.log('  - Crew ID:', currentCrewMember.id);
 
     // Call BACKEND API (not local state!)
     acceptRequest(
       { id: request.id, crewId: currentCrewMember.id },
       {
         onSuccess: () => {
+          console.log('✅ Backend accepted request successfully');
           toast.success(`Request from ${request.guestName} accepted`);
           onClose();
         },
         onError: (error: any) => {
+          console.error('❌ Backend error:', error);
           toast.error(error.message || 'Failed to accept request');
         }
       }
@@ -140,10 +155,24 @@ export function IncomingRequestDialog({
   const handleSelectCrew = (crewId: string, crewName: string) => {
     if (!request) return;
 
-    delegateServiceRequest(request.id, crewId);
-    toast.success(`Request delegated to ${crewName}`);
-    setShowDelegateDropdown(false);
-    onClose();
+    console.log('🔄 Delegating request to crew member:', crewName, crewId);
+
+    // Call BACKEND API to assign request to selected crew member
+    acceptRequest(
+      { id: request.id, crewId: crewId },
+      {
+        onSuccess: () => {
+          console.log('✅ Request delegated successfully via backend API');
+          toast.success(`Request delegated to ${crewName}`);
+          setShowDelegateDropdown(false);
+          onClose();
+        },
+        onError: (error: any) => {
+          console.error('❌ Failed to delegate request:', error);
+          toast.error(error.message || 'Failed to delegate request');
+        }
+      }
+    );
   };
 
   const handleForwardClick = () => {
@@ -281,6 +310,23 @@ export function IncomingRequestDialog({
           </div>
         </motion.div>
 
+        {/* Location Image - Large and Beautiful */}
+        {request.cabinImage && (
+          <div className="relative h-48 overflow-hidden">
+            <img
+              src={request.cabinImage}
+              alt={request.guestCabin}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/20 to-transparent" />
+            <div className="absolute bottom-4 left-6 right-6">
+              <h3 className="text-2xl font-bold text-white drop-shadow-lg">
+                {request.guestCabin}
+              </h3>
+            </div>
+          </div>
+        )}
+
         {/* Content */}
         <div className="p-6 space-y-4">
           {/* Location & Guest */}
@@ -291,7 +337,7 @@ export function IncomingRequestDialog({
               </div>
               <div className="flex-1">
                 <div className="text-xs text-muted-foreground">Location</div>
-                <div className="font-semibold">{request.guestCabin}</div>
+                <div className="font-bold text-lg">{request.guestCabin}</div>
               </div>
             </div>
 
@@ -302,6 +348,40 @@ export function IncomingRequestDialog({
               <div className="flex-1">
                 <div className="text-xs text-muted-foreground">Guest</div>
                 <div className="font-semibold">{request.guestName}</div>
+              </div>
+            </div>
+
+            {/* Request Type Badge */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
+                {request.requestType === 'voice' ? (
+                  <Volume2 className="h-5 w-5 text-accent" />
+                ) : request.requestType === 'dnd' ? (
+                  <Bell className="h-5 w-5 text-accent" />
+                ) : request.requestType === 'lights' ? (
+                  <Cog className="h-5 w-5 text-accent" />
+                ) : request.requestType === 'prepare_food' ? (
+                  <UtensilsCrossed className="h-5 w-5 text-accent" />
+                ) : request.requestType === 'bring_drinks' ? (
+                  <Wine className="h-5 w-5 text-accent" />
+                ) : request.requestType === 'emergency' ? (
+                  <AlertCircle className="h-5 w-5 text-destructive" />
+                ) : (
+                  <Bell className="h-5 w-5 text-accent" />
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="text-xs text-muted-foreground">Request Type</div>
+                <div className="font-semibold capitalize">
+                  {request.requestType === 'call' ? 'Service Call' :
+                   request.requestType === 'voice' ? 'Voice Message' :
+                   request.requestType === 'dnd' ? 'Do Not Disturb' :
+                   request.requestType === 'lights' ? 'Lights Control' :
+                   request.requestType === 'prepare_food' ? 'Food Service' :
+                   request.requestType === 'bring_drinks' ? 'Drinks Service' :
+                   request.requestType === 'emergency' ? 'EMERGENCY' :
+                   request.requestType}
+                </div>
               </div>
             </div>
           </div>
@@ -352,17 +432,6 @@ export function IncomingRequestDialog({
             <div className="bg-muted/50 rounded-lg p-4 border border-border">
               <div className="text-xs text-muted-foreground mb-2">Request Type</div>
               <p className="text-sm leading-relaxed">{request.notes}</p>
-            </div>
-          )}
-
-          {/* Cabin Image */}
-          {request.cabinImage && (
-            <div className="rounded-lg overflow-hidden border border-border">
-              <img 
-                src={request.cabinImage} 
-                alt={request.guestCabin}
-                className="w-full h-32 object-cover"
-              />
             </div>
           )}
         </div>
@@ -602,7 +671,7 @@ export function useIncomingRequests() {
       const wasCreatedAfterInit = request.timestamp.getTime() > initializationTime;
       const isNewRequest = age < 5000 && request.id !== lastRequestId && wasCreatedAfterInit;
       const shouldRepeat = repeatInterval > 0 && lastShown && (now - lastShown) >= repeatInterval;
-      
+
       if ((isNewRequest || shouldRepeat) && !shownRecently) {
         setLastRequestId(request.id);
         setLastShownTime(prev => ({ ...prev, [request.id]: now }));

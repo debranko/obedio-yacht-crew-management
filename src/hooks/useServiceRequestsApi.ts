@@ -22,7 +22,7 @@ interface ServiceRequestDTOWithRelations extends ServiceRequestDTO {
   location?: {
     id: string;
     name: string;
-    imageUrl?: string;
+    image?: string;
   };
   category?: {
     id: string;
@@ -47,10 +47,18 @@ function transformServiceRequest(dto: ServiceRequestDTOWithRelations): ServiceRe
   const guestCabin = dto.location?.name || 'Location';
 
   // Map location name to existing yacht interior images in /public/images/locations/
-  const cabinImage = dto.location?.imageUrl ||
+  const cabinImage = dto.location?.image ||
     (dto.location?.name ? `/images/locations/${dto.location.name}.jpg` : undefined);
 
   const frontendStatus = mapBackendStatusToFrontend(dto.status);
+
+  // Create timestamp with validation - ensure it's a valid Date
+  const timestamp = new Date(dto.createdAt);
+  if (isNaN(timestamp.getTime())) {
+    console.error('⚠️ Invalid createdAt timestamp for request:', dto.id, dto.createdAt);
+    // Use current time as fallback for invalid dates
+    timestamp.setTime(Date.now());
+  }
 
   return {
     id: dto.id,
@@ -59,7 +67,7 @@ function transformServiceRequest(dto: ServiceRequestDTOWithRelations): ServiceRe
     cabinId: dto.locationId || '',
     requestType: dto.requestType,
     priority: dto.priority as 'normal' | 'urgent' | 'emergency',
-    timestamp: new Date(dto.createdAt), // Convert string to Date
+    timestamp, // Validated Date object
     voiceTranscript: dto.voiceTranscript || undefined,
     voiceAudioUrl: dto.voiceAudioUrl || undefined,
     cabinImage,
