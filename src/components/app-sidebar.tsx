@@ -54,6 +54,11 @@ const navItems: NavItem[] = [
     href: "/service-requests"
   },
   {
+    label: "🚧 Service Requests NEW",
+    icon: Bell,
+    href: "/service-requests-new"
+  },
+  {
     label: "Activity Log",
     icon: ScrollText,
     href: "/activity-log"
