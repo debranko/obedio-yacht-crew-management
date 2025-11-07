@@ -10,7 +10,6 @@ import { ButtonSimulatorPage } from "./components/pages/button-simulator";
 import { LocationsPage } from "./components/pages/locations";
 import { ActivityLogPage } from "./components/pages/activity-log";
 import { ServiceRequestsPage } from "./components/pages/service-requests";
-import ServiceRequestsNew from "./components/pages/service-requests-new";
 import { SettingsPage } from "./components/pages/settings";
 import { Toaster } from "./components/ui/sonner";
 import { Button } from "./components/ui/button";
@@ -203,8 +202,6 @@ function AppContent() {
           return <LocationsPage />;
         case "service-requests":
           return <ServiceRequestsPage />;
-        case "service-requests-new":
-          return <ServiceRequestsNew />;
         case "activity-log":
           return <ActivityLogPage />;
         case "settings":
