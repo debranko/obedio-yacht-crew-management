@@ -518,13 +518,14 @@ export function ServiceRequestsPage({
           </div>
         </div>
 
-        {/* Request Cards */}
-        <div className="flex-1 overflow-y-auto bg-background">
-          <div className={`p-6 ${isFullscreen ? 'p-8' : ''}`}>
+        {/* Request Cards - Two Column Layout */}
+        <div className="flex-1 overflow-hidden bg-background flex">
+          {/* LEFT COLUMN - Pending Requests */}
+          <div className={`flex-1 overflow-y-auto border-r border-border ${isFullscreen ? 'p-8' : 'p-6'}`}>
             {/* Pending Requests Section */}
-            {pendingRequests.length > 0 && (
-              <div className="mb-8">
-                <div className="flex items-center gap-3 mb-6">
+            {pendingRequests.length > 0 ? (
+              <div>
+                <div className="flex items-center gap-3 mb-6 sticky top-0 bg-background pb-4 z-10">
                   <div className="h-1 w-12 bg-gradient-to-r from-destructive/50 to-transparent rounded-full" />
                   <h3 className={`${isFullscreen ? 'text-xl' : 'text-base'} font-medium`}>
                     Pending Requests
@@ -536,7 +537,7 @@ export function ServiceRequestsPage({
                 </div>
 
                 {/* Pending Request Cards with Beautiful Yacht Room Images */}
-                <div className={`grid gap-6 ${isFullscreen ? 'grid-cols-2 gap-8' : 'grid-cols-1 max-w-5xl'}`}>
+                <div className="grid gap-6">
                   {pendingRequests.map((request) => (
                     <Card
                       key={`${request.id}-${userPreferences.serviceRequestDisplayMode}`}
@@ -610,16 +611,16 @@ export function ServiceRequestsPage({
                           <Bell className={`${isFullscreen ? 'h-10 w-10' : 'h-8 w-8'} text-destructive animate-pulse`} />
                         </div>
 
-                        {/* Voice Transcript */}
+                        {/* Voice Transcript - LARGE & PROMINENT */}
                         {request.voiceTranscript && (
-                          <div className="mb-4 p-4 bg-card/70 backdrop-blur-sm rounded-lg border border-border shadow-sm">
-                            <div className="flex items-start gap-2 mb-2">
-                              <MessageSquare className={`${isFullscreen ? 'h-5 w-5' : 'h-4 w-4'} text-muted-foreground mt-0.5`} />
-                              <p className={`${isFullscreen ? 'text-sm' : 'text-xs'} font-medium text-muted-foreground`}>
+                          <div className="mb-6 p-6 bg-gradient-to-br from-primary/10 via-primary/5 to-background rounded-xl border-2 border-primary/30 shadow-lg">
+                            <div className="flex items-start gap-3 mb-3">
+                              <MessageSquare className={`${isFullscreen ? 'h-7 w-7' : 'h-6 w-6'} text-primary mt-1`} />
+                              <p className={`${isFullscreen ? 'text-lg' : 'text-base'} font-semibold text-primary`}>
                                 Voice Transcript
                               </p>
                             </div>
-                            <p className={`${isFullscreen ? 'text-base' : 'text-sm'} leading-relaxed pl-7`}>
+                            <p className={`${isFullscreen ? 'text-3xl' : 'text-2xl'} font-medium leading-relaxed pl-10 text-foreground`}>
                               "{request.voiceTranscript}"
                             </p>
                           </div>
@@ -669,12 +670,25 @@ export function ServiceRequestsPage({
                   ))}
                 </div>
               </div>
+            ) : (
+              <div className="flex items-center justify-center h-[400px]">
+                <div className="text-center">
+                  <Bell className={`${isFullscreen ? 'h-20 w-20' : 'h-12 w-12'} mx-auto mb-3 text-muted-foreground opacity-20`} />
+                  <h3 className={`${isFullscreen ? 'text-lg' : 'text-sm'} mb-1`}>No Pending Requests</h3>
+                  <p className={`${isFullscreen ? 'text-base' : 'text-xs'} text-muted-foreground`}>
+                    All requests have been handled
+                  </p>
+                </div>
+              </div>
             )}
+          </div>
 
-            {/* Serving Now Section - Show after pending */}
-            {servingRequests.length > 0 && (
-              <div className="mb-8">
-                <div className="flex items-center gap-3 mb-4">
+          {/* RIGHT COLUMN - Serving Now */}
+          <div className={`flex-1 overflow-y-auto ${isFullscreen ? 'p-8' : 'p-6'}`}>
+            {/* Serving Now Section */}
+            {servingRequests.length > 0 ? (
+              <div>
+                <div className="flex items-center gap-3 mb-6 sticky top-0 bg-background pb-4 z-10">
                   <div className="h-1 w-12 bg-gradient-to-r from-primary to-transparent rounded-full" />
                   <h3 className={`${isFullscreen ? 'text-xl' : 'text-base'} font-medium`}>
                     Serving Now
@@ -685,7 +699,7 @@ export function ServiceRequestsPage({
                   <div className="flex-1 h-1 bg-gradient-to-l from-primary to-transparent rounded-full" />
                 </div>
 
-                <div className={`grid gap-4 ${isFullscreen ? 'grid-cols-2 gap-6' : 'grid-cols-1'}`}>
+                <div className="grid gap-4">
                   {servingRequests.map((request) => (
                     <ServingRequestCard
                       key={`${request.id}-${userPreferences.serviceRequestDisplayMode}`}
@@ -699,9 +713,19 @@ export function ServiceRequestsPage({
                   ))}
                 </div>
               </div>
+            ) : (
+              <div className="flex items-center justify-center h-[400px]">
+                <div className="text-center">
+                  <CheckCircle2 className={`${isFullscreen ? 'h-20 w-20' : 'h-12 w-12'} mx-auto mb-3 text-muted-foreground opacity-20`} />
+                  <h3 className={`${isFullscreen ? 'text-lg' : 'text-sm'} mb-1`}>No Active Service</h3>
+                  <p className={`${isFullscreen ? 'text-base' : 'text-xs'} text-muted-foreground`}>
+                    Accept requests to begin serving
+                  </p>
+                </div>
+              </div>
             )}
 
-            {/* Completed with Timer Section */}
+            {/* Completed with Timer Section - Show below Serving Now in right column */}
             {completedRequestsWithTimer.length > 0 && (
               <div className="mb-8">
                 <div className="flex items-center gap-3 mb-4">
@@ -715,7 +739,7 @@ export function ServiceRequestsPage({
                   <div className="flex-1 h-1 bg-gradient-to-l from-chart-3/50 to-transparent rounded-full" />
                 </div>
 
-                <div className={`grid gap-4 ${isFullscreen ? 'grid-cols-2 gap-6' : 'grid-cols-1'}`}>
+                <div className="grid gap-4">
                   {completedRequestsWithTimer.map((request) => {
                     const timeLeft = completingRequests[request.id] || 0;
                     return (
@@ -766,19 +790,6 @@ export function ServiceRequestsPage({
                       </Card>
                     );
                   })}
-                </div>
-              </div>
-            )}
-
-            {/* Empty State */}
-            {pendingRequests.length === 0 && servingRequests.length === 0 && completedRequestsWithTimer.length === 0 && (
-              <div className="flex items-center justify-center h-[400px]">
-                <div className="text-center">
-                  <Bell className={`${isFullscreen ? 'h-20 w-20' : 'h-12 w-12'} mx-auto mb-3 text-muted-foreground opacity-20`} />
-                  <h3 className={`${isFullscreen ? 'text-lg' : 'text-sm'} mb-1`}>No Active Requests</h3>
-                  <p className={`${isFullscreen ? 'text-base' : 'text-xs'} text-muted-foreground`}>
-                    All guest requests have been handled
-                  </p>
                 </div>
               </div>
             )}

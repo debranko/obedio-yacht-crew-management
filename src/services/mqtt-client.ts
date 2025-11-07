@@ -139,6 +139,8 @@ class MQTTClientService {
     guestId: string | null;
     pressType: 'single' | 'double' | 'long' | 'shake';
     button: 'main' | 'aux1' | 'aux2' | 'aux3' | 'aux4';
+    voiceTranscript?: string;
+    audioUrl?: string;
   }): void {
     if (!this.isConnected || !this.client) {
       console.warn('⚠️ MQTT not connected, cannot publish button press');
@@ -159,7 +161,9 @@ class MQTTClientService {
       battery: 100,                          // Simulator: always full (0-100)
       rssi: -40,                             // Simulator: always good signal (dBm)
       firmwareVersion: '2.1.0-sim',          // Simulator firmware version
-      sequenceNumber: Date.now()             // Use timestamp as sequence for simulator
+      sequenceNumber: Date.now(),            // Use timestamp as sequence for simulator
+      voiceTranscript: data.voiceTranscript, // Voice transcript (if voice message)
+      audioUrl: data.audioUrl                // Audio URL (if voice message)
     };
 
     this.publish(topic, message);

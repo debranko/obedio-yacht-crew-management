@@ -114,7 +114,7 @@ export function ButtonSimulatorWidget() {
     updateGuest,
     getGuestByLocationId
   } = useAppData();
-  
+
   const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [isMainPressed, setIsMainPressed] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -280,25 +280,18 @@ export function ButtonSimulatorWidget() {
       locationId: location.id,
       guestId: guestAtLocation?.id || null,
       pressType,
-      button
+      button,
+      voiceTranscript: isVoice ? requestLabel : undefined,
+      audioUrl: isVoice ? audioUrl : undefined
     });
 
-    // Backend MQTT service will receive this and create service request in database
-    // We still add it locally for immediate UI feedback (will be synced via WebSocket)
-    const serviceRequest = addServiceRequest({
-      guestName: guestName,
-      guestCabin: location.name,
-      cabinId: location.id,
-      requestType: 'call' as const,
-      priority: requestPriority,
-      voiceTranscript: isVoice 
-        ? `Voice message (${voiceDuration?.toFixed(1)}s): ${requestLabel}`
-        : undefined, // Only set transcript for voice messages
-      voiceAudioUrl: isVoice ? (audioUrl || undefined) : undefined,
-      cabinImage: location.image || 'https://images.unsplash.com/photo-1597126729864-51740ac05236?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080',
-      status: 'pending' as const,
-      notes: requestNotes
-    });
+    // Backend MQTT handler will:
+    // 1. Receive this MQTT message
+    // 2. Create service request in database
+    // 3. Emit WebSocket event back to frontend
+    // 4. Frontend will receive and display via WebSocket subscription
+    //
+    // DO NOT create service request via API here - it would create duplicates!
 
     // Log activity for tracking
     addActivityLog({
@@ -339,33 +332,32 @@ export function ButtonSimulatorWidget() {
       { duration: 5000 }
     );
 
-    console.log("🔘 BUTTON PRESS GENERATED SERVICE REQUEST:", {
+    console.log("🔘 BUTTON PRESS - MQTT MESSAGE SENT:", {
       timestamp: new Date().toISOString(),
       buttonType: isVoice ? "MAIN_HOLD" : requestType === "main" ? "MAIN_TAP" : "AUX_" + requestType.toUpperCase(),
-      location: { 
-        id: location.id, 
-        name: location.name, 
+      location: {
+        id: location.id,
+        name: location.name,
         floor: location.floor,
-        smartButtonId: location.smartButtonId 
+        smartButtonId: location.smartButtonId
       },
-      request: { 
-        id: serviceRequest.id,
-        type: requestType, 
-        label: requestLabel, 
-        isVoice, 
+      requestDetails: {
+        type: requestType,
+        label: requestLabel,
+        isVoice,
         voiceDuration,
         priority: requestPriority,
-        status: 'pending'
       },
-      guest: guestAtLocation ? { 
-        id: guestAtLocation.id, 
+      guest: guestAtLocation ? {
+        id: guestAtLocation.id,
         name: guestName
       } : null,
-      assignedTo: assignedCrew ? { 
-        id: assignedCrew.id, 
-        name: assignedCrew.name, 
-        role: assignedCrew.role 
-      } : null
+      assignedTo: assignedCrew ? {
+        id: assignedCrew.id,
+        name: assignedCrew.name,
+        role: assignedCrew.role
+      } : null,
+      note: "Service request will be created by backend MQTT handler"
     });
   };
 

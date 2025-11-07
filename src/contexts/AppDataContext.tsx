@@ -358,17 +358,17 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         guestName,
         guestCabin: cabinName,
         cabinId: apiReq.locationId || '',
-        requestType: apiReq.priority === 'emergency' ? 'emergency' : 'call',
-        priority: apiReq.priority === 'low' ? 'normal' : apiReq.priority,
-        timestamp: new Date(apiReq.createdAt),
+        requestType: apiReq.requestType,  // Use requestType from API
+        priority: apiReq.priority,
+        timestamp: apiReq.timestamp,  // Already a Date object from API transformation
         voiceTranscript: apiReq.voiceTranscript || undefined,
         voiceAudioUrl: apiReq.voiceAudioUrl || undefined,
-        cabinImage: location?.image || undefined,
+        cabinImage: apiReq.cabinImage || location?.imageUrl || location?.image || undefined,  // Use image from API transform first
         status: apiReq.status as any,
-        assignedTo: apiReq.assignedTo || undefined, // Use backend's assignedTo field directly
-        acceptedAt: apiReq.acceptedAt ? new Date(apiReq.acceptedAt) : undefined,
-        completedAt: apiReq.completedAt ? new Date(apiReq.completedAt) : undefined,
-        notes: apiReq.message || undefined,
+        assignedTo: apiReq.assignedTo || undefined,
+        acceptedAt: apiReq.acceptedAt,  // Already Date or undefined
+        completedAt: apiReq.completedAt,  // Already Date or undefined
+        notes: apiReq.notes || undefined,
       };
     });
 

@@ -48,7 +48,22 @@
       "Bash(cmd /c \"taskkill /F /PID 40048 /PID 42792 /PID 47100 /PID 39704 /PID 31036 /PID 7340\")",
       "Bash(cmd /c \"taskkill /F /PID 38100\")",
       "Bash(cmd /c \"dir node_modules\\.vite\")",
-      "Bash(npx vite --force)"
+      "Bash(npx vite --force)",
+      "Bash(echo:*)",
+      "Bash(git restore:*)",
+      "Bash(git rm:*)",
+      "Bash(del backendcheck-crew-users.js)",
+      "Bash(cmd /c \"del backend\\check-crew-users.js\")",
+      "Bash(cmd //c \"taskkill //F //PID 34280\")",
+      "Bash(del set-crew-on-duty.js check-crew-users.js)",
+      "Bash(cmd /c \"del backend\\set-crew-on-duty.js backend\\check-crew-users.js\")",
+      "Bash(cmd /c \"del backend\\check-service-requests.js\")",
+      "Bash(cmd /c \"cd backend && if not exist uploads mkdir uploads && echo *> uploads\\.gitignore && dir uploads\")",
+      "Bash(cmd //c \"taskkill //F //PID 61908\")",
+      "Bash(cmd /c \"taskkill /F /PID 39992\")",
+      "Bash(cmd /c \"taskkill /F /PID 62360\")",
+      "Bash(cmd //c \"taskkill //F //PID 62360\")",
+      "Bash(powershell Stop-Process -Id 62360 -Force)"
     ],
     "deny": [],
     "ask": []

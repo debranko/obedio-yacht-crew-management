@@ -326,14 +326,24 @@ class MQTTService {
       // Create service request using DERIVED values (with or without guest)
       const serviceRequest = await prisma.serviceRequest.create({
         data: {
-          guestId: guest?.id || null,
-          locationId: device.locationId || message.locationId || null,
+          // Use Prisma relation syntax instead of direct foreign keys
+          ...(guest?.id && {
+            guest: {
+              connect: { id: guest.id }
+            }
+          }),
+          ...((device.locationId || message.locationId) && {
+            location: {
+              connect: { id: device.locationId || message.locationId }
+            }
+          }),
           status: 'pending',
           priority,
           requestType,
           notes,
           guestName: guest ? `${guest.firstName} ${guest.lastName}` : 'Guest',
           guestCabin: device.location?.name || 'Unknown',
+          voiceTranscript: message.voiceTranscript || null,
         },
         include: {
           guest: true,

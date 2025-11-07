@@ -17,8 +17,10 @@ export function WindyWidget({ className }: WindyWidgetProps) {
 
   // Get yacht's current coordinates from settings
   const coords = getCurrentCoordinates();
-  const lat = coords.latitude;
-  const lon = coords.longitude;
+
+  // Default coordinates (Monaco) if not set
+  const lat = coords?.latitude ?? 43.7384;
+  const lon = coords?.longitude ?? 7.4246;
   const zoom = 8;
 
   // Windy embed URL with custom parameters
