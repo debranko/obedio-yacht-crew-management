@@ -10,6 +10,7 @@ export interface CrewMemberExtended {
   email?: string;
   joinDate?: string;
   role?: string;
+  userId?: string;  // Link to User account (for authentication)
 }
 
 // Role & Permission Types

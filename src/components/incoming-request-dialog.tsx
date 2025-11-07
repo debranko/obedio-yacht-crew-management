@@ -30,6 +30,8 @@ import { motion } from "motion/react";
 import { ServiceRequest, InteriorTeam } from "../contexts/AppDataContext";
 import { useAppData } from "../contexts/AppDataContext";
 import { useWebSocket } from "../hooks/useWebSocket";
+import { useAcceptServiceRequest } from "../hooks/useServiceRequestsApi";
+import { useAuth } from "../contexts/AuthContext";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "./ui/dialog";
 import { toast } from "sonner";
@@ -45,7 +47,9 @@ export function IncomingRequestDialog({
   onClose,
   request,
 }: IncomingRequestDialogProps) {
-  const { acceptServiceRequest, delegateServiceRequest, forwardServiceRequest, crewMembers, getCurrentDutyStatus } = useAppData();
+  const { user } = useAuth();
+  const { delegateServiceRequest, forwardServiceRequest, crewMembers, getCurrentDutyStatus } = useAppData();
+  const { mutate: acceptRequest } = useAcceptServiceRequest();
   const [timeAgo, setTimeAgo] = useState<string>("Just now");
   const [showDelegateDropdown, setShowDelegateDropdown] = useState(false);
   const [showAvailableCrew, setShowAvailableCrew] = useState(false);
@@ -106,17 +110,27 @@ export function IncomingRequestDialog({
   const handleAccept = () => {
     if (!request) return;
 
-    // Get current user ID (in production, from auth context)
-    const currentUserId = onDutyCrew[0]?.id || '';
+    // Get current crew member from authenticated user
+    const currentCrewMember = crewMembers.find(crew => crew.userId === user?.id);
 
-    if (!currentUserId) {
-      toast.error('No crew member on duty to accept request');
+    if (!currentCrewMember) {
+      toast.error('You must be associated with a crew member to accept requests');
       return;
     }
 
-    acceptServiceRequest(request.id, currentUserId);
-    toast.success(`Request from ${request.guestName} accepted`);
-    onClose();
+    // Call BACKEND API (not local state!)
+    acceptRequest(
+      { id: request.id, crewId: currentCrewMember.id },
+      {
+        onSuccess: () => {
+          toast.success(`Request from ${request.guestName} accepted`);
+          onClose();
+        },
+        onError: (error: any) => {
+          toast.error(error.message || 'Failed to accept request');
+        }
+      }
+    );
   };
 
   const handleDelegateClick = () => {

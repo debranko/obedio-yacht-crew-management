@@ -221,6 +221,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       phone: member.phone ?? member.contact,
       notes: member.notes,
       shift: member.shift ?? undefined,
+      userId: member.userId ?? undefined,  // Map userId from backend
     }));
   }, [apiCrewMembers]);
 
