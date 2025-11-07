@@ -118,14 +118,15 @@ export default function ServiceRequestsNew() {
     toast.success(`Request from ${guestName} completed`);
   };
 
-  // Filter requests into sections
+  // Filter requests into sections - FIXED to match actual status values!
   const pendingRequests = useMemo(() =>
     serviceRequests.filter(req => req.status === 'pending'),
     [serviceRequests]
   );
 
+  // Serving = accepted OR delegated (copy from old service-requests.tsx line 222)
   const servingRequests = useMemo(() =>
-    serviceRequests.filter(req => req.status === 'serving'),
+    serviceRequests.filter(req => req.status === 'accepted' || req.status === 'delegated'),
     [serviceRequests]
   );
 
