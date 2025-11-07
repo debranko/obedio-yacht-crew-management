@@ -150,40 +150,95 @@ export default function ServiceRequestsNew() {
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto p-6">
         <div className="space-y-6">
-          {/* Phase 2 Progress */}
-          <div className="bg-muted/50 rounded-lg p-4 border border-border">
-            <h3 className="font-semibold mb-2">Phase 2: Core Features ✅</h3>
-            <ul className="text-sm text-muted-foreground space-y-1">
-              <li>✅ REAL audio playback (not fake!)</li>
-              <li>✅ Accept/Delegate/Complete handlers</li>
-              <li>✅ Data filtering (pending/serving/completed)</li>
-              <li>✅ Crew organization (on-duty/available)</li>
-            </ul>
+          {/* PENDING SECTION */}
+          <div>
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <span className="text-warning">Pending</span>
+              <span className="text-sm font-normal text-muted-foreground">({pendingRequests.length})</span>
+            </h2>
+            {pendingRequests.length === 0 ? (
+              <div className="bg-muted/50 rounded-lg p-8 text-center text-muted-foreground">
+                No pending requests
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {pendingRequests.map(request => (
+                  <div key={request.id} className="bg-card rounded-lg p-4 border border-border">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="font-semibold">{request.guestName}</div>
+                        <div className="text-sm text-muted-foreground">{request.guestCabin}</div>
+                        {request.voiceTranscript && (
+                          <div className="text-sm mt-2">{request.voiceTranscript}</div>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {request.priority}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Request Statistics */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-warning/10 border border-warning rounded-lg p-4">
-              <div className="text-2xl font-bold text-warning">{pendingRequests.length}</div>
-              <div className="text-sm text-muted-foreground">Pending</div>
-            </div>
-            <div className="bg-accent/10 border border-accent rounded-lg p-4">
-              <div className="text-2xl font-bold text-accent">{servingRequests.length}</div>
-              <div className="text-sm text-muted-foreground">Serving</div>
-            </div>
-            <div className="bg-success/10 border border-success rounded-lg p-4">
-              <div className="text-2xl font-bold text-success">{completedRequests.length}</div>
-              <div className="text-sm text-muted-foreground">Completed</div>
-            </div>
+          {/* SERVING SECTION */}
+          <div>
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <span className="text-accent">Serving</span>
+              <span className="text-sm font-normal text-muted-foreground">({servingRequests.length})</span>
+            </h2>
+            {servingRequests.length === 0 ? (
+              <div className="bg-muted/50 rounded-lg p-8 text-center text-muted-foreground">
+                No active requests
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {servingRequests.map(request => (
+                  <div key={request.id} className="bg-card rounded-lg p-4 border border-accent">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="font-semibold">{request.guestName}</div>
+                        <div className="text-sm text-muted-foreground">{request.guestCabin}</div>
+                        {request.assignedTo && (
+                          <div className="text-sm text-accent mt-1">Assigned to: {request.assignedTo}</div>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {request.status}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Crew Status */}
-          <div className="bg-card rounded-lg p-4 border border-border">
-            <h3 className="font-semibold mb-2">Crew Status</h3>
-            <div className="text-sm text-muted-foreground">
-              <p>On Duty: {onDutyCrew.length}</p>
-              <p>Available: {availableCrew.length}</p>
-            </div>
+          {/* COMPLETED SECTION */}
+          <div>
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <span className="text-success">Completed</span>
+              <span className="text-sm font-normal text-muted-foreground">({completedRequests.length})</span>
+            </h2>
+            {completedRequests.length === 0 ? (
+              <div className="bg-muted/50 rounded-lg p-8 text-center text-muted-foreground">
+                No completed requests
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {completedRequests.map(request => (
+                  <div key={request.id} className="bg-card rounded-lg p-4 border border-success/50">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="font-semibold">{request.guestName}</div>
+                        <div className="text-sm text-muted-foreground">{request.guestCabin}</div>
+                      </div>
+                      <div className="text-xs text-success">✓</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
