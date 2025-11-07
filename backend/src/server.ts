@@ -187,20 +187,26 @@ async function startServer() {
     // Start MQTT Monitor Dashboard (temporarily disabled due to port conflict)
     // mqttMonitor.start();
     
-    httpServer.listen(PORT, () => {
+    httpServer.listen(PORT, '0.0.0.0', () => {
       console.log(`
 🚀 Obedio Server Started Successfully!
 
 📍 Server Details:
-   • Host: localhost:${PORT}
+   • Host: 0.0.0.0:${PORT} (accessible from network)
+   • Local: localhost:${PORT}
+   • Network: 192.168.5.150:${PORT}
    • Environment: ${process.env.NODE_ENV || 'development'}
-   
+
 🌐 Access URLs:
    • API Health: http://localhost:${PORT}/api/health
    • Auth: http://localhost:${PORT}/api/auth/login
    • WebSocket: ws://localhost:${PORT}
    • MQTT Monitor: http://localhost:${process.env.MQTT_MONITOR_PORT || 8889}
    • API Docs: http://localhost:${PORT}/api-docs 📚
+
+📱 Wear OS Access:
+   • API: http://192.168.5.150:${PORT}/api
+   • WebSocket: ws://192.168.5.150:${PORT}
 
 📊 Available Endpoints:
    • GET /api/crew - List crew members

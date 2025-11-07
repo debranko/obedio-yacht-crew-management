@@ -18,6 +18,32 @@ r.get('/', asyncHandler(async (_, res) => {
 }));
 
 /**
+ * Get filtered crew members (for Wear OS app)
+ * Supports filtering by status and department
+ */
+r.get('/members', asyncHandler(async (req, res) => {
+  const { status, department } = req.query;
+
+  const where: any = {};
+
+  if (status && status !== 'all') {
+    where.status = status;
+  }
+
+  if (department && department !== 'all') {
+    where.department = department;
+  }
+
+  const data = await prisma.crewMember.findMany({
+    where,
+    orderBy: { name: 'asc' },
+    include: { user: true }
+  });
+
+  res.json(apiSuccess(data));
+}));
+
+/**
  * Create new crew member WITH user account
  * Automatically generates username and password
  */
