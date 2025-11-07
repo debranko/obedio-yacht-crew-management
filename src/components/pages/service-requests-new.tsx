@@ -14,21 +14,22 @@ import { useAppData } from '../../contexts/AppDataContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'sonner';
 import { Play, Volume2 } from 'lucide-react';
+import { useAcceptServiceRequest, useCompleteServiceRequest } from '../../hooks/useServiceRequestsApi';
 
 export default function ServiceRequestsNew() {
   // Auth
   const { user } = useAuth();
 
-  // Data & Actions - copied from pop-up line 48
+  // Data - from AppDataContext
   const {
     serviceRequests,
-    acceptServiceRequest,
-    delegateServiceRequest,
-    forwardServiceRequest,
-    completeServiceRequest,
     crewMembers,
     getCurrentDutyStatus
   } = useAppData();
+
+  // BACKEND API mutations - copied from OLD service-requests.tsx (WORKS!)
+  const { mutate: acceptRequest } = useAcceptServiceRequest();
+  const { mutate: completeRequest } = useCompleteServiceRequest();
 
   // State for dropdowns and audio - copied from pop-up lines 50-53
   const [showDelegateDropdown, setShowDelegateDropdown] = useState(false);
@@ -92,30 +93,41 @@ export default function ServiceRequestsNew() {
     }
   };
 
-  // Accept handler - copied from pop-up lines 106-120
+  // Accept handler - FIXED to use BACKEND API (like old service-requests.tsx)
   const handleAccept = (requestId: string, guestName: string) => {
-    const currentUserId = onDutyCrew[0]?.id || '';
+    // Get current crew member from authenticated user
+    const currentCrewMember = crewMembers.find(crew => crew.userId === user?.id);
 
-    if (!currentUserId) {
-      toast.error('No crew member on duty to accept request');
+    if (!currentCrewMember) {
+      toast.error('You must be associated with a crew member to accept requests');
       return;
     }
 
-    acceptServiceRequest(requestId, currentUserId);
-    toast.success(`Request from ${guestName} accepted`);
+    // Call BACKEND API (not local state!)
+    acceptRequest(
+      { id: requestId, crewId: currentCrewMember.id },
+      {
+        onSuccess: () => {
+          toast.success(`Request from ${guestName} accepted`);
+        },
+        onError: (error: any) => {
+          toast.error(error.message || 'Failed to accept request');
+        }
+      }
+    );
   };
 
-  // Delegate handler - copied from pop-up lines 126-133
-  const handleSelectCrew = (requestId: string, crewId: string, crewName: string) => {
-    delegateServiceRequest(requestId, crewId);
-    toast.success(`Request delegated to ${crewName}`);
-    setShowDelegateDropdown(false);
-  };
-
-  // Complete handler
+  // Complete handler - FIXED to use BACKEND API
   const handleComplete = (requestId: string, guestName: string) => {
-    completeServiceRequest(requestId);
-    toast.success(`Request from ${guestName} completed`);
+    // Call BACKEND API (not local state!)
+    completeRequest(requestId, {
+      onSuccess: () => {
+        toast.success(`Request from ${guestName} completed`);
+      },
+      onError: (error: any) => {
+        toast.error(error.message || 'Failed to complete request');
+      }
+    });
   };
 
   // Filter requests into sections - FIXED to match actual status values!
