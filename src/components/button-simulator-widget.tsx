@@ -457,13 +457,20 @@ export function ButtonSimulatorWidget() {
 
       const data = await response.json();
 
-      // Backend returns { success, transcript, duration } directly (no wrapper)
-      if (data.success && data.transcript) {
-        console.log('✅ Transcription successful:', data.transcript);
-        toast.success('Voice message transcribed!', {
-          description: data.transcript.substring(0, 100)
+      // Backend returns { success, transcript, translation, language, duration }
+      // We use TRANSLATION (English) for crew to read, but keep original AUDIO
+      const englishText = data.translation || data.transcript; // Fallback to transcript if already English
+
+      if (data.success && englishText) {
+        console.log('✅ Transcription successful:', {
+          original: data.transcript,
+          english: englishText,
+          language: data.language
         });
-        return data.transcript;
+        toast.success('Voice message transcribed!', {
+          description: englishText.substring(0, 100)
+        });
+        return englishText; // Return ENGLISH translation for crew
       }
 
       return null;
