@@ -77,6 +77,7 @@ export function ServiceRequestsPage({
     serviceRequestHistory,
     clearServiceRequestHistory,
     crewMembers,
+    getCurrentDutyStatus,
   } = useAppData();
 
   // Get user preferences from backend API
@@ -238,9 +239,10 @@ export function ServiceRequestsPage({
     return { pending, urgent, emergency, accepted };
   }, [serviceRequests]);
 
-  // Get on-duty crew members for delegation
-  const onDutyCrewMembers = crewMembers.filter(
-    (crew) => crew.status === 'on-duty' && crew.department === 'Interior'
+  // Get on-duty crew members for delegation (using duty roster system)
+  const dutyStatus = getCurrentDutyStatus();
+  const onDutyCrewMembers = dutyStatus.onDuty.filter(
+    (crew) => crew.department === 'Interior'
   );
 
   const handleAccept = (request: ServiceRequest) => {
