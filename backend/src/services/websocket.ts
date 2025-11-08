@@ -66,7 +66,7 @@ export class WebSocketService {
 
       // Join user-specific room for targeted messages
       socket.join(`user:${userId}`);
-      
+
       logger.info(`User ${userId} joined room: user:${userId}`);
     });
   }
