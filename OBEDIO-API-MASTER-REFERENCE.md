@@ -1,5 +1,5 @@
 # OBEDIO API MASTER REFERENCE
-**Living Document - Updated: 2025-11-06 (Guests API: Type/Status Enums Fix, Date Format Fix)**
+**Living Document - Updated: 2025-11-09 (Devices API: Added GET /me endpoint, Watch heartbeat integration)**
 **Project**: Luxury Minimal Web App Design (Obedio Yacht Crew Management)
 
 ---
@@ -164,6 +164,7 @@
 | `/` | GET | `devices.view` | List all devices with filters | `type`, `status`, `locationId`, `crewMemberId` | None |
 | `/logs` | GET | `devices.view` | Get all device logs with filters & pagination | `deviceId`, `status`, `startDate`, `endDate`, `search`, `page`, `limit`, `eventType` | None |
 | `/stats/summary` | GET | `devices.view` | Get device statistics (total, online, offline, low battery, by type) | None | None |
+| `/me` | GET | ✅ Bearer | Get current user's assigned device (watch) - used by watch app to discover device ID | None | None |
 | `/:id` | GET | `devices.view` | Get single device (includes location, crew, last 50 logs) | None | None |
 | `/` | POST | `devices.add` | Create new device | None | `DeviceDTO` |
 | `/:id` | PUT | `devices.edit` | Update device (broadcasts status changes) | None | `Partial<DeviceDTO>` |
@@ -176,7 +177,12 @@
 **Log Transformation**: Backend transforms logs before sending (includes device name, location, formatted message)
 **MQTT Integration**: Test signal sends MQTT command to smart buttons
 **WebSocket Events**: `device:created`, `device:updated`, `device:status-changed`
-**Used By**: `device-manager.tsx`, `device-manager-full.tsx`
+**Used By**: `device-manager.tsx`, `device-manager-full.tsx`, Wear OS watch app (heartbeat via PUT /:id)
+
+**Watch App Integration** (Updated 2025-11-09):
+- Watch discovers device ID via `GET /api/devices/me` on launch
+- Sends heartbeat every 30s via `PUT /api/devices/:id` with `{ batteryLevel, signalStrength, status, lastSeen }`
+- Uses existing device update endpoint (no custom /me/heartbeat needed)
 
 ---
 
