@@ -523,4 +523,56 @@ function formatEventMessage(eventType: string, eventData: any): string {
   }
 }
 
+/**
+ * PUT /api/devices/me/heartbeat
+ * Update watch device heartbeat for current authenticated user
+ * Watch app sends battery, signal, status without needing to know its device ID
+ */
+router.put('/me/heartbeat', asyncHandler(async (req, res) => {
+  const user = (req as any).user;
+
+  if (!user) {
+    return res.status(401).json(apiError('Unauthorized', 'UNAUTHORIZED'));
+  }
+
+  // Find crew member for this user
+  const crewMember = await prisma.crewMember.findUnique({
+    where: { userId: user.id },
+    include: {
+      devices: {
+        where: { type: 'watch' }
+      }
+    }
+  });
+
+  if (!crewMember || crewMember.devices.length === 0) {
+    return res.status(404).json(apiError('Watch device not found for this user', 'NOT_FOUND'));
+  }
+
+  const watchDevice = crewMember.devices[0]; // Assume one watch per crew member
+
+  // Extract heartbeat data from request body
+  const { batteryLevel, signalStrength, status = 'online' } = req.body;
+
+  // Update device
+  const updatedDevice = await prisma.device.update({
+    where: { id: watchDevice.id },
+    data: {
+      batteryLevel: batteryLevel !== undefined ? batteryLevel : watchDevice.batteryLevel,
+      signalStrength: signalStrength !== undefined ? signalStrength : watchDevice.signalStrength,
+      status,
+      lastSeen: new Date()
+    },
+    include: {
+      location: true,
+      crewMember: true
+    }
+  });
+
+  // Broadcast device status change to all connected clients
+  websocketService.emitDeviceStatusChanged(updatedDevice);
+
+  res.json(apiSuccess(updatedDevice));
+}));
+
 export default router;

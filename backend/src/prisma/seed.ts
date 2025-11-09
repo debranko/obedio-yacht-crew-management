@@ -20,9 +20,9 @@ async function seed() {
     await prisma.guest.deleteMany();
     await prisma.location.deleteMany();
     await prisma.device.deleteMany();
-    await prisma.smartButton.deleteMany();
+    // smartButton model removed - devices auto-created by MQTT handler
     await prisma.crewMember.deleteMany();
-    await prisma.shiftConfig.deleteMany();
+    await prisma.shift.deleteMany();
     await prisma.user.deleteMany();
 
     console.log('✅ Cleared existing data');
@@ -44,7 +44,7 @@ async function seed() {
 
     // Create shift configurations
     const shifts = await Promise.all([
-      prisma.shiftConfig.create({
+      prisma.shift.create({
         data: {
           id: 'morning',
           name: 'Morning Shift',
@@ -53,7 +53,7 @@ async function seed() {
           color: '#3b82f6'
         }
       }),
-      prisma.shiftConfig.create({
+      prisma.shift.create({
         data: {
           id: 'afternoon',
           name: 'Afternoon Shift',
@@ -62,7 +62,7 @@ async function seed() {
           color: '#f59e0b'
         }
       }),
-      prisma.shiftConfig.create({
+      prisma.shift.create({
         data: {
           id: 'night',
           name: 'Night Shift',
@@ -85,9 +85,7 @@ async function seed() {
           type: 'OUTDOOR',
           description: 'Open-air lounge area with sun beds and panoramic views',
           floor: 'Sun Deck',
-          capacity: 12,
-          status: 'ACTIVE',
-          smartButtonId: 'BTN-SUN-1',
+          smartButtonId: 'BTN-001',
           image: 'https://images.unsplash.com/photo-1686845928517-8ffc9009a45d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080',
           doNotDisturb: false
         }
@@ -100,9 +98,7 @@ async function seed() {
           type: 'COMMON',
           description: 'Fitness center with state-of-the-art equipment',
           floor: 'Bridge Deck',
-          capacity: 4,
-          status: 'ACTIVE',
-          smartButtonId: 'BTN-BRG-1',
+          smartButtonId: 'BTN-002',
           image: 'https://images.unsplash.com/photo-1719024483000-e72451273b5c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080',
           doNotDisturb: false
         }
@@ -115,9 +111,7 @@ async function seed() {
           type: 'CABIN',
           description: 'Luxurious master suite with private amenities',
           floor: 'Sun Deck Aft (Owner\'s Deck)',
-          capacity: 2,
-          status: 'ACTIVE',
-          smartButtonId: 'BTN-OWNER-1',
+          smartButtonId: 'BTN-003',
           image: 'https://images.unsplash.com/photo-1753505889211-9cfbac527474?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080',
           doNotDisturb: true // DND active for owner
         }
@@ -129,9 +123,7 @@ async function seed() {
           type: 'CABIN',
           description: 'Premium guest stateroom with ensuite',
           floor: 'Sun Deck Aft (Owner\'s Deck)',
-          capacity: 2,
-          status: 'ACTIVE',
-          smartButtonId: 'BTN-OWNER-2',
+          smartButtonId: 'BTN-004',
           image: 'https://images.unsplash.com/photo-1597126729864-51740ac05236?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080',
           doNotDisturb: true // DND active for VIP
         }
@@ -143,9 +135,7 @@ async function seed() {
           type: 'COMMON',
           description: 'Private office and study area',
           floor: 'Sun Deck Aft (Owner\'s Deck)',
-          capacity: 2,
-          status: 'ACTIVE',
-          smartButtonId: 'BTN-OWNER-3',
+          smartButtonId: 'BTN-005',
           image: 'https://images.unsplash.com/photo-1697124510316-13efcb2e3abd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080'
         }
       }),
@@ -156,9 +146,7 @@ async function seed() {
           type: 'COMMON',
           description: 'Formal dining area for elegant meals',
           floor: 'Sun Deck Aft (Owner\'s Deck)',
-          capacity: 12,
-          status: 'ACTIVE',
-          smartButtonId: 'BTN-OWNER-4',
+          smartButtonId: 'BTN-006',
           image: 'https://images.unsplash.com/photo-1674606878551-f424ad6ce965?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080'
         }
       }),
@@ -169,9 +157,7 @@ async function seed() {
           type: 'COMMON',
           description: 'Primary living and social space',
           floor: 'Sun Deck Aft (Owner\'s Deck)',
-          capacity: 14,
-          status: 'ACTIVE',
-          smartButtonId: 'BTN-OWNER-6',
+          smartButtonId: 'BTN-007',
           image: 'https://images.unsplash.com/photo-1674606878551-f424ad6ce965?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080'
         }
       }),
@@ -183,9 +169,7 @@ async function seed() {
           type: 'COMMON',
           description: 'Professional meeting room with AV equipment',
           floor: 'Main Deck',
-          capacity: 10,
-          status: 'ACTIVE',
-          smartButtonId: 'BTN-MAIN-1',
+          smartButtonId: 'BTN-008',
           image: 'https://images.unsplash.com/photo-1674606878551-f424ad6ce965?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080'
         }
       }),
@@ -197,9 +181,7 @@ async function seed() {
           type: 'CABIN',
           description: 'Guest stateroom with comfortable accommodations',
           floor: 'Lower Deck',
-          capacity: 2,
-          status: 'ACTIVE',
-          smartButtonId: 'BTN-LWR-1',
+          smartButtonId: 'BTN-009',
           image: 'https://images.unsplash.com/photo-1597126729864-51740ac05236?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080'
         }
       })
@@ -259,9 +241,9 @@ async function seed() {
           languages: ['English', 'French'],
           locationId: 'owner-1', // Owner's Stateroom
           cabin: 'Owner\'s Stateroom', // Legacy field
-          checkInDate: '2024-01-15',
+          checkInDate: new Date('2024-01-15T14:00:00Z'),
           checkInTime: '14:00',
-          checkOutDate: '2024-01-22',
+          checkOutDate: new Date('2024-01-22T11:00:00Z'),
           checkOutTime: '11:00',
           doNotDisturb: true, // Matches location DND
           allergies: ['Shellfish'],
@@ -280,9 +262,9 @@ async function seed() {
           languages: ['English', 'Mandarin'],
           locationId: 'owner-2', // VIP Cabin
           cabin: 'VIP Cabin', // Legacy field
-          checkInDate: '2024-01-15',
+          checkInDate: new Date('2024-01-15T14:00:00Z'),
           checkInTime: '14:00',
-          checkOutDate: '2024-01-22',
+          checkOutDate: new Date('2024-01-22T11:00:00Z'),
           checkOutTime: '11:00',
           doNotDisturb: true, // Matches location DND
           dietaryRestrictions: ['Vegetarian'],
@@ -300,9 +282,9 @@ async function seed() {
           languages: ['English'],
           locationId: 'lower-1', // Cabin 6
           cabin: 'Cabin 6', // Legacy field
-          checkInDate: '2024-01-16',
+          checkInDate: new Date('2024-01-16T14:00:00Z'),
           checkInTime: '14:00',
-          checkOutDate: '2024-01-23',
+          checkOutDate: new Date('2024-01-23T11:00:00Z'),
           checkOutTime: '11:00',
           allergies: ['Nuts'],
           favoriteFoods: ['Steak'],
@@ -313,45 +295,9 @@ async function seed() {
 
     console.log('✅ Created guests with proper location relationships');
 
-    // Create smart buttons
-    const smartButtons = await Promise.all([
-      prisma.smartButton.create({
-        data: {
-          id: 'smart-btn-1',
-          deviceId: 'BTN-OWNER-1',
-          name: 'Owner\'s Stateroom Button',
-          macAddress: '00:11:22:33:44:01',
-          status: 'ONLINE',
-          batteryLevel: 85,
-          locationId: 'owner-1',
-          assignedLocation: 'Owner\'s Stateroom',
-          mainButtonFunction: 'service_call',
-          auxButton1Function: 'dnd_toggle',
-          auxButton2Function: 'lights_control',
-          auxButton3Function: 'housekeeping',
-          auxButton4Function: 'climate_control'
-        }
-      }),
-      prisma.smartButton.create({
-        data: {
-          id: 'smart-btn-2',
-          deviceId: 'BTN-OWNER-2',
-          name: 'VIP Cabin Button',
-          macAddress: '00:11:22:33:44:02',
-          status: 'ONLINE',
-          batteryLevel: 92,
-          locationId: 'owner-2',
-          assignedLocation: 'VIP Cabin',
-          mainButtonFunction: 'service_call',
-          auxButton1Function: 'dnd_toggle',
-          auxButton2Function: 'lights_control',
-          auxButton3Function: 'housekeeping',
-          auxButton4Function: 'climate_control'
-        }
-      })
-    ]);
-
-    console.log('✅ Created smart buttons');
+    // Smart buttons no longer seeded - they auto-register via MQTT when first used
+    // Virtual Device objects will be created automatically by backend/src/services/mqtt.service.ts
+    // when button simulator sends MQTT messages to obedio/button/{deviceId}/press
 
     // Create sample service requests
     const serviceRequests = await Promise.all([
@@ -362,9 +308,9 @@ async function seed() {
           cabinId: 'owner-1',
           locationId: 'owner-1',
           guestId: 'guest-1',
-          requestType: 'CALL',
-          priority: 'NORMAL',
-          status: 'PENDING',
+          requestType: 'call',
+          priority: 'normal',
+          status: 'pending',
           voiceTranscript: 'Could we have a bottle of champagne and some fresh towels brought to the sun deck please?',
           cabinImage: 'https://images.unsplash.com/photo-1753505889211-9cfbac527474?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080'
         }
@@ -376,9 +322,9 @@ async function seed() {
           cabinId: 'owner-2',
           locationId: 'owner-2',
           guestId: 'guest-2',
-          requestType: 'CALL',
-          priority: 'URGENT',
-          status: 'PENDING',
+          requestType: 'call',
+          priority: 'urgent',
+          status: 'pending',
           voiceTranscript: 'We would like evening turndown service at 8 PM.',
           cabinImage: 'https://images.unsplash.com/photo-1597126729864-51740ac05236?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080'
         }
@@ -439,7 +385,7 @@ async function seed() {
    • 9 Locations (including DND locations)
    • 3 Crew Members
    • 3 Guests (with proper foreign key relationships)
-   • 2 Smart Buttons
+   • 0 Smart Buttons (auto-register via MQTT)
    • 2 Service Requests
    • 3 Duty Roster Assignments
    • 1 Activity Log

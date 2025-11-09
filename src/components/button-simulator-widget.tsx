@@ -704,6 +704,19 @@ export function ButtonSimulatorWidget() {
             )}
           </SelectContent>
         </Select>
+
+        {/* Button ID Display */}
+        {selectedLocation && currentLocation && (
+          <div className="flex items-center gap-2 px-1 py-1 text-[11px] bg-neutral-900/40 rounded border border-accent/10">
+            <span className="font-mono font-semibold text-accent">
+              {currentLocation.smartButtonId || 'NO-BTN'}
+            </span>
+            <span className="text-muted-foreground opacity-40">→</span>
+            <span className="text-muted-foreground">
+              {currentLocation.smartButtonId ? currentLocation.name : 'Unassigned'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Button Simulator */}

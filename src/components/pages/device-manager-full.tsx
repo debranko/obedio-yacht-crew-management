@@ -43,6 +43,22 @@ import {
 import { toast } from 'sonner';
 import { Progress } from '../ui/progress';
 
+// Helper function to format device subType for display
+const formatDeviceType = (subType: string | null | undefined): string => {
+  if (!subType) return 'Unknown';
+
+  const typeMap: Record<string, string> = {
+    'wear_os': 'Wear OS',
+    'esp32': 'ESP32',
+    'lora_wifi': 'LoRa-WiFi',
+    'lora_868': 'LoRa 868',
+    'lora_915': 'LoRa 915',
+    'lora_433': 'LoRa 433',
+  };
+
+  return typeMap[subType] || subType.toUpperCase();
+};
+
 export function DeviceManagerPage() {
   const [activeTab, setActiveTab] = useState('buttons');
   const [searchQuery] = useState('');
@@ -338,7 +354,7 @@ export function DeviceManagerPage() {
                 <TableCell>{device.name}</TableCell>
                 <TableCell>
                   <Badge variant="outline">
-                    {device.subType?.toUpperCase()}
+                    {formatDeviceType(device.subType)}
                   </Badge>
                 </TableCell>
                 <TableCell>
@@ -536,7 +552,7 @@ export function DeviceManagerPage() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline">
-                      {device.subType?.toUpperCase()}
+                      {formatDeviceType(device.subType)}
                     </Badge>
                   </TableCell>
                   <TableCell>
