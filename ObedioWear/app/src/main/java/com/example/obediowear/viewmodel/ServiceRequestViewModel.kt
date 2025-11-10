@@ -47,8 +47,8 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    // WebSocket connection status
-    val connectionStatus = WebSocketManager.connectionStatus
+    // MQTT connection status (watch uses MQTT, not WebSocket)
+    val connectionStatus = com.example.obediowear.data.mqtt.MqttManager.connectionStatus
 
     // Current crew member ID - discovered from device assignment (no hardcoding!)
     private var currentCrewMemberId: String? = null
@@ -57,17 +57,17 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
     private var myDeviceId: String? = null
 
     init {
-        // Connect to WebSocket server
-        WebSocketManager.connect()
+        // Watch uses MQTT ONLY for notifications (not WebSocket)
+        // WebSocket is for web clients only
+        // WebSocketManager.connect()
 
         // Connect to MQTT broker (for device registration and notifications)
         com.example.obediowear.data.mqtt.MqttManager.connect(getApplication())
 
-        // Listen for incoming service requests
-        listenForNewRequests()
-
-        // Listen for request updates
-        listenForRequestUpdates()
+        // MQTT handles incoming requests via FullScreenIncomingRequestActivity
+        // No need to listen here - MainActivity doesn't show incoming requests
+        // listenForNewRequests()
+        // listenForRequestUpdates()
 
         // Load crew members for delegation
         loadCrewMembers()
@@ -95,14 +95,16 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
                 Log.d("Device", "Looking up device by MAC: $macAddress")
                 val response = apiService.getDeviceByMacAddress(macAddress)
 
-                if (response.success && response.data.isNotEmpty()) {
-                    // Extract device ID from first (and should be only) result
-                    val deviceData = response.data[0].asJsonObject
+                if (response.success) {
+                    // Extract device ID from response (single device object, not a list)
+                    val deviceData = response.data.asJsonObject
                     myDeviceId = deviceData.get("id")?.asString
                     Log.i("Device", "✅ Discovered my device ID: $myDeviceId")
 
                     // Also extract crew member ID if assigned
-                    currentCrewMemberId = deviceData.get("crewMemberId")?.asString
+                    // API returns crewMember object, not crewMemberId directly
+                    val crewMember = deviceData.getAsJsonObject("crewMember")
+                    currentCrewMemberId = crewMember?.get("id")?.asString
                     if (currentCrewMemberId != null) {
                         Log.i("Device", "✅ Assigned to crew member: $currentCrewMemberId")
                     } else {
@@ -207,6 +209,44 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
     }
 
     /**
+     * Accept a service request by ID (used when launched from FullScreenIncomingRequestActivity)
+     */
+    fun acceptRequestById(requestId: String) {
+        // Check if watch is assigned to a crew member
+        if (currentCrewMemberId == null) {
+            Log.e("Accept", "Cannot accept request - watch not assigned to crew yet")
+            // Wait a bit and retry (device ID discovery might still be in progress)
+            viewModelScope.launch {
+                delay(1000)
+                if (currentCrewMemberId != null) {
+                    acceptRequestById(requestId)
+                } else {
+                    Log.e("Accept", "Still not assigned after waiting - giving up")
+                }
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                Log.i("Accept", "Accepting request $requestId for crew member $currentCrewMemberId")
+                val response = apiService.acceptServiceRequest(
+                    requestId = requestId,
+                    body = AcceptRequestBody(crewMemberId = currentCrewMemberId!!, confirmed = true)
+                )
+
+                if (response.success) {
+                    Log.i("Accept", "✅ Request accepted successfully")
+                } else {
+                    Log.e("Accept", "❌ Failed to accept request")
+                }
+            } catch (e: Exception) {
+                Log.e("Accept", "❌ Error accepting request: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
      * Delegate current service request to another crew member
      */
     fun delegateRequest(toCrewMemberId: String) {
@@ -232,6 +272,30 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
                 _errorMessage.value = "Network error: ${e.message}"
             } finally {
                 _isLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * Delegate a service request by ID to another crew member
+     * (used when launched from FullScreenIncomingRequestActivity)
+     */
+    fun delegateRequestById(requestId: String, toCrewMemberId: String) {
+        viewModelScope.launch {
+            try {
+                Log.i("Delegate", "Delegating request $requestId to crew member $toCrewMemberId")
+                val response = apiService.acceptServiceRequest(
+                    requestId = requestId,
+                    body = AcceptRequestBody(crewMemberId = toCrewMemberId)
+                )
+
+                if (response.success) {
+                    Log.i("Delegate", "✅ Request delegated successfully")
+                } else {
+                    Log.e("Delegate", "❌ Failed to delegate request")
+                }
+            } catch (e: Exception) {
+                Log.e("Delegate", "❌ Error delegating request: ${e.message}", e)
             }
         }
     }
@@ -370,7 +434,7 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
 
     override fun onCleared() {
         super.onCleared()
-        WebSocketManager.disconnect()
+        // WebSocketManager.disconnect() // Not using WebSocket on watch
         gpsLocationManager.stopTracking()
     }
 }

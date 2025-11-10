@@ -25,7 +25,9 @@ data class ApiResponse<T>(
  */
 data class AcceptRequestBody(
     @SerializedName("crewMemberId")
-    val crewMemberId: String
+    val crewMemberId: String,
+    @SerializedName("confirmed")
+    val confirmed: Boolean = false
 )
 
 /**
@@ -108,12 +110,12 @@ interface ApiService {
     /**
      * Get device by MAC address (Android ID).
      * No authentication required - uses MAC address as identifier.
-     * Returns a list, but should contain only one device.
+     * Uses public /discover endpoint that doesn't require auth.
      */
-    @GET("api/devices")
+    @GET("api/devices/discover")
     suspend fun getDeviceByMacAddress(
         @Query("macAddress") macAddress: String
-    ): ApiResponse<List<JsonElement>>
+    ): ApiResponse<JsonElement>
 
     /**
      * Updates device telemetry (battery, signal strength, status).

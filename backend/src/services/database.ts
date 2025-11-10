@@ -486,7 +486,7 @@ export class DatabaseService {
     return newRequest;
   }
 
-  async acceptServiceRequest(requestId: string, crewMemberId: string) {
+  async acceptServiceRequest(requestId: string, crewMemberId: string, confirmed: boolean = false) {
     // First get the crew member to get their name
     const crewMember = await this.prisma.crewMember.findUnique({
       where: { id: crewMemberId }
@@ -509,16 +509,23 @@ export class DatabaseService {
       throw new Error('Service request not found');
     }
 
+    // Build update data object
+    const updateData: any = {
+      assignedTo: crewMember.name,  // Store crew member name as string
+      assignedToId: crewMemberId,   // Store crew member ID
+      guestName: request.guest ? `${request.guest.firstName} ${request.guest.lastName}` : null,
+      guestCabin: request.location?.name || null
+    };
+
+    // If confirmed (from watch), change status to IN_PROGRESS
+    if (confirmed) {
+      updateData.status = 'IN_PROGRESS';
+      updateData.acceptedAt = new Date();
+    }
+
     const updatedRequest = await this.prisma.serviceRequest.update({
       where: { id: requestId },
-      data: {
-        status: 'IN_PROGRESS',
-        assignedTo: crewMember.name,  // Store crew member name as string
-        assignedToId: crewMemberId,   // Store crew member ID
-        acceptedAt: new Date(),
-        guestName: request.guest ? `${request.guest.firstName} ${request.guest.lastName}` : null,
-        guestCabin: request.location?.name || null
-      },
+      data: updateData,
       include: {
         guest: true,
         location: true,
@@ -536,8 +543,8 @@ export class DatabaseService {
     await this.prisma.activityLog.create({
       data: {
         type: 'service_request',
-        action: 'Request Accepted',
-        details: `${crewMember.name} accepted service request from ${guestName} at ${locationName}`,
+        action: 'Request Assigned',
+        details: `Service request assigned to ${crewMember.name} (${guestName} at ${locationName})`,
         userId: crewMember.userId || null,
         locationId: request.locationId,
         guestId: request.guestId,

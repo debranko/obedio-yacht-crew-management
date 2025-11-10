@@ -27,7 +27,10 @@ import {
   Wifi,
   WifiOff,
   Trash2,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useAppData } from '../../contexts/AppDataContext';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { useAuth } from '../../contexts/AuthContext';
@@ -160,6 +163,7 @@ export function ServiceRequestsPage({
   const [internalFullscreen, setInternalFullscreen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [clearAllDialogOpen, setClearAllDialogOpen] = useState(false);
+  const [showAvailableCrew, setShowAvailableCrew] = useState(false);
 
   // Use external fullscreen state if provided, otherwise use internal
   const isFullscreen = externalFullscreen !== undefined ? externalFullscreen : internalFullscreen;
@@ -239,10 +243,17 @@ export function ServiceRequestsPage({
     return { pending, urgent, emergency, accepted };
   }, [serviceRequests]);
 
-  // Get on-duty crew members for delegation (using duty roster system)
+  // Get crew organized by duty status (matching popup window implementation)
   const dutyStatus = getCurrentDutyStatus();
   const onDutyCrewMembers = dutyStatus.onDuty.filter(
     (crew) => crew.department === 'Interior'
+  );
+
+  // Get available (off-duty) crew members for delegation
+  const availableCrewMembers = crewMembers.filter(
+    (crew) => crew.department === 'Interior' &&
+     crew.status !== 'on-leave' &&
+     !onDutyCrewMembers.find(c => c.id === crew.id)
   );
 
   const handleAccept = (request: ServiceRequest) => {
@@ -271,6 +282,8 @@ export function ServiceRequestsPage({
 
   const handleDelegateClick = (request: ServiceRequest) => {
     setSelectedRequest(request);
+    setSelectedCrewMember(''); // Reset selection
+    setShowAvailableCrew(false); // Start with Available Crew collapsed
     setDelegateDialogOpen(true);
   };
 
@@ -282,16 +295,27 @@ export function ServiceRequestsPage({
   const confirmDelegate = () => {
     if (!selectedRequest || !selectedCrewMember) return;
 
-    // Find crew member name for toast message
-    const crewMember = onDutyCrewMembers.find(c => c.id === selectedCrewMember);
+    // Find crew member name from both on-duty and available crew
+    const allCrew = [...onDutyCrewMembers, ...availableCrewMembers];
+    const crewMember = allCrew.find(c => c.id === selectedCrewMember);
     const crewName = crewMember?.name || 'crew member';
 
-    delegateServiceRequest(selectedRequest.id, selectedCrewMember);
-    toast.success(`Request delegated to ${crewName}`);
-
-    setDelegateDialogOpen(false);
-    setSelectedRequest(null);
-    setSelectedCrewMember('');
+    // Use same API method as popup window (acceptRequest hook)
+    acceptRequest(
+      { id: selectedRequest.id, crewId: selectedCrewMember },
+      {
+        onSuccess: () => {
+          toast.success(`Request delegated to ${crewName}`);
+          setDelegateDialogOpen(false);
+          setSelectedRequest(null);
+          setSelectedCrewMember('');
+          setShowAvailableCrew(false); // Reset collapsible state
+        },
+        onError: (error: any) => {
+          toast.error(error.message || 'Failed to delegate request');
+        }
+      }
+    );
   };
 
   const confirmForward = () => {
@@ -911,35 +935,94 @@ export function ServiceRequestsPage({
               </div>
             )}
 
-            {/* Crew Member Selection */}
+            {/* Crew Member Selection - Two Section UI */}
             <div className="space-y-2">
-              <Label htmlFor="delegate-crew">Assign to Crew Member</Label>
-              <Select value={selectedCrewMember} onValueChange={setSelectedCrewMember}>
-                <SelectTrigger id="delegate-crew">
-                  <SelectValue placeholder="Select crew member" />
-                </SelectTrigger>
-                <SelectContent>
-                  {onDutyCrewMembers.map((crew) => (
-                    <SelectItem key={crew.id} value={crew.id}>
-                      <div className="flex items-center gap-2">
-                        <User className="h-3 w-3" />
-                        <span>{crew.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          ({crew.position})
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              <Label>Assign to Crew Member</Label>
 
-            {onDutyCrewMembers.length === 0 && (
-              <div className="p-3 bg-warning/10 border border-warning/30 rounded-md text-xs text-warning">
-                <AlertCircle className="h-4 w-4 inline mr-2" />
-                No crew members currently on duty
+              <div className="rounded-lg border border-border bg-card overflow-hidden">
+                {/* On-Duty Crew Section - Always Visible */}
+                {onDutyCrewMembers.length > 0 && (
+                  <div className={availableCrewMembers.length > 0 ? "border-b border-border" : ""}>
+                    <div className="px-3 py-2 bg-muted/30">
+                      <p className="text-xs font-medium text-muted-foreground">On Duty</p>
+                    </div>
+                    <div className="divide-y divide-border">
+                      {onDutyCrewMembers.map((crew) => (
+                        <button
+                          key={crew.id}
+                          onClick={() => setSelectedCrewMember(crew.id)}
+                          className={`w-full px-3 py-2.5 flex items-center justify-between gap-2 hover:bg-muted/50 transition-colors text-left ${
+                            selectedCrewMember === crew.id ? 'bg-primary/10' : ''
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <div className="w-2 h-2 rounded-full bg-success flex-shrink-0" />
+                            <span className="font-medium truncate">{crew.name}</span>
+                            <span className="text-xs text-muted-foreground truncate">({crew.position})</span>
+                          </div>
+                          {selectedCrewMember === crew.id && (
+                            <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Available Crew Section - Collapsible */}
+                {availableCrewMembers.length > 0 && (
+                  <div>
+                    {/* Collapsible Header */}
+                    <button
+                      onClick={() => setShowAvailableCrew(!showAvailableCrew)}
+                      className="w-full px-3 py-2 bg-muted/30 flex items-center justify-between hover:bg-muted/50 transition-colors"
+                    >
+                      <p className="text-xs font-medium text-muted-foreground">Available Crew ({availableCrewMembers.length})</p>
+                      {showAvailableCrew ? (
+                        <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </button>
+
+                    {/* Collapsible Content */}
+                    {showAvailableCrew && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="divide-y divide-border max-h-48 overflow-y-auto"
+                      >
+                        {availableCrewMembers.map((crew) => (
+                          <button
+                            key={crew.id}
+                            onClick={() => setSelectedCrewMember(crew.id)}
+                            className={`w-full px-3 py-2.5 flex items-center gap-2 hover:bg-muted/50 transition-colors text-left ${
+                              selectedCrewMember === crew.id ? 'bg-primary/10' : ''
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <div className="w-2 h-2 rounded-full bg-muted flex-shrink-0" />
+                              <span className="truncate">{crew.name}</span>
+                              <span className="text-xs text-muted-foreground truncate">({crew.position})</span>
+                            </div>
+                            {selectedCrewMember === crew.id && (
+                              <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                            )}
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </div>
+                )}
+
+                {onDutyCrewMembers.length === 0 && availableCrewMembers.length === 0 && (
+                  <div className="px-3 py-4 text-center text-sm text-muted-foreground">
+                    No crew members available
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
 
           <div className="flex justify-end gap-2">
@@ -948,7 +1031,7 @@ export function ServiceRequestsPage({
             </Button>
             <Button
               onClick={confirmDelegate}
-              disabled={!selectedCrewMember || onDutyCrewMembers.length === 0}
+              disabled={!selectedCrewMember || (onDutyCrewMembers.length === 0 && availableCrewMembers.length === 0)}
             >
               <Send className="h-4 w-4 mr-2" />
               Delegate

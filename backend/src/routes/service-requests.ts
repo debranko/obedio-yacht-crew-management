@@ -31,7 +31,8 @@ router.post('/', requirePermission('service-requests.create'), validate(CreateSe
 }));
 
 router.put('/:id/accept', requirePermission('service-requests.accept'), asyncHandler(async (req, res) => {
-  const request = await dbService.acceptServiceRequest(req.params.id, req.body.crewMemberId);
+  const { crewMemberId, confirmed = false } = req.body;
+  const request = await dbService.acceptServiceRequest(req.params.id, crewMemberId, confirmed);
 
   // Broadcast service request assignment to all connected clients
   websocketService.emitServiceRequestAssigned(request);
@@ -39,12 +40,15 @@ router.put('/:id/accept', requirePermission('service-requests.accept'), asyncHan
   websocketService.emitServiceRequestUpdated(request);
 
   // Send MQTT notification to assigned crew member's watch (if they have one)
-  // This will notify even if crew member is off-duty, since they were manually assigned
-  await mqttService.notifyAssignedCrewWatch(
-    request,
-    request.location?.name || request.guestCabin || 'Unknown',
-    request.guest
-  );
+  // Only send MQTT notification if not yet confirmed (i.e., web app delegation)
+  // If confirmed=true (from watch), notification already received
+  if (!confirmed) {
+    await mqttService.notifyAssignedCrewWatch(
+      request,
+      request.location?.name || request.guestCabin || 'Unknown',
+      request.guest
+    );
+  }
 
   res.json(apiSuccess(request));
 }));

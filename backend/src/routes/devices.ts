@@ -8,7 +8,49 @@ import { apiSuccess, apiError } from '../utils/api-response';
 
 const router = Router();
 
-// Apply auth middleware to ALL device routes
+/**
+ * GET /api/devices/discover
+ * Public endpoint for watch devices to discover their device ID and crew assignment
+ * No authentication required - uses MAC address as identifier
+ * NOTE: This MUST be before authMiddleware to remain public
+ */
+router.get('/discover', asyncHandler(async (req, res) => {
+  const { macAddress } = req.query;
+
+  if (!macAddress) {
+    return res.status(400).json(apiError('macAddress query parameter is required', 'BAD_REQUEST'));
+  }
+
+  const device = await prisma.device.findFirst({
+    where: { macAddress: macAddress as string },
+    include: {
+      location: {
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          floor: true
+        }
+      },
+      crewMember: {
+        select: {
+          id: true,
+          name: true,
+          position: true
+        }
+      }
+    }
+  });
+
+  if (!device) {
+    return res.status(404).json(apiError('Device not found', 'NOT_FOUND'));
+  }
+
+  console.log(`📱 Device discovery: ${device.name} (MAC: ${macAddress}) assigned to ${device.crewMember?.name || 'nobody'}`);
+  res.json(apiSuccess(device));
+}));
+
+// Apply auth middleware to ALL device routes (except /discover above)
 router.use(authMiddleware);
 
 /**
