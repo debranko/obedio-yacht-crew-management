@@ -8,6 +8,7 @@ import { requirePermission } from '../middleware/auth';
 import { DatabaseService } from '../services/database';
 import { CreateServiceRequestSchema, UpdateServiceRequestSchema } from '../validators/schemas';
 import { websocketService } from '../services/websocket';
+import { mqttService } from '../services/mqtt.service';
 import { apiSuccess, apiError } from '../utils/api-response';
 
 const router = Router();
@@ -36,6 +37,14 @@ router.put('/:id/accept', requirePermission('service-requests.accept'), asyncHan
   websocketService.emitServiceRequestAssigned(request);
   websocketService.emitServiceRequestStatusChanged(request);
   websocketService.emitServiceRequestUpdated(request);
+
+  // Send MQTT notification to assigned crew member's watch (if they have one)
+  // This will notify even if crew member is off-duty, since they were manually assigned
+  await mqttService.notifyAssignedCrewWatch(
+    request,
+    request.location?.name || request.guestCabin || 'Unknown',
+    request.guest
+  );
 
   res.json(apiSuccess(request));
 }));

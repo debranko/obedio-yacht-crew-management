@@ -773,30 +773,64 @@ class MQTTService {
 
   /**
    * Send notification to assigned crew member's watch
+   * - If request is manually assigned (assignedToId exists): notify ONLY that crew member regardless of duty status
+   * - If request is NOT assigned (assignedToId is null): notify all ON-DUTY crew members
    */
   async notifyAssignedCrewWatch(serviceRequest: any, locationName: string, guest: any): Promise<void> {
     try {
       console.log('📱 Looking for assigned crew watches...');
 
-      // Find all watches (type = 'watch') that are assigned to crew members
-      const watches = await prisma.device.findMany({
-        where: {
-          type: 'watch',
-          crewMemberId: { not: null } // Only watches assigned to crew
-        },
-        include: {
-          crewMember: true
-        }
-      });
+      let watches;
 
-      if (watches.length === 0) {
-        console.log('⚠️ No watches assigned to crew members');
-        return;
+      // CASE 1: Request is manually assigned to a specific crew member
+      if (serviceRequest.assignedToId) {
+        console.log(`🎯 Request manually assigned to crew member: ${serviceRequest.assignedToId}`);
+
+        // Find watch assigned to this specific crew member (ignore duty status)
+        watches = await prisma.device.findMany({
+          where: {
+            type: 'watch',
+            crewMemberId: serviceRequest.assignedToId // Specific crew member only
+          },
+          include: {
+            crewMember: true
+          }
+        });
+
+        if (watches.length === 0) {
+          console.log(`⚠️ No watch found for assigned crew member ${serviceRequest.assignedToId}`);
+          return;
+        }
+
+        console.log(`✅ Found ${watches.length} watch(es) for assigned crew member (${watches[0].crewMember?.name})`);
+
+      } else {
+        // CASE 2: Request is NOT assigned - notify all ON-DUTY crew members
+        console.log('📢 Request not assigned - notifying all ON-DUTY crew members');
+
+        // Find all watches assigned to ON-DUTY crew members
+        watches = await prisma.device.findMany({
+          where: {
+            type: 'watch',
+            crewMemberId: { not: null }, // Only watches assigned to crew
+            crewMember: {
+              status: 'on-duty' // Only notify on-duty crew members
+            }
+          },
+          include: {
+            crewMember: true
+          }
+        });
+
+        if (watches.length === 0) {
+          console.log('⚠️ No watches assigned to ON-DUTY crew members');
+          return;
+        }
+
+        console.log(`✅ Found ${watches.length} on-duty crew watch(es)`);
       }
 
-      console.log(`✅ Found ${watches.length} assigned watch(es)`);
-
-      // Send notification to each assigned watch
+      // Send notification to each watch
       for (const watch of watches) {
         const notificationTopic = `obedio/watch/${watch.deviceId}/notification`;
 

@@ -83,6 +83,17 @@ export function requirePermission(permission: string) {
         'devices.view',
         'system.view-logs'
       ],
+      // Underscore version for backward compatibility with watch tokens
+      'chief_stewardess': [
+        'service-requests.view',
+        'service-requests.create',
+        'service-requests.accept',
+        'service-requests.complete',
+        'guests.view',
+        'crew.view',
+        'devices.view',
+        'system.view-logs'
+      ],
       'stewardess': [
         'service-requests.view',
         'service-requests.accept',

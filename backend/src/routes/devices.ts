@@ -155,7 +155,7 @@ router.get('/', requirePermission('devices.view'), asyncHandler(async (req, res)
   console.log('   Query params:', req.query);
   console.log('   User:', (req as any).user);
 
-  const { type, status, locationId, crewMemberId } = req.query;
+  const { type, status, locationId, crewMemberId, macAddress } = req.query;
 
   // Build WHERE conditions using Prisma (secure, no SQL injection)
   const where: any = {};
@@ -164,6 +164,7 @@ router.get('/', requirePermission('devices.view'), asyncHandler(async (req, res)
   if (status) where.status = status as string;
   if (locationId) where.locationId = locationId as string;
   if (crewMemberId) where.crewMemberId = crewMemberId as string;
+  if (macAddress) where.macAddress = macAddress as string;
 
   // Execute query using Prisma (secure and type-safe)
   const devices = await prisma.device.findMany({
