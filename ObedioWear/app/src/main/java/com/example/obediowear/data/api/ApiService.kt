@@ -126,4 +126,12 @@ interface ApiService {
         @Path("id") deviceId: String,
         @Body body: DeviceHeartbeatBody
     ): ApiResponse<JsonElement>
+
+    /**
+     * Completes a service request (Finish button).
+     */
+    @PUT("api/service-requests/{id}/complete")
+    suspend fun completeServiceRequest(
+        @Path("id") requestId: String
+    ): ApiResponse<ServiceRequest>
 }

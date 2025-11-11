@@ -60,6 +60,14 @@ router.put('/:id/complete', requirePermission('service-requests.complete'), asyn
   websocketService.emitServiceRequestCompleted(request);
   websocketService.emitServiceRequestStatusChanged(request);
 
+  // Publish MQTT update for watches to clear "Serving now"
+  mqttService.publish('obedio/service/update', {
+    requestId: request.id,
+    status: 'completed',
+    assignedTo: request.assignedToId,
+    completedAt: new Date().toISOString()
+  });
+
   res.json(apiSuccess(request));
 }));
 

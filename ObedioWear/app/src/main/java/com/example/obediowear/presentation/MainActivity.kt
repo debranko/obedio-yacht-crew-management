@@ -172,14 +172,15 @@ class MainActivity : ComponentActivity() {
     private fun handleIntentActions() {
         val action = intent.getStringExtra("action")
         val requestId = intent.getStringExtra("request_id")
+        val requestLocation = intent.getStringExtra("request_location")
 
-        android.util.Log.d("MainActivity", "Intent action: $action, requestId: $requestId")
+        android.util.Log.d("MainActivity", "Intent action: $action, requestId: $requestId, location: $requestLocation")
 
         when (action) {
             "accept" -> {
                 if (requestId != null) {
-                    android.util.Log.i("MainActivity", "Accepting request $requestId")
-                    viewModel.acceptRequestById(requestId)
+                    android.util.Log.i("MainActivity", "Accepting request $requestId at $requestLocation")
+                    viewModel.acceptRequestById(requestId, requestLocation)
                 }
             }
             "delegate" -> {
@@ -208,6 +209,7 @@ fun ObedioApp(
         val currentRequest by viewModel.currentRequest.collectAsState()
         val crewMembers by viewModel.crewMembers.collectAsState()
         val connectionStatus by viewModel.connectionStatus.collectAsState()
+        val currentlyServing by viewModel.currentlyServing.collectAsState()
 
         Box(
             modifier = Modifier
@@ -232,7 +234,11 @@ fun ObedioApp(
                 )
             } else {
                 // Show placeholder/home screen when no request
-                HomeScreen(connectionStatus = connectionStatus)
+                HomeScreen(
+                    connectionStatus = connectionStatus,
+                    currentlyServing = currentlyServing?.second,
+                    onFinishServing = { viewModel.finishServing() }
+                )
             }
         }
     }
@@ -242,7 +248,11 @@ fun ObedioApp(
  * Home screen shown when no incoming request
  */
 @Composable
-fun HomeScreen(connectionStatus: com.example.obediowear.data.mqtt.MqttManager.ConnectionStatus) {
+fun HomeScreen(
+    connectionStatus: com.example.obediowear.data.mqtt.MqttManager.ConnectionStatus,
+    currentlyServing: String? = null,
+    onFinishServing: () -> Unit = {}
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -296,13 +306,52 @@ fun HomeScreen(connectionStatus: com.example.obediowear.data.mqtt.MqttManager.Co
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Status message
-        Text(
-            text = "Waiting for service requests...",
-            color = Color.White.copy(alpha = 0.5f),
-            fontSize = 10.sp,
-            textAlign = TextAlign.Center
-        )
+        // Currently serving status (if any)
+        if (currentlyServing != null) {
+            Text(
+                text = "Serving now:",
+                color = Color(0xFF10B981), // Green
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = currentlyServing,
+                color = Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Finish button
+            Button(
+                onClick = onFinishServing,
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .height(40.dp),
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = Color(0xFF10B981) // Green
+                )
+            ) {
+                Text(
+                    text = "FINISH",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+        } else {
+            // Status message
+            Text(
+                text = "Waiting for service requests...",
+                color = Color.White.copy(alpha = 0.5f),
+                fontSize = 10.sp,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 

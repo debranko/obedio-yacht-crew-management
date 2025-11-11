@@ -836,13 +836,14 @@ class MQTTService {
 
         const notification = {
           requestId: serviceRequest.id,
-          type: 'service_request',
+          type: serviceRequest.requestType || 'service_request',
           title: 'Service Request',
           message: `Guest needs assistance at ${locationName}`,
           location: locationName,
           guest: guest ? `${guest.firstName} ${guest.lastName}` : 'Guest',
           priority: serviceRequest.priority,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          voiceTranscript: serviceRequest.voiceTranscript || null
         };
 
         this.publish(notificationTopic, notification);

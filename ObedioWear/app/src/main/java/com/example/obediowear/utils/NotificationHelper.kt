@@ -52,7 +52,8 @@ object NotificationHelper {
     fun showFullScreenNotification(context: Context, request: ServiceRequest) {
         // Create intent for full-screen activity
         val fullScreenIntent = Intent(context, FullScreenIncomingRequestActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            // Add flags to ensure the activity is displayed correctly
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             // Pass service request data as JSON
             putExtra("service_request", gson.toJson(request))
         }

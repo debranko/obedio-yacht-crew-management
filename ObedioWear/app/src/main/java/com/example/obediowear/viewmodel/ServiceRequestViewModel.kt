@@ -56,6 +56,10 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
     // Watch device ID - fetched from backend on init
     private var myDeviceId: String? = null
 
+    // Currently serving request (shows "Serving now: Location" + Finish button)
+    private val _currentlyServing = MutableStateFlow<Pair<String, String>?>(null) // Pair<requestId, locationName>
+    val currentlyServing: StateFlow<Pair<String, String>?> = _currentlyServing.asStateFlow()
+
     init {
         // Watch uses MQTT ONLY for notifications (not WebSocket)
         // WebSocket is for web clients only
@@ -64,6 +68,19 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
         // MQTT foreground service is started by Application class (ObedioWearApplication)
         // No need to start it here - it's already running
         Log.i("ViewModel", "ViewModel initialized - MQTT service already running from Application")
+
+        // Listen for completed service requests from web app (via MQTT)
+        viewModelScope.launch {
+            com.example.obediowear.data.mqtt.MqttManager.updatedRequestFlow.collect { updatedRequest ->
+                if (updatedRequest.status == Status.COMPLETED) {
+                    Log.i("ViewModel", "🏁 Request completed (from web app): ${updatedRequest.id} - clearing 'Serving now'")
+                    // Clear serving status if this is the request we're serving
+                    if (_currentlyServing.value?.first == updatedRequest.id) {
+                        _currentlyServing.value = null
+                    }
+                }
+            }
+        }
 
         // MQTT handles incoming requests via FullScreenIncomingRequestActivity
         // No need to listen here - MainActivity doesn't show incoming requests
@@ -97,12 +114,13 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
                 val response = apiService.getDeviceByMacAddress(macAddress)
 
                 if (response.success) {
-                    // Extract device ID from response
+                    // Extract device ID from response (single device object, not a list)
                     val deviceData = response.data.asJsonObject
                     myDeviceId = deviceData.get("id")?.asString
                     Log.i("Device", "✅ Discovered my device ID: $myDeviceId")
 
                     // Also extract crew member ID if assigned
+                    // API returns crewMember object, not crewMemberId directly
                     val crewMember = deviceData.getAsJsonObject("crewMember")
                     currentCrewMemberId = crewMember?.get("id")?.asString
                     if (currentCrewMemberId != null) {
@@ -111,7 +129,7 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
                         Log.w("Device", "⚠️ Watch not assigned to any crew member yet")
                     }
                 } else {
-                    Log.w("Device", "⚠️ Device not found by MAC address")
+                    Log.w("Device", "⚠️ No device found with MAC address: $macAddress")
                 }
             } catch (e: Exception) {
                 Log.e("Device", "❌ Error discovering device ID: ${e.message}", e)
@@ -211,7 +229,7 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
     /**
      * Accept a service request by ID (used when launched from FullScreenIncomingRequestActivity)
      */
-    fun acceptRequestById(requestId: String) {
+    fun acceptRequestById(requestId: String, locationName: String? = null) {
         // Check if watch is assigned to a crew member
         if (currentCrewMemberId == null) {
             Log.e("Accept", "Cannot accept request - watch not assigned to crew yet")
@@ -219,7 +237,7 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
             viewModelScope.launch {
                 delay(1000)
                 if (currentCrewMemberId != null) {
-                    acceptRequestById(requestId)
+                    acceptRequestById(requestId, locationName)
                 } else {
                     Log.e("Accept", "Still not assigned after waiting - giving up")
                 }
@@ -237,11 +255,40 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
 
                 if (response.success) {
                     Log.i("Accept", "✅ Request accepted successfully")
+                    // Set currently serving
+                    if (locationName != null) {
+                        _currentlyServing.value = Pair(requestId, locationName)
+                        Log.i("Accept", "📍 Now serving: $locationName")
+                    }
                 } else {
                     Log.e("Accept", "❌ Failed to accept request")
                 }
             } catch (e: Exception) {
                 Log.e("Accept", "❌ Error accepting request: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
+     * Finish serving current request (calls backend complete endpoint)
+     */
+    fun finishServing() {
+        val serving = _currentlyServing.value ?: return
+        val requestId = serving.first
+
+        viewModelScope.launch {
+            try {
+                Log.i("Finish", "Finishing request: $requestId")
+                val response = apiService.completeServiceRequest(requestId)
+
+                if (response.success) {
+                    Log.i("Finish", "✅ Request completed successfully")
+                    _currentlyServing.value = null
+                } else {
+                    Log.e("Finish", "❌ Failed to complete request")
+                }
+            } catch (e: Exception) {
+                Log.e("Finish", "❌ Error completing request: ${e.message}", e)
             }
         }
     }

@@ -62,5 +62,15 @@ enum class RequestType {
     @SerializedName("service")
     SERVICE,
     @SerializedName("emergency")
-    EMERGENCY
+    EMERGENCY,
+    @SerializedName("voice")
+    VOICE,
+    @SerializedName("dnd")
+    DND,
+    @SerializedName("lights")
+    LIGHTS,
+    @SerializedName("prepare_food")
+    PREPARE_FOOD,
+    @SerializedName("bring_drinks")
+    BRING_DRINKS
 }

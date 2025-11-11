@@ -76,6 +76,7 @@ object MqttManager {
 
         if (mqttClient?.isConnected == true) {
             Log.d(TAG, "Already connected to MQTT broker")
+            _connectionStatus.value = ConnectionStatus.CONNECTED
             return
         }
 
@@ -226,6 +227,7 @@ object MqttManager {
                     val serviceRequest = notification.toServiceRequest()
                     _newRequestFlow.tryEmit(serviceRequest)
 
+                    // Show full-screen notification + launch activity
                     appContext?.let { context ->
                         // Show notification (for background/locked screen scenarios)
                         NotificationHelper.showFullScreenNotification(context, serviceRequest)
@@ -312,7 +314,8 @@ object MqttManager {
         val location: String,
         val guest: String,
         val priority: String,
-        val timestamp: String
+        val timestamp: String,
+        val voiceTranscript: String? = null
     ) {
         fun toServiceRequest(): ServiceRequest {
             // Parse guest name into first/last name
@@ -348,11 +351,16 @@ object MqttManager {
                 },
                 requestType = when (type.lowercase()) {
                     "emergency" -> com.example.obediowear.data.model.RequestType.EMERGENCY
+                    "voice" -> com.example.obediowear.data.model.RequestType.VOICE
+                    "dnd" -> com.example.obediowear.data.model.RequestType.DND
+                    "lights" -> com.example.obediowear.data.model.RequestType.LIGHTS
+                    "prepare_food" -> com.example.obediowear.data.model.RequestType.PREPARE_FOOD
+                    "bring_drinks" -> com.example.obediowear.data.model.RequestType.BRING_DRINKS
                     "service" -> com.example.obediowear.data.model.RequestType.SERVICE
                     else -> com.example.obediowear.data.model.RequestType.CALL
                 },
                 notes = message,
-                voiceTranscript = null,
+                voiceTranscript = voiceTranscript,
                 createdAt = timestamp,
                 guest = guestObj,
                 location = locationObj,

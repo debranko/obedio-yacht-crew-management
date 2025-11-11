@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Bundle
 import android.os.PowerManager
 import android.util.Log
+import android.view.View
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -99,6 +100,23 @@ class FullScreenIncomingRequestActivity : ComponentActivity() {
         }
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            // Enable sticky immersive mode for full-screen experience
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            )
+            Log.d("FullScreen", "Immersive mode enabled")
+        }
+    }
+
     private fun handleAccept() {
         Log.i("FullScreen", "User accepted request from full-screen notification")
 
@@ -110,6 +128,7 @@ class FullScreenIncomingRequestActivity : ComponentActivity() {
             flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("action", "accept")
             putExtra("request_id", serviceRequest?.id)
+            putExtra("request_location", serviceRequest?.location?.name)
         }
         startActivity(intent)
         finish()
@@ -207,7 +226,50 @@ fun FullScreenIncomingRequestScreen(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Request Type (if not standard CALL type)
+            if (request.requestType.name != "CALL") {
+                Text(
+                    text = when (request.requestType.name) {
+                        "SERVICE" -> "🔔 Service Request"
+                        "EMERGENCY" -> "🚨 Emergency"
+                        "VOICE" -> "🎤 Voice Message"
+                        "DND" -> "🚫 Do Not Disturb"
+                        "LIGHTS" -> "💡 Lights"
+                        "PREPARE_FOOD" -> "🍽️ Food Preparation"
+                        "BRING_DRINKS" -> "🥂 Drinks"
+                        else -> request.requestType.name
+                    },
+                    color = Color.White.copy(alpha = 0.8f),
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+
+            // Voice transcript (if exists)
+            request.voiceTranscript?.let { transcript ->
+                // Parse "Voice message (3.0s): Text" format
+                val text = if (transcript.contains("): ")) {
+                    transcript.substringAfter("): ")
+                } else {
+                    transcript
+                }
+
+                if (text.isNotBlank()) {
+                    Text(
+                        text = "\"$text\"",
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Accept button
             Button(
