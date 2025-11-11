@@ -9,11 +9,16 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.obediowear.R
 import com.example.obediowear.data.mqtt.MqttManager
 import com.example.obediowear.presentation.MainActivity
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.collectLatest
+import kotlin.math.min
+import kotlin.math.pow
 
 /**
  * Foreground service that maintains persistent MQTT connection.
@@ -27,6 +32,12 @@ class MqttForegroundService : Service() {
         private const val TAG = "MqttForegroundService"
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "mqtt_connection"
+
+        // Reconnection settings
+        private const val MAX_RECONNECT_ATTEMPTS = 10
+        private const val BASE_BACKOFF_MS = 2000L // 2 seconds
+        private const val MAX_BACKOFF_MS = 60000L // 60 seconds
+        private const val RESET_AFTER_MS = 300000L // 5 minutes - reset counter after successful connection
 
         fun start(context: Context) {
             val intent = Intent(context, MqttForegroundService::class.java)
@@ -43,9 +54,24 @@ class MqttForegroundService : Service() {
         }
     }
 
+    private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var reconnectJob: Job? = null
+    private var reconnectAttempts = 0
+    private var lastSuccessfulConnection = 0L
+
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "Service created")
+
+        // Acquire partial wake lock to prevent deep sleep from killing MQTT
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = powerManager.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "ObedioWear:MqttService"
+        )
+        wakeLock?.acquire()
+        Log.d(TAG, "Partial wake lock acquired - preventing deep sleep")
 
         // Create notification channel for Android 8+
         createNotificationChannel()
@@ -56,6 +82,9 @@ class MqttForegroundService : Service() {
 
         // Connect to MQTT broker
         connectToMqtt()
+
+        // Monitor connection status
+        monitorConnectionStatus()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -70,7 +99,21 @@ class MqttForegroundService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         Log.d(TAG, "Service destroyed - disconnecting MQTT")
+
+        // Cancel all coroutines
+        reconnectJob?.cancel()
+        serviceScope.cancel()
+
+        // Disconnect MQTT
         MqttManager.disconnect()
+
+        // Release wake lock
+        wakeLock?.let {
+            if (it.isHeld) {
+                it.release()
+                Log.d(TAG, "Wake lock released")
+            }
+        }
     }
 
     /**
@@ -79,14 +122,83 @@ class MqttForegroundService : Service() {
     private fun connectToMqtt() {
         try {
             MqttManager.connect(applicationContext)
-
-            // Update notification when connected
-            // Note: We could observe MqttManager.connectionStatus here
-            // and update notification accordingly, but keeping it simple for now
-            updateNotification("Connected • Listening")
+            Log.i(TAG, "MQTT connection initiated")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to connect to MQTT: ${e.message}", e)
-            updateNotification("Connection failed")
+            scheduleReconnect()
+        }
+    }
+
+    /**
+     * Monitor MQTT connection status and update notification/handle reconnection.
+     */
+    private fun monitorConnectionStatus() {
+        serviceScope.launch {
+            MqttManager.connectionStatus.collectLatest { status ->
+                when (status) {
+                    MqttManager.ConnectionStatus.CONNECTED -> {
+                        Log.i(TAG, "✅ MQTT Connected")
+                        updateNotification("Connected • Listening")
+
+                        // Reset reconnect counter on successful connection
+                        reconnectAttempts = 0
+                        lastSuccessfulConnection = System.currentTimeMillis()
+                        reconnectJob?.cancel()
+                    }
+                    MqttManager.ConnectionStatus.CONNECTING -> {
+                        Log.d(TAG, "🔄 MQTT Connecting...")
+                        updateNotification("Connecting...")
+                    }
+                    MqttManager.ConnectionStatus.DISCONNECTED -> {
+                        Log.w(TAG, "❌ MQTT Disconnected")
+                        updateNotification("Disconnected • Reconnecting...")
+                        scheduleReconnect()
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Schedule reconnection with exponential backoff.
+     */
+    private fun scheduleReconnect() {
+        // Cancel existing reconnect job
+        reconnectJob?.cancel()
+
+        // Reset counter if we've been connected for a while
+        val timeSinceLastSuccess = System.currentTimeMillis() - lastSuccessfulConnection
+        if (timeSinceLastSuccess > RESET_AFTER_MS && reconnectAttempts > 0) {
+            Log.d(TAG, "Resetting reconnect counter (stable for ${timeSinceLastSuccess}ms)")
+            reconnectAttempts = 0
+        }
+
+        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+            Log.e(TAG, "Max reconnect attempts reached. Waiting 5 minutes before retry...")
+            updateNotification("Connection lost • Retrying in 5 min")
+
+            reconnectJob = serviceScope.launch {
+                delay(RESET_AFTER_MS) // Wait 5 minutes
+                reconnectAttempts = 0 // Reset counter
+                connectToMqtt()
+            }
+            return
+        }
+
+        reconnectAttempts++
+
+        // Exponential backoff: min(BASE * 2^attempts, MAX)
+        val backoffMs = min(
+            BASE_BACKOFF_MS * 2.0.pow(reconnectAttempts - 1).toLong(),
+            MAX_BACKOFF_MS
+        )
+
+        Log.d(TAG, "Scheduling reconnect attempt $reconnectAttempts in ${backoffMs}ms...")
+        updateNotification("Reconnecting in ${backoffMs / 1000}s (attempt $reconnectAttempts)")
+
+        reconnectJob = serviceScope.launch {
+            delay(backoffMs)
+            connectToMqtt()
         }
     }
 

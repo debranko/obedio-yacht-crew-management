@@ -61,8 +61,9 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
         // WebSocket is for web clients only
         // WebSocketManager.connect()
 
-        // Connect to MQTT broker (for device registration and notifications)
-        com.example.obediowear.data.mqtt.MqttManager.connect(getApplication())
+        // MQTT foreground service is started by Application class (ObedioWearApplication)
+        // No need to start it here - it's already running
+        Log.i("ViewModel", "ViewModel initialized - MQTT service already running from Application")
 
         // MQTT handles incoming requests via FullScreenIncomingRequestActivity
         // No need to listen here - MainActivity doesn't show incoming requests
@@ -436,5 +437,9 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
         super.onCleared()
         // WebSocketManager.disconnect() // Not using WebSocket on watch
         gpsLocationManager.stopTracking()
+
+        // Note: We DON'T stop the MQTT foreground service here
+        // It should keep running even when ViewModel is cleared
+        // The service will be stopped when the app is explicitly closed
     }
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.example.obediowear.data.model.ServiceRequest
 import com.example.obediowear.utils.DeviceInfoHelper
+import com.example.obediowear.utils.NotificationHelper
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,6 +66,9 @@ object MqttManager {
     fun connect(context: Context) {
         // Store context for device info extraction
         appContext = context.applicationContext
+
+        // Create notification channel for full-screen notifications
+        NotificationHelper.createNotificationChannel(context)
 
         // Set CLIENT_ID from Android device ID
         CLIENT_ID = DeviceInfoHelper.getDeviceId(context)
@@ -221,6 +225,13 @@ object MqttManager {
                     // Convert notification to ServiceRequest and emit
                     val serviceRequest = notification.toServiceRequest()
                     _newRequestFlow.tryEmit(serviceRequest)
+
+                    // Show full-screen notification (WhatsApp call style)
+                    // This works even when watch is sleeping - Android allows full-screen intents via notifications
+                    appContext?.let { context ->
+                        NotificationHelper.showFullScreenNotification(context, serviceRequest)
+                        Log.i(TAG, "📲 Full-screen notification shown for request: ${serviceRequest.id}")
+                    }
                 }
 
                 // Service request update (status changed, assigned, completed)
