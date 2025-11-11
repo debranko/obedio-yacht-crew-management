@@ -52,8 +52,7 @@ object NotificationHelper {
     fun showFullScreenNotification(context: Context, request: ServiceRequest) {
         // Create intent for full-screen activity
         val fullScreenIntent = Intent(context, FullScreenIncomingRequestActivity::class.java).apply {
-            // Add flags to ensure the activity is displayed correctly
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             // Pass service request data as JSON
             putExtra("service_request", gson.toJson(request))
         }
@@ -81,7 +80,7 @@ object NotificationHelper {
 
         // Create notification
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification) // You'll need to add this icon
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(text)
             .setPriority(NotificationCompat.PRIORITY_HIGH)

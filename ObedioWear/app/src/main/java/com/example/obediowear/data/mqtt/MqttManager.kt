@@ -1,6 +1,7 @@
 package com.example.obediowear.data.mqtt
 
 import android.content.Context
+import android.os.PowerManager
 import android.util.Log
 import com.example.obediowear.data.model.ServiceRequest
 import com.example.obediowear.utils.DeviceInfoHelper
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import info.mqtt.android.service.MqttAndroidClient
 import org.eclipse.paho.client.mqttv3.*
+import kotlinx.coroutines.*
 
 /**
  * Manages MQTT connection using Eclipse Paho for receiving service request notifications.
@@ -28,6 +30,10 @@ object MqttManager {
     // CLIENT_ID is dynamically generated from Android ID (set on first connect)
     private var CLIENT_ID: String = "WEAR-UNKNOWN"
     private var appContext: Context? = null
+
+    // Wake lock for turning on screen when notification arrives
+    private var screenWakeLock: PowerManager.WakeLock? = null
+    private val wakeLockScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     // MQTT Topics (dynamically generated based on CLIENT_ID)
     private fun getNotificationTopic() = "obedio/watch/$CLIENT_ID/notification"
@@ -229,6 +235,10 @@ object MqttManager {
 
                     // Show full-screen notification + launch activity
                     appContext?.let { context ->
+                        // CRITICAL: Acquire screen wake lock BEFORE launching activity
+                        // This ensures the screen turns on even in deep sleep mode
+                        acquireScreenWakeLock(context)
+
                         // Show notification (for background/locked screen scenarios)
                         NotificationHelper.showFullScreenNotification(context, serviceRequest)
                         Log.i(TAG, "📲 Notification created for request: ${serviceRequest.id}")
@@ -240,6 +250,9 @@ object MqttManager {
                         }
                         context.startActivity(intent)
                         Log.i(TAG, "📲 Full-screen activity launched directly for request: ${serviceRequest.id}")
+
+                        // Release wake lock after 10 seconds (activity will have its own by then)
+                        scheduleWakeLockRelease(10000L)
                     }
                 }
 
@@ -300,6 +313,55 @@ object MqttManager {
             _connectionStatus.value = ConnectionStatus.DISCONNECTED
         } catch (e: Exception) {
             Log.e(TAG, "Error disconnecting: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Acquire screen wake lock to turn on screen for incoming notification.
+     * This is critical for waking the watch from deep sleep mode.
+     */
+    private fun acquireScreenWakeLock(context: Context) {
+        try {
+            // Release any existing wake lock first
+            releaseScreenWakeLock()
+
+            val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+            screenWakeLock = powerManager.newWakeLock(
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                "ObedioWear:NotificationWake"
+            )
+            screenWakeLock?.acquire(15000L) // Max 15 seconds
+            Log.d(TAG, "🔆 Screen wake lock acquired - screen should turn on")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to acquire screen wake lock: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Schedule wake lock release after a delay.
+     * The activity will have its own wake lock by then.
+     */
+    private fun scheduleWakeLockRelease(delayMs: Long) {
+        wakeLockScope.launch {
+            delay(delayMs)
+            releaseScreenWakeLock()
+        }
+    }
+
+    /**
+     * Release the screen wake lock.
+     */
+    private fun releaseScreenWakeLock() {
+        try {
+            screenWakeLock?.let {
+                if (it.isHeld) {
+                    it.release()
+                    Log.d(TAG, "🔆 Screen wake lock released")
+                }
+            }
+            screenWakeLock = null
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to release screen wake lock: ${e.message}", e)
         }
     }
 

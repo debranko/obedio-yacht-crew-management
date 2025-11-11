@@ -116,6 +116,26 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // Request Full-Screen Intent permission for Android 14+ (CRITICAL for wake-up notifications!)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            if (!notificationManager.canUseFullScreenIntent()) {
+                android.util.Log.w("MainActivity", "⚠️ Full-screen intent permission not granted - redirecting to settings")
+                // Open settings so user can grant permission
+                try {
+                    val intent = android.content.Intent(
+                        android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+                        android.net.Uri.parse("package:$packageName")
+                    )
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    android.util.Log.e("MainActivity", "Failed to open full-screen intent settings: ${e.message}")
+                }
+            } else {
+                android.util.Log.i("MainActivity", "✅ Full-screen intent permission granted")
+            }
+        }
+
         // Handle intent extras from FullScreenIncomingRequestActivity
         handleIntentActions()
 
