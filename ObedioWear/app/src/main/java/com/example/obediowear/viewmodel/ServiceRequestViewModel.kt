@@ -430,18 +430,15 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
 
     /**
      * Send device heartbeat with current battery level and signal strength.
-     * Uses existing PUT /api/devices/:id endpoint (not a custom endpoint).
+     * Uses public /api/devices/heartbeat endpoint (no auth required).
      */
     private fun sendDeviceHeartbeat() {
-        // Skip if we don't know our device ID yet
-        if (myDeviceId == null) {
-            Log.d("Heartbeat", "⏳ Waiting for device ID discovery...")
-            return
-        }
-
         viewModelScope.launch {
             try {
                 val context = getApplication<Application>().applicationContext
+
+                // Get MAC address (Android ID)
+                val macAddress = com.example.obediowear.utils.DeviceInfoHelper.getDeviceId(context)
 
                 // Get battery level and WiFi signal strength from DeviceInfoHelper
                 val batteryLevel = com.example.obediowear.utils.DeviceInfoHelper.getBatteryLevel(context)
@@ -452,10 +449,10 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
                     timeZone = TimeZone.getTimeZone("UTC")
                 }.format(Date())
 
-                // Use existing device update endpoint (not custom /me/heartbeat)
-                val response = apiService.updateDevice(
-                    deviceId = myDeviceId!!,
+                // Use public heartbeat endpoint (no auth required)
+                val response = apiService.sendDeviceHeartbeat(
                     body = DeviceHeartbeatBody(
+                        macAddress = macAddress,
                         batteryLevel = batteryLevel,
                         signalStrength = signalStrength,
                         status = "online",

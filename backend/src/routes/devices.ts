@@ -50,7 +50,49 @@ router.get('/discover', asyncHandler(async (req, res) => {
   res.json(apiSuccess(device));
 }));
 
-// Apply auth middleware to ALL device routes (except /discover above)
+/**
+ * PUT /api/devices/heartbeat
+ * Public endpoint for watch devices to send telemetry (battery, signal, GPS)
+ * No authentication required - uses MAC address as identifier
+ * NOTE: This MUST be before authMiddleware to remain public
+ */
+router.put('/heartbeat', asyncHandler(async (req, res) => {
+  const { macAddress, batteryLevel, signalStrength, status, lastSeen } = req.body;
+
+  if (!macAddress) {
+    return res.status(400).json(apiError('macAddress is required', 'BAD_REQUEST'));
+  }
+
+  // Find device by MAC address
+  const device = await prisma.device.findFirst({
+    where: { macAddress: macAddress as string }
+  });
+
+  if (!device) {
+    return res.status(404).json(apiError('Device not found', 'NOT_FOUND'));
+  }
+
+  // Update device telemetry
+  const updateData: any = {};
+  if (batteryLevel !== undefined) updateData.batteryLevel = batteryLevel;
+  if (signalStrength !== undefined) updateData.signalStrength = signalStrength;
+  if (status !== undefined) updateData.status = status;
+  if (lastSeen !== undefined) updateData.lastSeen = lastSeen;
+
+  const updatedDevice = await prisma.device.update({
+    where: { id: device.id },
+    data: updateData
+  });
+
+  console.log(`💓 Device heartbeat: ${device.name} (Battery: ${batteryLevel}%, Signal: ${signalStrength}dBm)`);
+
+  // Broadcast device update via WebSocket
+  websocketService.emitDeviceEvent('updated', updatedDevice);
+
+  res.json(apiSuccess(updatedDevice));
+}));
+
+// Apply auth middleware to ALL device routes (except /discover and /heartbeat above)
 router.use(authMiddleware);
 
 /**

@@ -48,6 +48,8 @@ data class UpdateYachtLocationBody(
  * Data class for device heartbeat/telemetry updates.
  */
 data class DeviceHeartbeatBody(
+    @SerializedName("macAddress")
+    val macAddress: String,
     @SerializedName("batteryLevel")
     val batteryLevel: Int,
     @SerializedName("signalStrength")
@@ -118,12 +120,12 @@ interface ApiService {
     ): ApiResponse<JsonElement>
 
     /**
-     * Updates device telemetry (battery, signal strength, status).
-     * Uses existing device update endpoint - just send what changed.
+     * Sends device heartbeat with telemetry (battery, signal strength, status).
+     * No authentication required - uses MAC address as identifier.
+     * Uses public /heartbeat endpoint that doesn't require auth.
      */
-    @PUT("api/devices/{id}")
-    suspend fun updateDevice(
-        @Path("id") deviceId: String,
+    @PUT("api/devices/heartbeat")
+    suspend fun sendDeviceHeartbeat(
         @Body body: DeviceHeartbeatBody
     ): ApiResponse<JsonElement>
 
