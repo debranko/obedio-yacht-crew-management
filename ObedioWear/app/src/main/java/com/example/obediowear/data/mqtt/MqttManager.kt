@@ -226,15 +226,18 @@ object MqttManager {
                     val serviceRequest = notification.toServiceRequest()
                     _newRequestFlow.tryEmit(serviceRequest)
 
-                    // Launch full-screen activity DIRECTLY (Wear OS doesn't reliably trigger full-screen intents from notifications)
                     appContext?.let { context ->
+                        // Show notification (for background/locked screen scenarios)
+                        NotificationHelper.showFullScreenNotification(context, serviceRequest)
+                        Log.i(TAG, "📲 Notification created for request: ${serviceRequest.id}")
+
+                        // ALSO launch activity DIRECTLY (for foreground scenarios - more reliable on Wear OS)
                         val intent = android.content.Intent(context, com.example.obediowear.presentation.FullScreenIncomingRequestActivity::class.java).apply {
                             flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
-                            // Pass service request data as JSON
                             putExtra("service_request", gson.toJson(serviceRequest))
                         }
                         context.startActivity(intent)
-                        Log.i(TAG, "📲 Full-screen activity launched for request: ${serviceRequest.id}")
+                        Log.i(TAG, "📲 Full-screen activity launched directly for request: ${serviceRequest.id}")
                     }
                 }
 
