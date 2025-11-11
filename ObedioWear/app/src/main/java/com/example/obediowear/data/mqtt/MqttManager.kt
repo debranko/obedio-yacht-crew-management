@@ -226,11 +226,15 @@ object MqttManager {
                     val serviceRequest = notification.toServiceRequest()
                     _newRequestFlow.tryEmit(serviceRequest)
 
-                    // Show full-screen notification (WhatsApp call style)
-                    // This works even when watch is sleeping - Android allows full-screen intents via notifications
+                    // Launch full-screen activity DIRECTLY (Wear OS doesn't reliably trigger full-screen intents from notifications)
                     appContext?.let { context ->
-                        NotificationHelper.showFullScreenNotification(context, serviceRequest)
-                        Log.i(TAG, "📲 Full-screen notification shown for request: ${serviceRequest.id}")
+                        val intent = android.content.Intent(context, com.example.obediowear.presentation.FullScreenIncomingRequestActivity::class.java).apply {
+                            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+                            // Pass service request data as JSON
+                            putExtra("service_request", gson.toJson(serviceRequest))
+                        }
+                        context.startActivity(intent)
+                        Log.i(TAG, "📲 Full-screen activity launched for request: ${serviceRequest.id}")
                     }
                 }
 

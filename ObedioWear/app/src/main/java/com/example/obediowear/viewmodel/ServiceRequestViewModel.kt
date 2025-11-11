@@ -97,13 +97,12 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
                 val response = apiService.getDeviceByMacAddress(macAddress)
 
                 if (response.success) {
-                    // Extract device ID from response (single device object, not a list)
+                    // Extract device ID from response
                     val deviceData = response.data.asJsonObject
                     myDeviceId = deviceData.get("id")?.asString
                     Log.i("Device", "✅ Discovered my device ID: $myDeviceId")
 
                     // Also extract crew member ID if assigned
-                    // API returns crewMember object, not crewMemberId directly
                     val crewMember = deviceData.getAsJsonObject("crewMember")
                     currentCrewMemberId = crewMember?.get("id")?.asString
                     if (currentCrewMemberId != null) {
@@ -112,7 +111,7 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
                         Log.w("Device", "⚠️ Watch not assigned to any crew member yet")
                     }
                 } else {
-                    Log.w("Device", "⚠️ No device found with MAC address: $macAddress")
+                    Log.w("Device", "⚠️ Device not found by MAC address")
                 }
             } catch (e: Exception) {
                 Log.e("Device", "❌ Error discovering device ID: ${e.message}", e)
