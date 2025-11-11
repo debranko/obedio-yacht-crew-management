@@ -239,15 +239,30 @@ model Message {
 #### **YachtSettings** - Yacht konfiguracija
 ```prisma
 model YachtSettings {
-  id              String   @id @default(cuid())
-  name            String   @default("Serenity")
-  type            String   @default("motor")
-  timezone        String   @default("Europe/Monaco")
-  floors          String[] @default(["Lower Deck", "Main Deck", "Upper Deck", "Sun Deck"])
-  dateFormat      String   @default("DD/MM/YYYY")
-  timeFormat      String   @default("24h")
+  id                    String    @id @default(cuid())
+  name                  String    @default("Serenity")
+  type                  String    @default("motor")
+  timezone              String    @default("Europe/Monaco")
+  floors                String[]  @default(["Lower Deck", "Main Deck", "Upper Deck", "Sun Deck"])
+  dateFormat            String    @default("DD/MM/YYYY")
+  timeFormat            String    @default("24h")
+  weatherUnits          String    @default("metric")
+  windSpeedUnits        String    @default("knots")
+  weatherUpdateInterval Int       @default(30)
+
+  // GPS Location fields (updated from Wear OS watch)
+  latitude              Float?
+  longitude             Float?
+  accuracy              Float?    // GPS accuracy in meters
+  locationName          String?
+  locationUpdatedAt     DateTime?
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 }
 ```
+
+**GPS Tracking**: Wear OS watch šalje GPS lokaciju jahte svakih 60 sekundi putem `PUT /api/yacht-settings` endpoint-a.
 
 ---
 
@@ -397,6 +412,22 @@ model YachtSettings {
 **Prisma Models**: Device, DeviceLog, Location, CrewMember
 **MQTT Integration**: ✅ DA (publishes config to MQTT)
 **WebSocket**: ✅ DA (device events)
+
+**Device Heartbeat** (PUT `/api/devices/:id`):
+```json
+{
+  "batteryLevel": 85,
+  "signalStrength": -65,
+  "status": "online",
+  "lastSeen": "2025-11-12T10:30:00.000Z"
+}
+```
+
+**Wear OS Integration**:
+- Watch šalje heartbeat svakih 30 sekundi
+- Battery level: 0-100% (čita se sa `BatteryManager`)
+- Signal strength: -120 do 0 dBm (čita se WiFi RSSI)
+- Auto-discovery: Watch se identifikuje putem MAC adrese (Android ID)
 
 ---
 
@@ -556,6 +587,25 @@ model YachtSettings {
 | `/api/yacht-settings` | PUT | ✅ | ❌ | ❌ | ⚠️ OK |
 
 **Prisma Models**: YachtSettings
+
+**Request Body** (PUT):
+```json
+{
+  "name": "M/Y Serenity",
+  "type": "motor",
+  "timezone": "Europe/Monaco",
+  "floors": ["Lower Deck", "Main Deck", "Upper Deck", "Sun Deck"],
+  "latitude": 43.7384,
+  "longitude": 7.4246,
+  "accuracy": 12.5,
+  "locationUpdatedAt": "2025-11-12T10:30:00.000Z"
+}
+```
+
+**Wear OS Integration**:
+- Watch šalje GPS lokaciju jahte svakih 60 sekundi
+- Koristi `GPSLocationManager` sa high-accuracy modom
+- Update interval: 30s ili kada se jahta pomeri 10+ metara
 
 **⚠️ PROBLEM**: Bilo ko može mijenjati yacht name, timezone, floors!
 

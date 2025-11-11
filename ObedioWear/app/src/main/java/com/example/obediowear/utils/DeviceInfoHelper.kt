@@ -1,8 +1,11 @@
 package com.example.obediowear.utils
 
 import android.content.Context
+import android.net.wifi.WifiManager
+import android.os.BatteryManager
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 
 /**
  * Helper class for extracting device information (unique identifier, model, etc.)
@@ -74,5 +77,43 @@ object DeviceInfoHelper {
         val shortId = deviceId.takeLast(6) // Last 6 chars of Android ID
 
         return "Watch - $deviceModel ($shortId)"
+    }
+
+    /**
+     * Get current battery level (0-100%).
+     * Returns battery percentage using BatteryManager.
+     */
+    fun getBatteryLevel(context: Context): Int {
+        return try {
+            val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+            batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+        } catch (e: Exception) {
+            Log.e("DeviceInfo", "Failed to get battery level: ${e.message}")
+            -1 // Return -1 on error
+        }
+    }
+
+    /**
+     * Get WiFi signal strength in dBm (e.g., -50 is excellent, -70 is fair, -90 is poor).
+     * Returns signal strength in dBm, or -100 if WiFi is disabled/unavailable.
+     */
+    fun getWiFiSignalStrength(context: Context): Int {
+        return try {
+            val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+
+            if (!wifiManager.isWifiEnabled) {
+                Log.d("DeviceInfo", "WiFi is disabled")
+                return -100 // WiFi disabled
+            }
+
+            val wifiInfo = wifiManager.connectionInfo
+            val rssi = wifiInfo.rssi // Signal strength in dBm
+
+            Log.d("DeviceInfo", "WiFi signal strength: ${rssi}dBm (SSID: ${wifiInfo.ssid})")
+            rssi
+        } catch (e: Exception) {
+            Log.e("DeviceInfo", "Failed to get WiFi signal strength: ${e.message}")
+            -100 // Return weak signal on error
+        }
     }
 }
