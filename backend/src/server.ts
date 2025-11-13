@@ -194,7 +194,7 @@ async function startServer() {
 📍 Server Details:
    • Host: 0.0.0.0:${PORT} (accessible from network)
    • Local: localhost:${PORT}
-   • Network: 192.168.5.150:${PORT}
+   • Network: 192.168.5.152:${PORT}
    • Environment: ${process.env.NODE_ENV || 'development'}
 
 🌐 Access URLs:
@@ -205,8 +205,8 @@ async function startServer() {
    • API Docs: http://localhost:${PORT}/api-docs 📚
 
 📱 Wear OS Access:
-   • API: http://192.168.5.150:${PORT}/api
-   • WebSocket: ws://192.168.5.150:${PORT}
+   • API: http://192.168.5.152:${PORT}/api
+   • WebSocket: ws://192.168.5.152:${PORT}
 
 📊 Available Endpoints:
    • GET /api/crew - List crew members
