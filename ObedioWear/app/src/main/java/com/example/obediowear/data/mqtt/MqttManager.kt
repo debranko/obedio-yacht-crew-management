@@ -25,7 +25,7 @@ object MqttManager {
     private const val TAG = "MqttManager"
 
     // MQTT Broker configuration
-    private const val BROKER_URL = "tcp://192.168.5.150:1883"
+    private const val BROKER_URL = "tcp://192.168.5.152:1883"
 
     // CLIENT_ID is dynamically generated from Android ID (set on first connect)
     private var CLIENT_ID: String = "WEAR-UNKNOWN"
