@@ -16,8 +16,8 @@ RUN npm ci && npm cache clean --force
 # Copy source code
 COPY . .
 
-# Build frontend
-RUN npm run build
+# Build frontend (skip Windows-specific copy command)
+RUN npx vite build
 
 # Production server with nginx
 FROM nginx:alpine
