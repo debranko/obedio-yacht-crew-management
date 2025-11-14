@@ -9,12 +9,21 @@ Quick fixes for common issues during deployment.
 ### ~~Build Error: "tsc: not found"~~
 **Status:** ✅ FIXED in latest version
 
-**What was wrong:** Dockerfile was only installing production dependencies, missing TypeScript compiler.
+**What was wrong:** Backend Dockerfile was only installing production dependencies, missing TypeScript compiler.
 
 **Fix applied:**
 - Now installs all dependencies for build
 - Removes dev dependencies after build
 - Added entrypoint script for automatic migrations
+
+### ~~Build Error: "xcopy: not found"~~
+**Status:** ✅ FIXED in latest version
+
+**What was wrong:** Frontend build script used Windows `xcopy` command which doesn't exist in Linux containers.
+
+**Fix applied:**
+- Changed Dockerfile to use `npx vite build` directly
+- Skips the Windows-specific copy command
 
 **Action:** Just pull latest version from your fork (already done!)
 
