@@ -28,11 +28,11 @@ Before starting, ensure:
 ssh obedio@10.10.0.10
 ```
 
-### 2. Clone the Repository
+### 2. Clone Your Fork
 
 ```bash
 cd /opt
-sudo git clone https://github.com/debranko/obedio-yacht-crew-management.git
+sudo git clone https://github.com/Kruppes/obedio-yacht-crew-management.git
 sudo chown -R obedio:obedio obedio-yacht-crew-management
 cd obedio-yacht-crew-management
 ```

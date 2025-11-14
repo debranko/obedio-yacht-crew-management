@@ -89,6 +89,17 @@ docker system prune -a
 
 ---
 
+## 🔄 Sync with Friend's Updates
+
+```bash
+# If your friend pushes to his original repo, pull those changes:
+cd /opt/obedio-yacht-crew-management
+git pull https://github.com/debranko/obedio-yacht-crew-management.git main
+./update-from-git.sh
+```
+
+---
+
 ## 🗄️ Database Quick Commands
 
 ### Backup Database RIGHT NOW

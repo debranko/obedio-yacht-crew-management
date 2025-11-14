@@ -35,48 +35,20 @@ These new files have been added to the repository:
 
 This is best because it keeps everything in sync with your friend's work.
 
-### Step 1: Push Files to GitHub
+### Step 1: Files Already on GitHub (Your Fork)
 
-**On your Mac (where you are now):**
+**✅ DONE!** All deployment files are already pushed to your fork:
+https://github.com/Kruppes/obedio-yacht-crew-management
 
-```bash
-cd /Users/nicolas/vibecoding/obedio/obedio-yacht-crew-management
-
-# Check what files were created
-git status
-
-# Add the new deployment files
-git add docker-compose.prod.yml
-git add Dockerfile.frontend
-git add nginx.conf
-git add deploy-exhibition.sh
-git add update-from-git.sh
-git add backend/Dockerfile
-git add DEPLOYMENT-GUIDE-NUC.md
-git add QUICK-COMMANDS.md
-git add TRANSFER-TO-NUC.md
-
-# Commit (but remember: your friend's project, so coordinate!)
-git commit -m "Add Docker production deployment setup for exhibition"
-
-# Push to GitHub
-git push origin main
-```
-
-**⚠️ IMPORTANT:** Since this is your friend's project, coordinate with him first!
-You might want to:
-- Create a branch instead: `git checkout -b exhibition-deployment`
-- Or ask him to pull these files first
-
-### Step 2: SSH into NUC and Clone
+### Step 2: SSH into NUC and Clone Your Fork
 
 ```bash
 # From your Mac, SSH to NUC
 ssh obedio@10.10.0.10
 
-# Once on NUC, clone the repo
+# Once on NUC, clone YOUR fork
 cd /opt
-sudo git clone https://github.com/debranko/obedio-yacht-crew-management.git
+sudo git clone https://github.com/Kruppes/obedio-yacht-crew-management.git
 sudo chown -R obedio:obedio obedio-yacht-crew-management
 cd obedio-yacht-crew-management
 ```
