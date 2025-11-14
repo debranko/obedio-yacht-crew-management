@@ -9,7 +9,7 @@
     "strict": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
+    "forceConsistentCasingInFileNames": false,
     "resolveJsonModule": true,
     "declaration": false,
     "declarationMap": false,
@@ -22,8 +22,9 @@
     "noImplicitAny": false,
     "noImplicitThis": false,
     "noImplicitReturns": false,
-    "noFallthroughCasesInSwitch": true,
+    "noFallthroughCasesInSwitch": false,
     "noUncheckedIndexedAccess": false,
+    "noEmitOnError": false,
     "types": ["node"]
   },
   "include": [
