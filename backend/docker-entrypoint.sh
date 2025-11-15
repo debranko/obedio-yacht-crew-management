@@ -15,7 +15,7 @@ echo "✅ Database is ready!"
 echo "🔄 Setting up database schema..."
 if npx prisma migrate deploy 2>&1 | grep -q "No migration found"; then
   echo "📦 No migrations found, pushing schema directly..."
-  npx prisma db push --accept-data-loss
+  npx prisma db push --skip-generate
 else
   echo "✅ Migrations applied"
 fi
