@@ -23,7 +23,7 @@ ssh obedio@10.10.0.10
 ### Step 2: Clone Your Fork
 ```bash
 cd /opt
-sudo git clone https://github.com/Kruppes/obedio-yacht-crew-management.git
+sudo git clone -b deployment-fixes https://github.com/debranko/obedio-yacht-crew-management.git obedio-yacht-crew-management
 sudo chown -R obedio:obedio obedio-yacht-crew-management
 cd obedio-yacht-crew-management
 ```
@@ -54,12 +54,8 @@ Your friend pushes to his repo → You sync:
 ssh obedio@10.10.0.10
 cd /opt/obedio-yacht-crew-management
 
-# Option 1: Pull from your fork
-git pull origin main
-./update-from-git.sh
-
-# Option 2: Pull from friend's original repo
-git pull https://github.com/debranko/obedio-yacht-crew-management.git main
+# Pull latest deployment fixes
+git pull origin deployment-fixes
 ./update-from-git.sh
 ```
 
@@ -174,6 +170,7 @@ docker compose -f docker-compose.prod.yml down
 
 ---
 
-**Repository:** https://github.com/Kruppes/obedio-yacht-crew-management
+**Repository:** https://github.com/debranko/obedio-yacht-crew-management
+**Branch:** deployment-fixes
 
 **Everything is ready to go! 🚢**

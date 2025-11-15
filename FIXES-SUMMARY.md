@@ -192,7 +192,7 @@ After fixes, the system consists of **4 services**:
 ## 🚀 Deployment Status
 
 **Ready to deploy!** All changes pushed to fork:
-https://github.com/Kruppes/obedio-yacht-crew-management
+https://github.com/debranko/obedio-yacht-crew-management
 
 ### To deploy on NUC:
 

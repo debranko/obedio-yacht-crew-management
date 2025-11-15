@@ -244,4 +244,4 @@ If you need more details about any of these errors, check:
 
 **Note:** The app works for the exhibition, but these issues should be fixed before real production use!
 
-**Fork with fixes:** https://github.com/Kruppes/obedio-yacht-crew-management
+**Fork with fixes:** https://github.com/debranko/obedio-yacht-crew-management

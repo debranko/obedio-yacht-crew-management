@@ -229,7 +229,7 @@ cd /opt
 sudo rm -rf obedio-yacht-crew-management
 
 # 4. Start from scratch
-sudo git clone https://github.com/Kruppes/obedio-yacht-crew-management.git
+sudo git clone https://github.com/debranko/obedio-yacht-crew-management.git
 sudo chown -R obedio:obedio obedio-yacht-crew-management
 cd obedio-yacht-crew-management
 

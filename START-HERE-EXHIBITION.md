@@ -23,12 +23,12 @@ I've created a complete Docker-based deployment system with:
 **✅ Files Already on GitHub (Your Fork):**
 ```bash
 # All deployment files are ready in your fork!
-# https://github.com/Kruppes/obedio-yacht-crew-management
+# https://github.com/debranko/obedio-yacht-crew-management
 
 # On NUC
 ssh obedio@10.10.0.10
 cd /opt
-sudo git clone https://github.com/Kruppes/obedio-yacht-crew-management.git
+sudo git clone -b deployment-fixes https://github.com/debranko/obedio-yacht-crew-management.git obedio-yacht-crew-management
 sudo chown -R obedio:obedio obedio-yacht-crew-management
 ```
 

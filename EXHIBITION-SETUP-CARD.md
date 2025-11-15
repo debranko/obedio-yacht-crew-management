@@ -6,7 +6,7 @@
 
 ## 📋 Your Setup (Ready to Go!)
 
-- ✅ **Your Fork:** https://github.com/Kruppes/obedio-yacht-crew-management
+- ✅ **Your Fork:** https://github.com/debranko/obedio-yacht-crew-management
 - ✅ **NUC IP:** 10.10.0.10
 - ✅ **User:** obedio
 - ✅ **All deployment files already in your fork!**
@@ -21,7 +21,7 @@ ssh obedio@10.10.0.10
 
 # 2. Clone your fork
 cd /opt
-sudo git clone https://github.com/Kruppes/obedio-yacht-crew-management.git
+sudo git clone -b deployment-fixes https://github.com/debranko/obedio-yacht-crew-management.git obedio-yacht-crew-management
 sudo chown -R obedio:obedio obedio-yacht-crew-management
 cd obedio-yacht-crew-management
 
@@ -46,7 +46,7 @@ chmod +x deploy-exhibition.sh
 ```bash
 ssh obedio@10.10.0.10
 cd /opt/obedio-yacht-crew-management
-git pull https://github.com/debranko/obedio-yacht-crew-management.git main
+git pull origin deployment-fixes
 ./update-from-git.sh
 ```
 

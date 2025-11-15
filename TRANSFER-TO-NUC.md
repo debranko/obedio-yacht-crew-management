@@ -38,7 +38,7 @@ This is best because it keeps everything in sync with your friend's work.
 ### Step 1: Files Already on GitHub (Your Fork)
 
 **✅ DONE!** All deployment files are already pushed to your fork:
-https://github.com/Kruppes/obedio-yacht-crew-management
+https://github.com/debranko/obedio-yacht-crew-management
 
 ### Step 2: SSH into NUC and Clone Your Fork
 
@@ -48,7 +48,7 @@ ssh obedio@10.10.0.10
 
 # Once on NUC, clone YOUR fork
 cd /opt
-sudo git clone https://github.com/Kruppes/obedio-yacht-crew-management.git
+sudo git clone https://github.com/debranko/obedio-yacht-crew-management.git
 sudo chown -R obedio:obedio obedio-yacht-crew-management
 cd obedio-yacht-crew-management
 ```
