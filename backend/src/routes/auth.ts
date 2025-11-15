@@ -61,7 +61,7 @@ router.post('/login', asyncHandler(async (req, res) => {
   // Set HTTP-only cookie for token (server-side storage, 24/7 operation)
   res.cookie('obedio-auth-token', token, {
     httpOnly: true,      // Cannot be accessed by JavaScript
-    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+    secure: false,       // Allow HTTP (exhibition setup uses HTTP, not HTTPS)
     sameSite: 'lax',     // CSRF protection
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
     path: '/'
@@ -123,7 +123,7 @@ router.post('/refresh', asyncHandler(async (req, res) => {
     // Set HTTP-only cookie for refreshed token
     res.cookie('obedio-auth-token', newToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: false,       // Allow HTTP (exhibition setup uses HTTP, not HTTPS)
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/'
@@ -206,7 +206,7 @@ router.post('/logout', (req, res) => {
   // Clear HTTP-only cookie
   res.clearCookie('obedio-auth-token', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: false,       // Allow HTTP (exhibition setup uses HTTP, not HTTPS)
     sameSite: 'lax',
     path: '/'
   });
