@@ -184,8 +184,8 @@ async function startServer() {
     await mqttService.connect(websocketService.getIO());
     console.log('✅ MQTT service connected');
 
-    // Start MQTT Monitor Dashboard (temporarily disabled due to port conflict)
-    // mqttMonitor.start();
+    // Start MQTT Monitor Dashboard
+    mqttMonitor.start();
     
     httpServer.listen(PORT, '0.0.0.0', () => {
       console.log(`
@@ -194,7 +194,7 @@ async function startServer() {
 📍 Server Details:
    • Host: 0.0.0.0:${PORT} (accessible from network)
    • Local: localhost:${PORT}
-   • Network: 192.168.5.152:${PORT}
+   • Network: 10.158.214.151:${PORT}
    • Environment: ${process.env.NODE_ENV || 'development'}
 
 🌐 Access URLs:
@@ -205,8 +205,8 @@ async function startServer() {
    • API Docs: http://localhost:${PORT}/api-docs 📚
 
 📱 Wear OS Access:
-   • API: http://192.168.5.152:${PORT}/api
-   • WebSocket: ws://192.168.5.152:${PORT}
+   • API: http://10.158.214.151:${PORT}/api
+   • WebSocket: ws://10.158.214.151:${PORT}
 
 📊 Available Endpoints:
    • GET /api/crew - List crew members

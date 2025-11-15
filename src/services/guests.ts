@@ -43,7 +43,7 @@ export interface GuestMetaResponse {
 }
 
 export class GuestsService {
-  private static baseUrl = 'http://localhost:8080/api/guests';
+  private static baseUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8080/api'}/guests`;
 
   /**
    * Make authenticated API request
