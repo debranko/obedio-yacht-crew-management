@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline - OBEDIO</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 48px 32px;
+            max-width: 480px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .icon {
+            font-size: 80px;
+            margin-bottom: 24px;
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 16px;
+        }
+
+        p {
+            font-size: 16px;
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+
+        .features {
+            text-align: left;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .feature {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 14px;
+            color: #444;
+        }
+
+        .feature:last-child {
+            margin-bottom: 0;
+        }
+
+        .feature::before {
+            content: "✓";
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 20px;
+            margin-right: 12px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 14px 32px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: transform 0.2s;
+            cursor: pointer;
+            border: none;
+            font-size: 16px;
+        }
+
+        .button:hover {
+            transform: translateY(-2px);
+        }
+
+        .status {
+            margin-top: 24px;
+            padding: 12px;
+            background: #fff3cd;
+            border-radius: 8px;
+            color: #856404;
+            font-size: 14px;
+        }
+
+        .status.online {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .checking {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">📡</div>
+        <h1>You're Offline</h1>
+        <p>It looks like you've lost your internet connection. Don't worry, some features are still available!</p>
+
+        <div class="features">
+            <div class="feature">View cached service requests</div>
+            <div class="feature">Access guest information</div>
+            <div class="feature">Browse device details</div>
+            <div class="feature">View crew roster</div>
+        </div>
+
+        <button class="button" onclick="checkConnection()">Check Connection</button>
+
+        <div id="status" class="status checking">
+            Checking connection status...
+        </div>
+    </div>
+
+    <script>
+        function checkConnection() {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = 'Checking...';
+            statusEl.className = 'status checking';
+
+            // Try to fetch from API
+            fetch('/api/health', { cache: 'no-store' })
+                .then(response => {
+                    if (response.ok) {
+                        statusEl.textContent = 'Connection restored! Redirecting...';
+                        statusEl.className = 'status online';
+                        setTimeout(() => {
+                            window.location.href = '/';
+                        }, 1000);
+                    }
+                })
+                .catch(() => {
+                    statusEl.textContent = 'Still offline. Please check your connection.';
+                    statusEl.className = 'status';
+                });
+        }
+
+        // Check connection every 10 seconds
+        setInterval(checkConnection, 10000);
+
+        // Initial check
+        setTimeout(checkConnection, 1000);
+
+        // Listen for online event
+        window.addEventListener('online', () => {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = 'Connection restored! Redirecting...';
+            statusEl.className = 'status online';
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

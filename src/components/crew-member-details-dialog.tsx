@@ -44,11 +44,13 @@ import {
   BatteryLow,
   Camera,
   Upload,
+  AlertCircle,
 } from 'lucide-react';
 import { formatDate, parseDate, formatDateDisplay, getDayName } from './duty-roster/utils';
 import { toast } from 'sonner';
 import { useAppData } from '../contexts/AppDataContext';
 import { CameraDialog } from './camera-dialog';
+import { useDevices } from '../hooks/useDevices';
 
 interface CrewMemberDetailsDialogProps {
   open: boolean;
@@ -69,7 +71,6 @@ export function CrewMemberDetailsDialog({
   onUpdate,
   onAssignToShift,
 }: CrewMemberDetailsDialogProps) {
-  const { getCrewDevice, assignDeviceToCrew, removeDeviceFromCrew } = useAppData();
   const [isEditing, setIsEditing] = useState(false);
   const [editedCrew, setEditedCrew] = useState<CrewMember>(crewMember);
   const [showLeaveCalendar, setShowLeaveCalendar] = useState(false);
@@ -79,47 +80,110 @@ export function CrewMemberDetailsDialog({
   });
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [isCameraDialogOpen, setIsCameraDialogOpen] = useState(false);
-  
-  // Get current device assignment
-  const currentDevice = getCrewDevice(crewMember.id);
-  
-  // Mock available devices - In production, this would come from AppDataContext
-  const availableDevices = [
-    { id: 'watch-001', name: 'Apple Watch Series 9', type: 'watch' as const },
-    { id: 'watch-002', name: 'Samsung Galaxy Watch 6', type: 'watch' as const },
-    { id: 'watch-003', name: 'Apple Watch Ultra 2', type: 'watch' as const },
-    { id: 'tablet-001', name: 'iPad Pro 12.9"', type: 'tablet' as const },
-    { id: 'tablet-002', name: 'Samsung Galaxy Tab S9', type: 'tablet' as const },
-    { id: 'phone-001', name: 'iPhone 15 Pro', type: 'phone' as const },
-  ];
-  
-  const handleAssignDevice = () => {
+
+  // Fetch real devices from database
+  const { data: allDevices = [], isLoading: devicesLoading, refetch: refetchDevices } = useDevices();
+
+  // Find device assigned to this crew member from real database
+  const assignedDevice = allDevices.find(device => device.crewMemberId === crewMember.id);
+
+  // Map to old format for backward compatibility with UI
+  const currentDevice = assignedDevice ? {
+    deviceId: assignedDevice.deviceId,
+    deviceName: assignedDevice.name,
+    deviceType: assignedDevice.type === 'watch' ? 'watch' :
+                assignedDevice.type === 'mobile_app' ? 'phone' :
+                assignedDevice.type === 'smart_button' ? 'other' :
+                assignedDevice.type === 'repeater' ? 'other' : 'other',
+    status: assignedDevice.status === 'online' ? 'connected' :
+            assignedDevice.status === 'low_battery' ? 'low-battery' : 'disconnected',
+    assignedAt: new Date(assignedDevice.updatedAt),
+    lastSync: new Date(assignedDevice.lastSeen || assignedDevice.updatedAt)
+  } : null;
+
+  // Filter to show only unassigned watch devices (no Virtual Buttons, Repeaters, etc.)
+  const availableDevices = allDevices
+    .filter(device => !device.crewMemberId && device.type === 'watch')
+    .map(device => ({
+      id: device.id,
+      deviceId: device.deviceId,
+      name: device.name,
+      type: device.type
+    }));
+
+  const handleAssignDevice = async () => {
     if (!selectedDeviceId) {
       toast.error('Please select a device');
       return;
     }
-    
+
     const device = availableDevices.find(d => d.id === selectedDeviceId);
     if (!device) return;
-    
-    assignDeviceToCrew({
-      crewMemberId: crewMember.id,
-      crewMemberName: crewMember.name,
-      deviceId: device.id,
-      deviceName: device.name,
-      deviceType: device.type,
-      status: 'connected',
-    });
-    
-    toast.success(`${device.name} assigned to ${crewMember.name.split(' ')[0]}`);
-    setSelectedDeviceId('');
+
+    try {
+      // Update device in database with crewMemberId (same pattern as Device Manager)
+      const response = await fetch(`/api/devices/${device.id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          crewMemberId: crewMember.id
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to assign device');
+      }
+
+      toast.success(`${device.name} assigned to ${crewMember.name.split(' ')[0]}`);
+      setSelectedDeviceId('');
+
+      // Refetch devices to update available list
+      await refetchDevices();
+    } catch (error) {
+      console.error('Failed to assign device:', error);
+      toast.error('Failed to assign device. Please try again.');
+    }
   };
   
-  const handleRemoveDevice = () => {
+  const handleRemoveDevice = async () => {
     if (!currentDevice) return;
-    
-    removeDeviceFromCrew(crewMember.id);
-    toast.success(`${currentDevice.deviceName} removed from ${crewMember.name.split(' ')[0]}`);
+
+    try {
+      // Find device in allDevices by deviceId to get database id
+      const device = allDevices.find(d => d.deviceId === currentDevice.deviceId);
+
+      if (!device) {
+        toast.error('Device not found');
+        return;
+      }
+
+      // Update device in database - set crewMemberId to null (same pattern as Device Manager)
+      const response = await fetch(`/api/devices/${device.id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          crewMemberId: null
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to remove device');
+      }
+
+      toast.success(`${currentDevice.deviceName} removed from ${crewMember.name.split(' ')[0]}`);
+
+      // Refetch devices to update available list
+      await refetchDevices();
+    } catch (error) {
+      console.error('Failed to remove device:', error);
+      toast.error('Failed to remove device. Please try again.');
+    }
   };
   
   const getDeviceIcon = (type: string) => {
@@ -129,7 +193,12 @@ export function CrewMemberDetailsDialog({
       case 'tablet':
         return Tablet;
       case 'phone':
+      case 'mobile_app':
         return Smartphone;
+      case 'smart_button':
+        return Radio;
+      case 'repeater':
+        return Wifi;
       default:
         return Smartphone;
     }
@@ -143,7 +212,8 @@ export function CrewMemberDetailsDialog({
   const handleFileUpload = () => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*';
+    // Accept common image formats using both MIME types and extensions for better compatibility
+    input.accept = 'image/png,image/jpeg,image/jpg,image/bmp,.png,.jpg,.jpeg,.bmp';
     input.onchange = (e: Event) => {
       const file = (e.target as HTMLInputElement)?.files?.[0];
       if (file) {
@@ -162,31 +232,82 @@ export function CrewMemberDetailsDialog({
   const scheduleOverview = useMemo(() => {
     const today = formatDate(new Date());
     const now = new Date();
-    
+    const currentHour = now.getHours();
+    const currentMinutes = now.getMinutes();
+    const currentTimeInMinutes = currentHour * 60 + currentMinutes;
+
     // Find today's assignments
     const todayAssignments = assignments.filter(
       (a) => a.crewId === crewMember.id && a.date === today
     );
-    
-    // Find future assignments
-    const futureAssignments = assignments
+
+    // Find the CURRENTLY ACTIVE shift based on time
+    let currentActiveShift = null;
+    for (const assignment of todayAssignments) {
+      const shift = shifts.find(s => s.id === assignment.shiftId);
+      if (shift) {
+        const [startHour, startMin] = shift.startTime.split(':').map(Number);
+        const [endHour, endMin] = shift.endTime.split(':').map(Number);
+        const startTime = startHour * 60 + startMin;
+        let endTime = endHour * 60 + endMin;
+
+        // Handle overnight shifts (e.g., 22:00 - 06:00)
+        if (endTime < startTime) {
+          endTime += 24 * 60;
+        }
+
+        let adjustedCurrentTime = currentTimeInMinutes;
+        // Adjust current time for overnight shifts
+        if (currentTimeInMinutes < startTime && endTime > 24 * 60) {
+          adjustedCurrentTime += 24 * 60;
+        }
+
+        // Check if current time is within this shift
+        if (adjustedCurrentTime >= startTime && adjustedCurrentTime < endTime) {
+          currentActiveShift = assignment;
+          break;
+        }
+      }
+    }
+
+    // Find future assignments (including today's future shifts and upcoming days)
+    const futureAssignments = [];
+
+    // Add today's future shifts (shifts that haven't started yet)
+    for (const assignment of todayAssignments) {
+      const shift = shifts.find(s => s.id === assignment.shiftId);
+      if (shift) {
+        const [startHour, startMin] = shift.startTime.split(':').map(Number);
+        const startTime = startHour * 60 + startMin;
+
+        // If shift starts in the future today
+        if (startTime > currentTimeInMinutes) {
+          futureAssignments.push(assignment);
+        }
+      }
+    }
+
+    // Add assignments from future dates
+    const futureDateAssignments = assignments
       .filter((a) => a.crewId === crewMember.id && a.date > today)
       .sort((a, b) => a.date.localeCompare(b.date));
-    
+
+    futureAssignments.push(...futureDateAssignments);
+
     const nextAssignment = futureAssignments[0];
-    
+
     // Calculate hours worked this week (last 7 days)
     const weekStart = new Date(now);
     weekStart.setDate(weekStart.getDate() - 7);
     const weekStartStr = formatDate(weekStart);
-    
+
     const weekAssignments = assignments.filter(
       (a) => a.crewId === crewMember.id && a.date >= weekStartStr && a.date <= today
     );
-    
+
     // Estimate hours (each shift ~8 hours for calculation)
     const hoursThisWeek = weekAssignments.length * 8;
-    
+
     // Calculate days off (days without assignments in last 7 days)
     const assignedDays = new Set(weekAssignments.map((a) => a.date));
     let daysOff = 0;
@@ -198,14 +319,14 @@ export function CrewMemberDetailsDialog({
         daysOff++;
       }
     }
-    
+
     return {
-      currentShift: todayAssignments.length > 0 ? todayAssignments[0] : null,
+      currentShift: currentActiveShift,
       nextShift: nextAssignment,
       hoursThisWeek,
       daysOffThisWeek: daysOff,
     };
-  }, [assignments, crewMember.id]);
+  }, [assignments, crewMember.id, shifts]);
 
   const handleSave = () => {
     // Update leave dates from calendar selection
@@ -636,27 +757,43 @@ export function CrewMemberDetailsDialog({
                 <p className="text-sm text-muted-foreground">
                   No device currently assigned to this crew member
                 </p>
-                <div className="flex gap-2">
-                  <Select value={selectedDeviceId} onValueChange={setSelectedDeviceId}>
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Select a device..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableDevices.map((device) => {
-                        const DeviceIcon = getDeviceIcon(device.type);
-                        return (
-                          <SelectItem key={device.id} value={device.id}>
-                            <div className="flex items-center gap-2">
-                              <DeviceIcon className="h-4 w-4" />
-                              {device.name}
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  <Button onClick={handleAssignDevice}>Assign</Button>
-                </div>
+                {availableDevices.length === 0 ? (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                    <div className="flex gap-2">
+                      <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-amber-900">
+                          No devices available
+                        </p>
+                        <p className="text-sm text-amber-700">
+                          All watches are currently assigned to other crew members. Please unassign a watch from another crew member before assigning it to this one.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Select value={selectedDeviceId} onValueChange={setSelectedDeviceId}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Select a device..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableDevices.map((device) => {
+                          const DeviceIcon = getDeviceIcon(device.type);
+                          return (
+                            <SelectItem key={device.id} value={device.id}>
+                              <div className="flex items-center gap-2">
+                                <DeviceIcon className="h-4 w-4" />
+                                {device.name}
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    <Button onClick={handleAssignDevice}>Assign</Button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -770,10 +907,7 @@ export function CrewMemberDetailsDialog({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      setEditedCrew(crewMember);
-                      setIsEditing(true);
-                    }}
+                    onClick={() => setIsEditing(true)}
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     Edit Details

@@ -11,12 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Badge } from './ui/badge';
-import { 
-  User, 
-  MapPin, 
-  Clock, 
-  Bell, 
-  Zap, 
+import {
+  User,
+  MapPin,
+  Clock,
+  Bell,
+  Zap,
   LayoutGrid,
   Archive,
   AlertTriangle,
@@ -24,27 +24,23 @@ import {
   Eye,
   Timer
 } from 'lucide-react';
-import { useAppData } from '../contexts/AppDataContext';
-import { toast } from 'sonner';
+import { useUserPreferences } from '../hooks/useUserPreferences';
 
 interface ServiceRequestsSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function ServiceRequestsSettingsDialog({ 
-  open, 
-  onOpenChange 
+export function ServiceRequestsSettingsDialog({
+  open,
+  onOpenChange
 }: ServiceRequestsSettingsDialogProps) {
-  const { userPreferences, updateUserPreferences } = useAppData();
+  // Get user preferences from backend API
+  const { preferences, updateServiceRequests, isUpdatingServiceRequests } = useUserPreferences();
 
-  // Local state for settings
-  const [displayMode, setDisplayMode] = useState<'guest-name' | 'location'>(
-    userPreferences.serviceRequestDisplayMode
-  );
-  const [servingNowTimeout, setServingNowTimeout] = useState(
-    userPreferences.servingNowTimeout
-  );
+  // Local state for settings with proper defaults from backend
+  const [displayMode, setDisplayMode] = useState<'guest-name' | 'location'>('location');
+  const [servingNowTimeout, setServingNowTimeout] = useState(5);
   const [viewStyle, setViewStyle] = useState<'expanded' | 'compact'>('expanded');
   const [sortOrder, setSortOrder] = useState<'newest' | 'priority' | 'location'>('newest');
   const [showGuestPhotos, setShowGuestPhotos] = useState(true);
@@ -55,55 +51,40 @@ export function ServiceRequestsSettingsDialog({
   const [autoPriorityVIP, setAutoPriorityVIP] = useState(true);
   const [autoPriorityMasterSuite, setAutoPriorityMasterSuite] = useState(false);
 
-  // Sync with context when dialog opens
+  // Load preferences from backend when dialog opens or preferences change
   useEffect(() => {
-    if (open) {
-      setDisplayMode(userPreferences.serviceRequestDisplayMode);
-      setServingNowTimeout(userPreferences.servingNowTimeout);
-      
-      // Load additional settings from localStorage
-      const stored = localStorage.getItem('obedio-service-requests-settings');
-      if (stored) {
-        try {
-          const additionalPrefs = JSON.parse(stored);
-          setViewStyle(additionalPrefs.viewStyle || 'expanded');
-          setSortOrder(additionalPrefs.sortOrder || 'newest');
-          setShowGuestPhotos(additionalPrefs.showGuestPhotos ?? true);
-          setSoundAlerts(additionalPrefs.soundAlerts ?? true);
-          setVisualFlash(additionalPrefs.visualFlash ?? false);
-          setResponseTimeWarning(additionalPrefs.responseTimeWarning || 5);
-          setAutoArchiveTime(additionalPrefs.autoArchiveTime || 30);
-          setAutoPriorityVIP(additionalPrefs.autoPriorityVIP ?? true);
-          setAutoPriorityMasterSuite(additionalPrefs.autoPriorityMasterSuite ?? false);
-        } catch (e) {
-          // Ignore parse errors
-        }
-      }
+    if (open && preferences) {
+      setDisplayMode((preferences.serviceRequestDisplayMode as 'guest-name' | 'location') || 'location');
+      setServingNowTimeout(preferences.serviceRequestServingTimeout || 5);
+      setViewStyle((preferences.serviceRequestViewStyle as 'expanded' | 'compact') || 'expanded');
+      setSortOrder((preferences.serviceRequestSortOrder as 'newest' | 'priority' | 'location') || 'newest');
+      setShowGuestPhotos(preferences.serviceRequestShowGuestPhotos ?? true);
+      setSoundAlerts(preferences.serviceRequestSoundAlerts ?? true);
+      setVisualFlash(preferences.serviceRequestVisualFlash ?? false);
+      setResponseTimeWarning(preferences.serviceRequestResponseWarning || 5);
+      setAutoArchiveTime(preferences.serviceRequestAutoArchive || 30);
+      setAutoPriorityVIP(preferences.serviceRequestAutoPriorityVIP ?? true);
+      setAutoPriorityMasterSuite(preferences.serviceRequestAutoPriorityMaster ?? false);
     }
-  }, [open, userPreferences]);
+  }, [open, preferences]);
 
   const handleSave = () => {
-    // Update user preferences in context
-    updateUserPreferences({
+    // Save all Service Requests preferences to backend API
+    updateServiceRequests({
       serviceRequestDisplayMode: displayMode,
-      servingNowTimeout: servingNowTimeout,
+      serviceRequestServingTimeout: servingNowTimeout || 5,
+      serviceRequestViewStyle: viewStyle,
+      serviceRequestSortOrder: sortOrder,
+      serviceRequestShowGuestPhotos: showGuestPhotos,
+      serviceRequestSoundAlerts: soundAlerts,
+      serviceRequestVisualFlash: visualFlash,
+      serviceRequestResponseWarning: responseTimeWarning,
+      serviceRequestAutoArchive: autoArchiveTime,
+      serviceRequestAutoPriorityVIP: autoPriorityVIP,
+      serviceRequestAutoPriorityMaster: autoPriorityMasterSuite,
     });
 
-    // Store additional preferences in localStorage (until API integration)
-    const additionalPrefs = {
-      viewStyle,
-      sortOrder,
-      showGuestPhotos,
-      soundAlerts,
-      visualFlash,
-      responseTimeWarning,
-      autoArchiveTime,
-      autoPriorityVIP,
-      autoPriorityMasterSuite,
-    };
-    localStorage.setItem('obedio-service-requests-settings', JSON.stringify(additionalPrefs));
-
-    toast.success('Settings saved successfully');
+    // Close dialog after save
     onOpenChange(false);
   };
 
@@ -239,9 +220,9 @@ export function ServiceRequestsSettingsDialog({
                 <Timer className="h-4 w-4 text-muted-foreground" />
                 <Label>"Serving Now" Display Duration</Label>
               </div>
-              <Select 
-                value={servingNowTimeout.toString()} 
-                onValueChange={(value) => setServingNowTimeout(parseInt(value))}
+              <Select
+                value={servingNowTimeout?.toString() || '5'}
+                onValueChange={(value: string) => setServingNowTimeout(parseInt(value))}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -301,9 +282,9 @@ export function ServiceRequestsSettingsDialog({
                 <AlertTriangle className="h-4 w-4 text-warning" />
                 <Label>Response Time Warning</Label>
               </div>
-              <Select 
-                value={responseTimeWarning.toString()} 
-                onValueChange={(value) => setResponseTimeWarning(parseInt(value))}
+              <Select
+                value={responseTimeWarning.toString()}
+                onValueChange={(value: string) => setResponseTimeWarning(parseInt(value))}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -366,9 +347,9 @@ export function ServiceRequestsSettingsDialog({
                 <Archive className="h-4 w-4 text-muted-foreground" />
                 <Label>Auto-Archive Completed Requests</Label>
               </div>
-              <Select 
-                value={autoArchiveTime.toString()} 
-                onValueChange={(value) => setAutoArchiveTime(parseInt(value))}
+              <Select
+                value={autoArchiveTime.toString()}
+                onValueChange={(value: string) => setAutoArchiveTime(parseInt(value))}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -413,8 +394,8 @@ export function ServiceRequestsSettingsDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSave}>
-              Save Settings
+            <Button onClick={handleSave} disabled={isUpdatingServiceRequests}>
+              {isUpdatingServiceRequests ? 'Saving...' : 'Save Settings'}
             </Button>
           </div>
         </div>

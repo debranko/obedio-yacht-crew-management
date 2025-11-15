@@ -29,6 +29,9 @@ import {
 import { motion } from "motion/react";
 import { ServiceRequest, InteriorTeam } from "../contexts/AppDataContext";
 import { useAppData } from "../contexts/AppDataContext";
+import { useWebSocket } from "../hooks/useWebSocket";
+import { useAcceptServiceRequest } from "../hooks/useServiceRequestsApi";
+import { useAuth } from "../contexts/AuthContext";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "./ui/dialog";
 import { toast } from "sonner";
@@ -44,7 +47,9 @@ export function IncomingRequestDialog({
   onClose,
   request,
 }: IncomingRequestDialogProps) {
-  const { acceptServiceRequest, delegateServiceRequest, forwardServiceRequest, crewMembers, getCurrentDutyStatus } = useAppData();
+  const { user } = useAuth();
+  const { delegateServiceRequest, forwardServiceRequest, crewMembers, getCurrentDutyStatus } = useAppData();
+  const { mutate: acceptRequest } = useAcceptServiceRequest();
   const [timeAgo, setTimeAgo] = useState<string>("Just now");
   const [showDelegateDropdown, setShowDelegateDropdown] = useState(false);
   const [showAvailableCrew, setShowAvailableCrew] = useState(false);
@@ -74,9 +79,15 @@ export function IncomingRequestDialog({
     if (!request) return;
 
     const updateTime = () => {
+      // Guard: Handle missing or invalid timestamp
+      if (!request.timestamp || !(request.timestamp instanceof Date)) {
+        setTimeAgo("Just now");
+        return;
+      }
+
       const now = new Date();
       const diff = Math.floor((now.getTime() - request.timestamp.getTime()) / 1000);
-      
+
       if (diff < 10) setTimeAgo("Just now");
       else if (diff < 60) setTimeAgo(`${diff}s ago`);
       else setTimeAgo(`${Math.floor(diff / 60)}m ago`);
@@ -98,25 +109,70 @@ export function IncomingRequestDialog({
 
   const handleAccept = () => {
     if (!request) return;
-    
-    // Get current user (in production, from auth context)
-    const currentUser = onDutyCrew[0]?.name || 'Crew Member';
-    acceptServiceRequest(request.id, currentUser);
-    toast.success(`Request from ${request.guestName} accepted`);
-    onClose();
+
+    // DEBUG: Log current state
+    console.log('🔍 DEBUG Accept button clicked:');
+    console.log('  - Current user ID:', user?.id);
+    console.log('  - All crew members:', crewMembers.map(c => ({ id: c.id, name: c.name, userId: c.userId })));
+    console.log('  - Looking for crew with userId:', user?.id);
+
+    // Get current crew member from authenticated user
+    const currentCrewMember = crewMembers.find(crew => crew.userId === user?.id);
+
+    console.log('  - Found crew member:', currentCrewMember);
+
+    if (!currentCrewMember) {
+      console.error('❌ No crew member found for user:', user?.id);
+      toast.error('You must be associated with a crew member to accept requests');
+      return;
+    }
+
+    console.log('✅ Calling backend API to accept request');
+    console.log('  - Request ID:', request.id);
+    console.log('  - Crew ID:', currentCrewMember.id);
+
+    // Call BACKEND API (not local state!)
+    acceptRequest(
+      { id: request.id, crewId: currentCrewMember.id },
+      {
+        onSuccess: () => {
+          console.log('✅ Backend accepted request successfully');
+          toast.success(`Request from ${request.guestName} accepted`);
+          onClose();
+        },
+        onError: (error: any) => {
+          console.error('❌ Backend error:', error);
+          toast.error(error.message || 'Failed to accept request');
+        }
+      }
+    );
   };
 
   const handleDelegateClick = () => {
     setShowDelegateDropdown(!showDelegateDropdown);
   };
 
-  const handleSelectCrew = (crewName: string) => {
+  const handleSelectCrew = (crewId: string, crewName: string) => {
     if (!request) return;
-    
-    delegateServiceRequest(request.id, crewName);
-    toast.success(`Request delegated to ${crewName}`);
-    setShowDelegateDropdown(false);
-    onClose();
+
+    console.log('🔄 Delegating request to crew member:', crewName, crewId);
+
+    // Call BACKEND API to assign request to selected crew member
+    acceptRequest(
+      { id: request.id, crewId: crewId },
+      {
+        onSuccess: () => {
+          console.log('✅ Request delegated successfully via backend API');
+          toast.success(`Request delegated to ${crewName}`);
+          setShowDelegateDropdown(false);
+          onClose();
+        },
+        onError: (error: any) => {
+          console.error('❌ Failed to delegate request:', error);
+          toast.error(error.message || 'Failed to delegate request');
+        }
+      }
+    );
   };
 
   const handleForwardClick = () => {
@@ -254,6 +310,23 @@ export function IncomingRequestDialog({
           </div>
         </motion.div>
 
+        {/* Location Image - Large and Beautiful */}
+        {request.cabinImage && (
+          <div className="relative h-48 overflow-hidden">
+            <img
+              src={request.cabinImage}
+              alt={request.guestCabin}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/20 to-transparent" />
+            <div className="absolute bottom-4 left-6 right-6">
+              <h3 className="text-2xl font-bold text-white drop-shadow-lg">
+                {request.guestCabin}
+              </h3>
+            </div>
+          </div>
+        )}
+
         {/* Content */}
         <div className="p-6 space-y-4">
           {/* Location & Guest */}
@@ -264,7 +337,7 @@ export function IncomingRequestDialog({
               </div>
               <div className="flex-1">
                 <div className="text-xs text-muted-foreground">Location</div>
-                <div className="font-semibold">{request.guestCabin}</div>
+                <div className="font-bold text-lg">{request.guestCabin}</div>
               </div>
             </div>
 
@@ -275,6 +348,40 @@ export function IncomingRequestDialog({
               <div className="flex-1">
                 <div className="text-xs text-muted-foreground">Guest</div>
                 <div className="font-semibold">{request.guestName}</div>
+              </div>
+            </div>
+
+            {/* Request Type Badge */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
+                {request.requestType === 'voice' ? (
+                  <Volume2 className="h-5 w-5 text-accent" />
+                ) : request.requestType === 'dnd' ? (
+                  <Bell className="h-5 w-5 text-accent" />
+                ) : request.requestType === 'lights' ? (
+                  <Cog className="h-5 w-5 text-accent" />
+                ) : request.requestType === 'prepare_food' ? (
+                  <UtensilsCrossed className="h-5 w-5 text-accent" />
+                ) : request.requestType === 'bring_drinks' ? (
+                  <Wine className="h-5 w-5 text-accent" />
+                ) : request.requestType === 'emergency' ? (
+                  <AlertCircle className="h-5 w-5 text-destructive" />
+                ) : (
+                  <Bell className="h-5 w-5 text-accent" />
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="text-xs text-muted-foreground">Request Type</div>
+                <div className="font-semibold capitalize">
+                  {request.requestType === 'call' ? 'Service Call' :
+                   request.requestType === 'voice' ? 'Voice Message' :
+                   request.requestType === 'dnd' ? 'Do Not Disturb' :
+                   request.requestType === 'lights' ? 'Lights Control' :
+                   request.requestType === 'prepare_food' ? 'Food Service' :
+                   request.requestType === 'bring_drinks' ? 'Drinks Service' :
+                   request.requestType === 'emergency' ? 'EMERGENCY' :
+                   request.requestType}
+                </div>
               </div>
             </div>
           </div>
@@ -327,17 +434,6 @@ export function IncomingRequestDialog({
               <p className="text-sm leading-relaxed">{request.notes}</p>
             </div>
           )}
-
-          {/* Cabin Image */}
-          {request.cabinImage && (
-            <div className="rounded-lg overflow-hidden border border-border">
-              <img 
-                src={request.cabinImage} 
-                alt={request.guestCabin}
-                className="w-full h-32 object-cover"
-              />
-            </div>
-          )}
         </div>
 
         {/* Actions */}
@@ -379,7 +475,7 @@ export function IncomingRequestDialog({
                     {onDutyCrew.map((crew) => (
                       <button
                         key={crew.id}
-                        onClick={() => handleSelectCrew(crew.name)}
+                        onClick={() => handleSelectCrew(crew.id, crew.name)}
                         className="w-full px-3 py-2.5 flex items-center justify-between gap-2 hover:bg-muted/50 transition-colors text-left"
                       >
                         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -420,7 +516,7 @@ export function IncomingRequestDialog({
                       {availableCrew.map((crew) => (
                         <button
                           key={crew.id}
-                          onClick={() => handleSelectCrew(crew.name)}
+                          onClick={() => handleSelectCrew(crew.id, crew.name)}
                           className="w-full px-3 py-2.5 flex items-center gap-2 hover:bg-muted/50 transition-colors text-left"
                         >
                           <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -503,6 +599,33 @@ export function useIncomingRequests() {
   const [lastClosedTime, setLastClosedTime] = useState<number>(0);
   const [initializationTime, setInitializationTime] = useState<number>(0);
 
+  // Import WebSocket hook
+  const { on, off } = useWebSocket();
+
+  // Listen for service request updates via WebSocket
+  useEffect(() => {
+    if (!on || !off) return;
+
+    const handleRequestUpdate = (updatedRequest: any) => {
+      console.log('📞 Dialog: Service request updated via WebSocket:', updatedRequest);
+
+      // If the currently displayed request was updated to non-pending status, close the dialog
+      if (currentRequest && updatedRequest.id === currentRequest.id) {
+        if (updatedRequest.status !== 'pending') {
+          console.log('✅ Request accepted/updated - closing dialog');
+          setShowDialog(false);
+          setLastClosedTime(Date.now());
+        }
+      }
+    };
+
+    const unsubscribe = on('service-request:updated', handleRequestUpdate);
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [on, off, currentRequest]);
+
   // Mark as initialized after 2 seconds to ignore initial mock data
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -528,21 +651,27 @@ export function useIncomingRequests() {
 
     // Find oldest pending request that should be shown
     const pendingRequests = serviceRequests.filter(req => req.status === 'pending');
-    
+
     for (const request of pendingRequests) {
+      // Guard: Skip requests with missing or invalid timestamp
+      if (!request.timestamp || !(request.timestamp instanceof Date)) {
+        console.warn('⚠️ Request has invalid timestamp:', request.id);
+        continue;
+      }
+
       const age = now - request.timestamp.getTime();
       const lastShown = lastShownTime[request.id];
-      
+
       // Additional guard: prevent showing same request if shown very recently (within 1500ms)
       const shownRecently = lastShown && (now - lastShown) < 1500;
-      
+
       // Show if:
       // 1. New request created AFTER initialization (< 5 seconds old AND created after init) OR
       // 2. Repeat interval passed since last shown (if repeatInterval > 0)
       const wasCreatedAfterInit = request.timestamp.getTime() > initializationTime;
       const isNewRequest = age < 5000 && request.id !== lastRequestId && wasCreatedAfterInit;
       const shouldRepeat = repeatInterval > 0 && lastShown && (now - lastShown) >= repeatInterval;
-      
+
       if ((isNewRequest || shouldRepeat) && !shownRecently) {
         setLastRequestId(request.id);
         setLastShownTime(prev => ({ ...prev, [request.id]: now }));

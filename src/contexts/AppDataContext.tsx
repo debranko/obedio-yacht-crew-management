@@ -1,5 +1,5 @@
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Assignment, CrewMember, ShiftConfig } from '../components/duty-roster/types';
 // Removed defaultShiftConfig import - will use API data
@@ -7,7 +7,9 @@ import { useCrewMembers as useCrewMembersApi } from '../hooks/useCrewMembers';
 import { useGuestsApi } from '../hooks/useGuestsApi';
 import { useServiceRequestsApi } from '../hooks/useServiceRequestsApi';
 import { useShifts as useShiftsApi } from '../hooks/useShifts';
+import { useAssignments as useAssignmentsApi, useCreateBulkAssignments, useDeleteAssignmentsByDate } from '../hooks/useAssignments';
 import { useLocations } from '../hooks/useLocations';
+import { useWebSocket } from '../hooks/useWebSocket';
 import { api, GuestDTO } from '../services/api';
 import { Location, LocationType } from '../domain/locations';
 import { locationsService } from '../services/locations';
@@ -16,7 +18,6 @@ import { locationsService } from '../services/locations';
 import {
   CrewMemberExtended,
   Role,
-  CrewDeviceAssignment,
   CrewChange,
   CrewChangeLog
 } from '../types/crew';
@@ -43,7 +44,6 @@ import { YachtLocation } from '../types/yacht-locations';
 export type {
   CrewMemberExtended,
   Role,
-  CrewDeviceAssignment,
   CrewChange,
   CrewChangeLog
 } from '../types/crew';
@@ -77,7 +77,7 @@ interface AppDataContextType {
   setShifts: (shifts: ShiftConfig[]) => void;
   
   // Save functionality
-  saveAssignments: () => Promise<void>;
+  saveAssignments: (assignmentsToSave?: Assignment[]) => Promise<void>;
   lastSaved: Date | null;
   isSaving: boolean;
   
@@ -101,15 +101,8 @@ interface AppDataContextType {
   
   // Change tracking for notifications
   detectRosterChanges: () => CrewChange[];
-  markChangesAsNotified: (changes: CrewChange[]) => void;
-  
-  // Device Assignments
-  deviceAssignments: CrewDeviceAssignment[];
-  assignDeviceToCrew: (assignment: Omit<CrewDeviceAssignment, 'id' | 'assignedAt' | 'lastSync'>) => void;
-  removeDeviceFromCrew: (crewMemberId: string) => void;
-  getCrewDevice: (crewMemberId: string) => CrewDeviceAssignment | undefined;
-  getDeviceAssignment: (deviceId: string) => CrewDeviceAssignment | undefined;
-  
+  markChangesAsNotified: (changes: CrewChange[]) => Promise<void>;
+
   // Messages
   messages: Message[];
   sendMessage: (message: Omit<Message, 'id' | 'timestamp' | 'deliveryStatus'>) => void;
@@ -155,200 +148,104 @@ interface AppDataContextType {
   addServiceRequest: (request: Omit<ServiceRequest, 'id' | 'timestamp'>) => ServiceRequest;
   acceptServiceRequest: (requestId: string, crewMemberName: string) => void;
   delegateServiceRequest: (requestId: string, toCrewMember: string) => void;
-  forwardServiceRequest: (requestId: string, toTeam: InteriorTeam) => void;
   completeServiceRequest: (requestId: string, crewMemberName?: string) => void;
-  simulateNewRequest: () => ServiceRequest;
-  getPendingRequestsForService: (serviceName: string) => ServiceRequest[];
+  // simulateNewRequest removed - use API directly
+  // forwardServiceRequest removed - use service categories instead
+  // getPendingRequestsForService removed - use API filters instead
   serviceRequestHistory: ServiceRequestHistory[];
   clearServiceRequestHistory: () => void;
 }
 
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
 
-// Role permissions are defined in backend auth middleware
-// TODO: Create API endpoint to fetch role permissions dynamically
-
-// Generate default assignments for the next 7 days
-function generateDefaultAssignments(crewMembers: CrewMemberExtended[], shifts: ShiftConfig[]): Assignment[] {
-  const assignments: Assignment[] = [];
-  const now = new Date();
-  
-  // Get shifts from passed shifts array (match by ID, not name)
-  const morningShift = shifts.find((s: ShiftConfig) => s.id === 'morning');
-  const afternoonShift = shifts.find((s: ShiftConfig) => s.id === 'afternoon');
-  const nightShift = shifts.find((s: ShiftConfig) => s.id === 'night');
-  
-  if (!morningShift || !afternoonShift || !nightShift) {
-    return [];
-  }
-  
-  // Interior crew members (from actual crew state) - EXCLUDE on-leave crew
-  const interiorCrew = crewMembers.filter(
-    c => c.department === 'Interior' && c.status !== 'on-leave'
-  );
-  
-  if (interiorCrew.length === 0) {
-    return []; // No available crew to assign
-  }
-  
-  // Rotate crew through shifts over 7 days
-  for (let day = 0; day < 7; day++) {
-    const date = new Date(now);
-    date.setDate(date.getDate() + day);
-    const dateStr = date.toISOString().split('T')[0];
-    
-    // Morning shift crew rotation (3 crew members)
-    const morningCrewIndex = day % interiorCrew.length;
-    assignments.push({
-      id: `default-morning-${day}-0`,
-      date: dateStr,
-      shiftId: morningShift.id,
-      crewId: interiorCrew[morningCrewIndex]?.id || 'crew-1',
-      type: 'primary',
-    });
-    assignments.push({
-      id: `default-morning-${day}-1`,
-      date: dateStr,
-      shiftId: morningShift.id,
-      crewId: interiorCrew[(morningCrewIndex + 1) % interiorCrew.length]?.id || 'crew-2',
-      type: 'primary',
-    });
-    assignments.push({
-      id: `default-morning-${day}-2`,
-      date: dateStr,
-      shiftId: morningShift.id,
-      crewId: interiorCrew[(morningCrewIndex + 2) % interiorCrew.length]?.id || 'crew-3',
-      type: 'primary',
-    });
-    
-    // Afternoon shift crew rotation (3 crew members)
-    const afternoonCrewIndex = (day + 3) % interiorCrew.length;
-    assignments.push({
-      id: `default-afternoon-${day}-0`,
-      date: dateStr,
-      shiftId: afternoonShift.id,
-      crewId: interiorCrew[afternoonCrewIndex]?.id || 'crew-4',
-      type: 'primary',
-    });
-    assignments.push({
-      id: `default-afternoon-${day}-1`,
-      date: dateStr,
-      shiftId: afternoonShift.id,
-      crewId: interiorCrew[(afternoonCrewIndex + 1) % interiorCrew.length]?.id || 'crew-5',
-      type: 'primary',
-    });
-    assignments.push({
-      id: `default-afternoon-${day}-2`,
-      date: dateStr,
-      shiftId: afternoonShift.id,
-      crewId: interiorCrew[(afternoonCrewIndex + 2) % interiorCrew.length]?.id || 'crew-6',
-      type: 'primary',
-    });
-    
-    // Night shift crew rotation (2 crew members)
-    const nightCrewIndex = (day + 6) % interiorCrew.length;
-    assignments.push({
-      id: `default-night-${day}-0`,
-      date: dateStr,
-      shiftId: nightShift.id,
-      crewId: interiorCrew[nightCrewIndex]?.id || 'crew-7',
-      type: 'primary',
-    });
-    assignments.push({
-      id: `default-night-${day}-1`,
-      date: dateStr,
-      shiftId: nightShift.id,
-      crewId: interiorCrew[(nightCrewIndex + 1) % interiorCrew.length]?.id || 'crew-8',
-      type: 'primary',
-    });
-    
-    // Add backup crew (1 per shift)
-    assignments.push({
-      id: `default-morning-backup-${day}`,
-      date: dateStr,
-      shiftId: morningShift.id,
-      crewId: interiorCrew[(morningCrewIndex + 5) % interiorCrew.length]?.id || 'crew-9',
-      type: 'backup',
-    });
-    assignments.push({
-      id: `default-afternoon-backup-${day}`,
-      date: dateStr,
-      shiftId: afternoonShift.id,
-      crewId: interiorCrew[(afternoonCrewIndex + 5) % interiorCrew.length]?.id || 'crew-9',
-      type: 'backup',
-    });
-    assignments.push({
-      id: `default-night-backup-${day}`,
-      date: dateStr,
-      shiftId: nightShift.id,
-      crewId: interiorCrew[(nightCrewIndex + 2) % interiorCrew.length]?.id || 'crew-9',
-      type: 'backup',
-    });
-  }
-  
-  return assignments;
-}
+// REMOVED: generateDefaultAssignments function - was completely hardcoded
+// All assignments should come from the database via API
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
-  
+
+  // Initialize WebSocket for real-time updates
+  const { isConnected: wsConnected } = useWebSocket();
+
   // Fetch crew members from API
   const { crewMembers: apiCrewMembers, isLoading: isLoadingCrew } = useCrewMembersApi();
   
-  // Fetch guests from API
-  const { guests: apiGuests, isLoading: isLoadingGuests } = useGuestsApi();
+  // Fetch guests from API with mutations
+  const {
+    guests: apiGuests,
+    isLoading: isLoadingGuests,
+    createGuest: apiCreateGuest,
+    updateGuest: apiUpdateGuest,
+    deleteGuest: apiDeleteGuest,
+  } = useGuestsApi();
   
   // Fetch service requests from API
   const { serviceRequests: apiServiceRequests, isLoading: isLoadingServiceRequests } = useServiceRequestsApi();
   
   // Fetch shifts from API
   const { data: apiShifts = [], isLoading: isLoadingShifts } = useShiftsApi();
-  
+
+  // Fetch assignments from API (get current week)
+  const today = new Date().toISOString().split('T')[0];
+  const { data: apiAssignments = [], isLoading: isLoadingAssignments } = useAssignmentsApi({
+    startDate: today,
+  });
+
+  // Mutation for bulk creating assignments
+  const createBulkAssignments = useCreateBulkAssignments();
+  const deleteAssignmentsByDate = useDeleteAssignmentsByDate();
+
   // Fetch locations from API
   const { locations: apiLocations, isLoading: isLoadingLocations } = useLocations();
   
-  // Initialize crew members with empty array - will be populated from API
-  const [crewMembers, setCrewMembers] = useState<CrewMemberExtended[]>([]);
-  
-  // Update crew members when API data arrives - no localStorage
-  useEffect(() => {
-    if (apiCrewMembers.length > 0) {
-      const extendedCrew = apiCrewMembers.map(member => ({
-        id: member.id,
-        name: member.name,
-        position: member.position,
-        department: member.department,
-        role: member.role || member.position,
-        status: (member.status as any) || 'off-duty',
-        shift: '08:00 - 20:00',
-        contact: member.contact || '+1 555 0100',
-        email: member.email || `${member.name.toLowerCase().replace(' ', '.')}@yacht.com`,
-        joinDate: member.joinDate || '2023-01-15',
-        nickname: member.name.split(' ')[0], // Generate from name
-        // Extended fields not in API - use defaults
-        avatar: undefined,
-        color: '#A8A8A8', // Default gray color
-        languages: ['English'], // Default language
-        skills: [], // Empty skills array
-        onBoardContact: undefined,
-        phone: member.contact || undefined, // Use contact as phone fallback
-      }));
-      setCrewMembers(extendedCrew);
-    }
+  // Map API crew members to extended format directly (no duplicate state)
+  const crewMembers: CrewMemberExtended[] = useMemo(() => {
+    return apiCrewMembers.map(member => ({
+      id: member.id,
+      name: member.name,
+      position: member.position,
+      department: member.department,
+      role: member.role ?? undefined,
+      status: (member.status as any),
+      contact: member.contact ?? undefined,
+      email: member.email ?? undefined,
+      joinDate: member.joinDate ?? undefined,
+      leaveStart: member.leaveStart ?? undefined,
+      leaveEnd: member.leaveEnd ?? undefined,
+      languages: member.languages,
+      skills: member.skills,
+      avatar: member.avatar,
+      nickname: member.nickname,
+      color: member.color,
+      onBoardContact: member.onBoardContact,
+      phone: member.phone ?? member.contact,
+      notes: member.notes,
+      shift: member.shift ?? undefined,
+      userId: member.userId ?? undefined,  // Map userId from backend
+    }));
   }, [apiCrewMembers]);
 
-  // Initialize assignments with empty array - will be populated from API
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  // Use API assignments directly (no duplicate state)
+  const assignments: Assignment[] = apiAssignments;
 
-  // Initialize shifts with empty array - will be populated from API
-  const [shifts, setShifts] = useState<ShiftConfig[]>([]);
-  
-  // Update shifts when API data arrives
-  useEffect(() => {
-    if (apiShifts && apiShifts.length > 0) {
-      setShifts(apiShifts);
-    }
-  }, [apiShifts]);
+  // Use API shifts directly (no duplicate state)
+  const shifts: ShiftConfig[] = apiShifts;
+
+  // Setter functions that invalidate React Query cache instead of setting local state
+  const setCrewMembers = useCallback((members: CrewMemberExtended[]) => {
+    // Invalidate crew members cache to trigger re-fetch
+    queryClient.invalidateQueries({ queryKey: ['crewMembers'] });
+  }, [queryClient]);
+
+  const setAssignments = useCallback((assignments: Assignment[]) => {
+    // Invalidate assignments cache to trigger re-fetch
+    queryClient.invalidateQueries({ queryKey: ['assignments'] });
+  }, [queryClient]);
+
+  const setShifts = useCallback((shifts: ShiftConfig[]) => {
+    // Invalidate shifts cache to trigger re-fetch
+    queryClient.invalidateQueries({ queryKey: ['shifts'] });
+  }, [queryClient]);
 
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
@@ -370,10 +267,6 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   // TODO: Create backend API endpoint and hook to fetch crew change logs
   const [crewChangeLogs, setCrewChangeLogs] = useState<CrewChangeLog[]>([]);
 
-  // Device assignments will be fetched from backend via useDeviceAssignments hook
-  // Keeping empty array for backward compatibility - will be removed
-  const [deviceAssignments, setDeviceAssignments] = useState<CrewDeviceAssignment[]>([]);
-
   // Messages will be fetched from backend via useMessages hook and WebSocket
   // Keeping empty array for backward compatibility - will be removed
   const [messages, setMessages] = useState<Message[]>([]);
@@ -387,36 +280,20 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [yachtLocations, setYachtLocations] = useState<YachtLocation[]>([]);
 
   // User Preferences - will be fetched from backend via useUserPreferences hook
-  // TODO: Create backend API endpoint and hook to fetch user preferences
-  const [userPreferences, setUserPreferences] = useState<UserPreferences>({
-    serviceRequestDisplayMode: 'guest-name',
-    servingNowTimeout: 5,
-    requestDialogRepeatInterval: 60,
-  });
+  // Using empty object as initial state - will be populated from API
+  const [userPreferences, setUserPreferences] = useState<UserPreferences>({} as UserPreferences);
 
   // Service Request History - will be fetched from backend via useServiceRequestHistory hook
   // Keeping empty array for backward compatibility - will be removed
   const [serviceRequestHistory, setServiceRequestHistory] = useState<ServiceRequestHistory[]>([]);
 
   // Role Permissions - will be fetched from backend via useRolePermissions hook
-  // TODO: Create backend API endpoint and hook to fetch role permissions
-  const [rolePermissions, setRolePermissions] = useState<Record<Role, string[]>>({
-    "admin": [],
-    "eto": [],
-    "chief-stewardess": [],
-    "stewardess": [],
-    "crew": [],
-  });
+  // Using empty object as initial state - will be populated from API
+  const [rolePermissions, setRolePermissions] = useState<Record<Role, string[]>>({} as Record<Role, string[]>);
 
   // Notification Settings - will be fetched from backend via useNotificationSettings hook
-  // TODO: Create backend API endpoint and hook to fetch notification settings
-  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
-    enabled: true,
-    shiftStartAdvanceTime: '1hour',
-    shiftEndAdvanceTime: '30min',
-    shiftStartEnabled: true,
-    shiftEndEnabled: true,
-  });
+  // Using empty object as initial state - will be populated from API
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({} as NotificationSettings);
 
   // Guest Management - empty array, will be filled by API
   const [guests, setGuests] = useState<Guest[]>([]);
@@ -427,47 +304,34 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       // Map API DTO to app Guest type with all required fields
       const mappedGuests: Guest[] = apiGuests.map(apiGuest => ({
         id: apiGuest.id,
-        
-        // Basic Info
         firstName: apiGuest.firstName,
         lastName: apiGuest.lastName,
-        photo: apiGuest.photo || undefined,
-        preferredName: apiGuest.preferredName || undefined,
+        photo: apiGuest.photo ?? undefined,
+        preferredName: apiGuest.preferredName ?? undefined,
         type: apiGuest.type as any,
         status: apiGuest.status as any,
-        nationality: apiGuest.nationality || undefined,
-        languages: apiGuest.languages || [],
-        passportNumber: apiGuest.passportNumber || undefined,
-        
-        // Accommodation
-        locationId: apiGuest.locationId || undefined,
-        checkInDate: apiGuest.checkInDate || new Date().toISOString().split('T')[0],
-        checkOutDate: apiGuest.checkOutDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        
-        // Dietary & Medical - from database
-        allergies: apiGuest.allergies || [],
-        dietaryRestrictions: apiGuest.dietaryRestrictions || [],
-        medicalConditions: apiGuest.medicalConditions || [],
-        
-        // Preferences & Notes - from database
-        preferences: apiGuest.preferences || undefined,
-        notes: apiGuest.notes || undefined,
-        
-        // Emergency Contact - from database
-        emergencyContactName: apiGuest.emergencyContactName || undefined,
-        emergencyContactPhone: apiGuest.emergencyContactPhone || undefined,
-        emergencyContactRelation: apiGuest.emergencyContactRelation || undefined,
-        
-        // Legacy fields (keep for backward compatibility, can be removed later)
-        doNotDisturb: false,
-        foodDislikes: [],
-        favoriteFoods: [],
-        favoriteDrinks: [],
-        
+        nationality: apiGuest.nationality ?? undefined,
+        languages: apiGuest.languages ?? [],
+        passportNumber: apiGuest.passportNumber ?? undefined,
+        locationId: apiGuest.locationId ?? undefined,
+        checkInDate: apiGuest.checkInDate ?? undefined,
+        checkOutDate: apiGuest.checkOutDate ?? undefined,
+        allergies: apiGuest.allergies ?? [],
+        dietaryRestrictions: apiGuest.dietaryRestrictions ?? [],
+        medicalConditions: apiGuest.medicalConditions ?? [],
+        preferences: apiGuest.preferences ?? undefined,
+        notes: apiGuest.notes ?? undefined,
+        emergencyContactName: apiGuest.emergencyContactName ?? undefined,
+        emergencyContactPhone: apiGuest.emergencyContactPhone ?? undefined,
+        emergencyContactRelation: apiGuest.emergencyContactRelation ?? undefined,
+        doNotDisturb: (apiGuest as any).doNotDisturb ?? false,
+        foodDislikes: (apiGuest as any).foodDislikes ?? [],
+        favoriteFoods: (apiGuest as any).favoriteFoods ?? [],
+        favoriteDrinks: (apiGuest as any).favoriteDrinks ?? [],
         createdAt: apiGuest.createdAt,
         updatedAt: apiGuest.updatedAt,
-        createdBy: 'system',
-      }));
+        createdBy: (apiGuest as any).createdBy ?? undefined,
+      } as Guest));
       
       setGuests(mappedGuests);
     }
@@ -477,42 +341,38 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
   
   // Sync service requests from API when data arrives
+  // IMPORTANT: Always sync, even when array is empty (for "Clear All" to work)
   useEffect(() => {
-    if (apiServiceRequests.length > 0) {
-      // Map API DTO to app ServiceRequest type with all required fields
-      const mappedRequests: ServiceRequest[] = apiServiceRequests.map(apiReq => {
-        // Find guest to get name
-        const guest = guests.find(g => g.id === apiReq.guestId);
-        const guestName = guest ? `${guest.firstName} ${guest.lastName}` : 'Unknown Guest';
-        
-        // Find location/cabin
-        const location = locations.find(l => l.id === apiReq.locationId);
-        const cabinName = location?.name || 'Unknown Location';
-        
-        // Find assigned crew member
-        const assignedCrew = crewMembers.find(c => c.id === apiReq.assignedCrewId);
-        
-        return {
-          id: apiReq.id,
-          guestName,
-          guestCabin: cabinName,
-          cabinId: apiReq.locationId || '',
-          requestType: apiReq.priority === 'emergency' ? 'emergency' : 'call',
-          priority: apiReq.priority === 'low' ? 'normal' : apiReq.priority,
-          timestamp: new Date(apiReq.createdAt),
-          voiceTranscript: apiReq.voiceTranscript || undefined,
-          voiceAudioUrl: apiReq.voiceAudioUrl || undefined,
-          cabinImage: location?.image || undefined,
-          status: apiReq.status as any,
-          assignedTo: assignedCrew?.name || undefined,
-          acceptedAt: apiReq.assignedCrewId ? new Date(apiReq.updatedAt) : undefined,
-          completedAt: apiReq.completedAt ? new Date(apiReq.completedAt) : undefined,
-          notes: apiReq.message || undefined,
-        };
-      });
-      
-      setServiceRequests(mappedRequests);
-    }
+    // Map API DTO to app ServiceRequest type with all required fields
+    const mappedRequests: ServiceRequest[] = apiServiceRequests.map(apiReq => {
+      // Find guest to get name
+      const guest = guests.find(g => g.id === apiReq.guestId);
+      const guestName = guest ? `${guest.firstName} ${guest.lastName}` : apiReq.guestName;
+
+      // Find location/cabin
+      const location = locations.find(l => l.id === apiReq.locationId);
+      const cabinName = location?.name ?? apiReq.guestCabin;
+
+      return {
+        id: apiReq.id,
+        guestName,
+        guestCabin: cabinName,
+        cabinId: apiReq.locationId || '',
+        requestType: apiReq.requestType,  // Use requestType from API
+        priority: apiReq.priority,
+        timestamp: apiReq.timestamp,  // Already a Date object from API transformation
+        voiceTranscript: apiReq.voiceTranscript || undefined,
+        voiceAudioUrl: apiReq.voiceAudioUrl || undefined,
+        cabinImage: apiReq.cabinImage || location?.imageUrl || location?.image || undefined,  // Use image from API transform first
+        status: apiReq.status as any,
+        assignedTo: apiReq.assignedTo || undefined,
+        acceptedAt: apiReq.acceptedAt,  // Already Date or undefined
+        completedAt: apiReq.completedAt,  // Already Date or undefined
+        notes: apiReq.notes || undefined,
+      };
+    });
+
+    setServiceRequests(mappedRequests);
   }, [apiServiceRequests, guests, locations, crewMembers]);
 
   // Activity logs state
@@ -520,31 +380,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   // Removed localStorage persistence for crew members - using API as single source of truth
 
-  // Auto-reset crew statuses when assignments change (no localStorage)
-  useEffect(() => {
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
-    const todayAssignments = assignments.filter(a => a.date === today);
-    const assignedCrewIds = new Set(todayAssignments.map(a => a.crewId));
-    
-    setCrewMembers(prevCrew => {
-      let hasChanges = false;
-      
-      const updated = prevCrew.map(member => {
-        if (
-          member.department === 'Interior' &&
-          member.status === 'on-duty' &&
-          !assignedCrewIds.has(member.id)
-        ) {
-          hasChanges = true;
-          return { ...member, status: 'off-duty' as const };
-        }
-        return member;
-      });
-      
-      return hasChanges ? updated : prevCrew;
-    });
-  }, [assignments, setCrewMembers]);
+  // REMOVED: Auto-reset crew statuses when assignments change
+  // This was automatically resetting manual "on-duty" (Emergency) status back to "off-duty"
+  // Manual status changes should persist in the database until manually changed
+  // The crew status should come from the backend API, not be auto-calculated here
 
   // Removed localStorage persistence for shifts - will use API
   // Persist other data (device logs and call logs removed - now from API)
@@ -675,33 +514,59 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return changes;
   };
 
-  // Mark changes as notified
-  const markChangesAsNotified = (changes: CrewChange[]) => {
-    changes.forEach(change => {
-      addCrewChangeLog({
-        crewMember: change.crewMember,
-        changeType: change.changeType,
-        date: change.date,
-        shift: change.shift,
-        performedBy: 'Chief Steward', // In production, get from auth context
-        notified: true,
-        details: change.details,
-      });
-    });
+  // Mark changes as notified - sends to backend API
+  const markChangesAsNotified = async (changes: CrewChange[]) => {
+    if (changes.length === 0) return;
+
+    try {
+      // Call backend API to create crew change logs
+      await api.post('/crew-change-logs/bulk', { changes });
+
+      // Invalidate crew change logs cache to trigger re-fetch
+      queryClient.invalidateQueries({ queryKey: ['crew-change-logs'] });
+
+      console.log(`✅ Created ${changes.length} crew change logs`);
+    } catch (error) {
+      console.error('❌ Failed to create crew change logs:', error);
+      throw error;
+    }
   };
 
-  // Save function - TODO: Replace with API call to save assignments
-  const saveAssignments = async () => {
+  // Save assignments to database
+  // Accepts optional assignmentsToSave parameter to avoid race conditions
+  const saveAssignments = async (assignmentsToSave?: Assignment[]) => {
     setIsSaving(true);
-    setPreviousAssignments([...assignments]);
-    
-    // TODO: Replace with actual API call
-    // await api.dutyRoster.saveAssignments(assignments);
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    const now = new Date();
-    setLastSaved(now);
-    setIsSaving(false);
+
+    // Use provided assignments or fallback to context assignments
+    const assignmentsData = assignmentsToSave || assignments;
+    setPreviousAssignments([...assignmentsData]);
+
+    try {
+      // Get all unique dates from assignments
+      const uniqueDates = Array.from(new Set(assignmentsData.map(a => a.date)));
+
+      // Delete all existing assignments for these dates first
+      // This ensures removed assignments are actually deleted from the database
+      for (const date of uniqueDates) {
+        await deleteAssignmentsByDate.mutateAsync(date);
+      }
+
+      // Now create all the new assignments
+      if (assignmentsData.length > 0) {
+        await createBulkAssignments.mutateAsync(assignmentsData);
+      }
+
+      const now = new Date();
+      setLastSaved(now);
+
+      // Invalidate assignments cache to trigger re-fetch
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
+    } catch (error) {
+      console.error('[AppData] Failed to save assignments:', error);
+      throw error;
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Get current duty status based on assignments AND manual crew status
@@ -794,44 +659,45 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       });
     }
 
-    // Find next shift
-    const nextShiftConfig = shifts.find(shift => {
+    // Find next shift (must be AFTER current shift, not same as current)
+    // First, try to find next shift today that starts after current time
+    let nextShiftConfig = shifts.find(shift => {
       const [startHour, startMin] = shift.startTime.split(':').map(Number);
       const startTime = startHour * 60 + startMin;
       return startTime > currentTime;
-    }) || shifts[0];
+    });
+
+    // If no shift found today OR if next shift is same as current shift, use tomorrow's first shift
+    let nextShiftDate = today;
+    if (!nextShiftConfig || (currentShift && nextShiftConfig.id === currentShift.id)) {
+      // No more shifts today or next = current, so next shift is tomorrow's first shift
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      nextShiftDate = tomorrow.toISOString().split('T')[0];
+      nextShiftConfig = shifts[0]; // First shift of the day
+    }
 
     let nextBackup: CrewMemberExtended[] = [];
 
     if (nextShiftConfig) {
-      // Get next shift assignments
-      let nextShiftAssignments = todayAssignments.filter(
+      // Get next shift assignments from the appropriate date
+      const relevantAssignments = nextShiftDate === today
+        ? todayAssignments
+        : assignments.filter(a => a.date === nextShiftDate);
+
+      let nextShiftAssignments = relevantAssignments.filter(
         a => a.shiftId === nextShiftConfig.id && a.type === 'primary'
       );
-      
-      let nextBackupAssignments = todayAssignments.filter(
+
+      let nextBackupAssignments = relevantAssignments.filter(
         a => a.shiftId === nextShiftConfig.id && a.type === 'backup'
       );
-      
-      // If no assignments for next shift today, check tomorrow
-      if (nextShiftAssignments.length === 0) {
-        const tomorrow = new Date(now);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowStr = tomorrow.toISOString().split('T')[0];
-        const tomorrowAssignments = assignments.filter(a => a.date === tomorrowStr);
-        nextShiftAssignments = tomorrowAssignments.filter(
-          a => a.shiftId === nextShiftConfig.id && a.type === 'primary'
-        );
-        nextBackupAssignments = tomorrowAssignments.filter(
-          a => a.shiftId === nextShiftConfig.id && a.type === 'backup'
-        );
-      }
-      
-      // Populate next shift primary crew
+
+      // Populate next shift primary crew (don't filter out onDuty if it's a different shift)
       nextShiftAssignments.forEach(assignment => {
         const member = crewMembers.find(c => c.id === assignment.crewId);
-        
-        if (member && member.department === 'Interior' && member.status !== 'on-leave' && !onDuty.find(m => m.id === member.id)) {
+
+        if (member && member.department === 'Interior' && member.status !== 'on-leave') {
           nextShift.push({
             ...member,
             status: 'off-duty',
@@ -857,44 +723,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return { onDuty, nextShift, backup, nextBackup };
   }, [assignments, shifts, crewMembers]);
 
-  // Device Assignment Functions - TODO: Replace with API calls
-  const assignDeviceToCrew = (assignment: Omit<CrewDeviceAssignment, 'id' | 'assignedAt' | 'lastSync'>) => {
-    const now = new Date();
-    const newAssignment: CrewDeviceAssignment = {
-      ...assignment,
-      id: `device-assignment-${Date.now()}`,
-      assignedAt: now,
-      lastSync: now,
-      status: assignment.status || 'connected',
-    };
-    
-    setDeviceAssignments(prev => {
-      const filtered = prev.filter(
-        a => a.crewMemberId !== assignment.crewMemberId && a.deviceId !== assignment.deviceId
-      );
-      return [...filtered, newAssignment];
-    });
-  };
-
-  const removeDeviceFromCrew = (crewMemberId: string) => {
-    setDeviceAssignments(prev => prev.filter(a => a.crewMemberId !== crewMemberId));
-  };
-
-  const getCrewDevice = (crewMemberId: string): CrewDeviceAssignment | undefined => {
-    return deviceAssignments.find(a => a.crewMemberId === crewMemberId);
-  };
-
-  const getDeviceAssignment = (deviceId: string): CrewDeviceAssignment | undefined => {
-    return deviceAssignments.find(a => a.deviceId === deviceId);
-  };
-
   // Message Functions
   const sendMessage = (message: Omit<Message, 'id' | 'timestamp' | 'deliveryStatus'>) => {
     const newMessage: Message = {
       ...message,
       id: `message-${Date.now()}`,
       timestamp: new Date(),
-      deliveryStatus: 'sent',
+      deliveryStatus: 'sent' as const,
     };
     
     setMessages(prev => [newMessage, ...prev]);
@@ -925,41 +760,30 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     setUserPreferences(prev => ({ ...prev, ...preferences }));
   };
 
-  // Guest Management Functions
+  // Guest Management Functions - Connected to Backend API
   const addGuest = (guest: Omit<Guest, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const now = new Date().toISOString();
-    const newGuest: Guest = {
-      ...guest,
-      id: `guest-${Date.now()}`,
-      createdAt: now,
-      updatedAt: now,
-    };
-    
-    setGuests(prev => [newGuest, ...prev]);
+    // Call backend API mutation
+    apiCreateGuest(guest as any);
   };
 
   const updateGuest = (id: string, updates: Partial<Guest>) => {
-    setGuests(prev =>
-      prev.map(guest =>
-        guest.id === id
-          ? { ...guest, ...updates, updatedAt: new Date().toISOString() }
-          : guest
-      )
-    );
+    // Call backend API mutation
+    apiUpdateGuest(id, updates as any);
   };
 
   const deleteGuest = (id: string) => {
-    setGuests(prev => prev.filter(guest => guest.id !== id));
+    // Call backend API mutation
+    apiDeleteGuest(id);
   };
 
   // Yacht Location Management Functions
-  const addLocation = (location: Omit<YachtLocation, 'id' | 'createdAt' | 'createdBy' | 'isCustom'>) => {
+  const addLocation = (location: Omit<YachtLocation, 'id' | 'createdAt' | 'createdBy' | 'isCustom'> & { createdBy?: string }) => {
     const now = new Date().toISOString();
     const newLocation: YachtLocation = {
       ...location,
       id: `LOC-${Date.now()}`,
       isCustom: true,
-      createdBy: 'ETO',
+      createdBy: location.createdBy ?? 'system',
       createdAt: now,
     };
     
@@ -990,15 +814,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     setYachtLocations(prev => prev.filter(location => location.id !== id));
   };
 
-  const updateLocationDeviceStatus = (id: string, deviceStatus: 'online' | 'offline' | 'alert', activeRequests?: number) => {
+  const updateLocationDeviceStatus = (id: string, deviceStatus: 'online' | 'offline' | 'alert', activeRequests?: number, lastActivity?: string) => {
     setYachtLocations(prev =>
       prev.map(location =>
         location.id === id
-          ? { 
-              ...location, 
-              deviceStatus, 
+          ? {
+              ...location,
+              deviceStatus,
               activeRequests: activeRequests !== undefined ? activeRequests : location.activeRequests,
-              lastActivity: 'Just now'
+              lastActivity: lastActivity ?? location.lastActivity
             }
           : location
       )
@@ -1052,15 +876,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     );
   };
 
-  const forwardServiceRequest = (requestId: string, toTeam: InteriorTeam) => {
-    setServiceRequests(prev =>
-      prev.map(req =>
-        req.id === requestId
-          ? { ...req, status: 'forwarded' as const, forwardedToTeam: toTeam, forwardedAt: new Date() }
-          : req
-      )
-    );
-  };
+  // forwardServiceRequest removed - components should update service request with categoryId via API
 
   const completeServiceRequest = (requestId: string, crewMemberName?: string) => {
     const now = new Date();
@@ -1076,7 +892,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             const historyEntry: ServiceRequestHistory = {
               id: `history-${Date.now()}`,
               originalRequest: completedReq,
-              completedBy: crewMemberName || req.assignedTo || 'Unknown',
+              completedBy: crewMemberName ?? req.assignedTo ?? '',
               completedAt: now,
               duration,
             };
@@ -1127,36 +943,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, [userPreferences.servingNowTimeout]);
 
-  const getPendingRequestsForService = (serviceName: string): ServiceRequest[] => {
-    return serviceRequests.filter(req =>
-      req.status === 'forwarded' && req.forwardedToTeam === serviceName
-    );
-  };
+  // getPendingRequestsForService removed - use API filters instead
 
   const clearServiceRequestHistory = () => {
     setServiceRequestHistory([]);
   };
 
-  const simulateNewRequest = (): ServiceRequest => {
-    // TODO: Replace with real API call to create a service request
-    // For now, create a minimal request using real data
-    const newRequest: ServiceRequest = {
-      id: `req-${Date.now()}`,
-      guestName: 'Simulated Guest',
-      guestCabin: 'Test Location',
-      cabinId: '',
-      requestType: 'call',
-      priority: 'normal',
-      timestamp: new Date(),
-      voiceTranscript: 'Simulated service request',
-      voiceAudioUrl: undefined,
-      cabinImage: undefined,
-      status: 'pending',
-    };
-    
-    setServiceRequests(prev => [newRequest, ...prev]);
-    return newRequest;
-  };
+  // REMOVED: simulateNewRequest - replaced with real API calls in components
+  // Components should use useServiceRequestsApi().createMutation directly
 
   return (
     <AppDataContext.Provider
@@ -1182,11 +976,6 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         addActivityLog,
         detectRosterChanges,
         markChangesAsNotified,
-        deviceAssignments,
-        assignDeviceToCrew,
-        removeDeviceFromCrew,
-        getCrewDevice,
-        getDeviceAssignment,
         messages,
         sendMessage,
         recentActivity,
@@ -1213,10 +1002,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         addServiceRequest,
         acceptServiceRequest,
         delegateServiceRequest,
-        forwardServiceRequest,
         completeServiceRequest,
-        simulateNewRequest,
-        getPendingRequestsForService,
+        // simulateNewRequest removed - use API directly
+        // forwardServiceRequest removed - use service categories instead
+        // getPendingRequestsForService removed - use API filters instead
         serviceRequestHistory,
         clearServiceRequestHistory,
       }}

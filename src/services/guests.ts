@@ -43,29 +43,22 @@ export interface GuestMetaResponse {
 }
 
 export class GuestsService {
-  private static baseUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/guests`;
-
-  /**
-   * Get JWT token for API authentication
-   */
-  private static getAuthToken(): string | null {
-    return localStorage.getItem('obedio-auth-token');
-  }
+  private static baseUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8080/api'}/guests`;
 
   /**
    * Make authenticated API request
+   * Auth handled via HTTP-only cookies (server runs 24/7)
    */
   private static async apiRequest(endpoint: string, options: RequestInit = {}) {
-    const token = this.getAuthToken();
     const url = `${this.baseUrl}${endpoint}`;
-    
+
     const config: RequestInit = {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.headers,
       },
+      credentials: 'include', // Send HTTP-only cookie automatically
     };
 
     const response = await fetch(url, config);

@@ -3,6 +3,7 @@ import { asyncHandler } from '../middleware/error-handler';
 import { requirePermission, authMiddleware } from '../middleware/auth';
 import { prisma } from '../services/db';
 import { websocketService } from '../services/websocket';
+import { calculatePagination, buildPaginationMeta } from '../utils/pagination';
 import { apiSuccess, apiError } from '../utils/api-response';
 
 const router = Router();
@@ -95,6 +96,141 @@ router.put('/heartbeat', asyncHandler(async (req, res) => {
 router.use(authMiddleware);
 
 /**
+ * GET /api/devices/logs
+ * Get all device logs with optional filters
+ * NOTE: This MUST be before /:id routes to avoid "logs" being treated as an ID
+ */
+router.get('/logs', requirePermission('devices.view'), asyncHandler(async (req, res) => {
+  console.log('📱 GET /api/devices/logs - Handler called');
+  console.log('   Query params:', req.query);
+
+  const {
+    deviceId,
+    status,
+    startDate,
+    endDate,
+    search,
+    page = 1,
+    limit = 50,
+    eventType
+  } = req.query;
+
+  const where: any = {};
+
+  if (deviceId) where.deviceId = deviceId as string;
+  if (eventType) where.eventType = eventType as string;
+
+  // Handle status filter - map status to eventType
+  if (status) {
+    switch (status) {
+      case 'online':
+        where.eventType = 'device_online';
+        break;
+      case 'offline':
+        where.eventType = 'device_offline';
+        break;
+      case 'alert':
+        where.eventType = { in: ['battery_low', 'error'] };
+        break;
+      case 'maintenance':
+        where.eventType = 'maintenance';
+        break;
+    }
+  }
+
+  // Date range filter
+  if (startDate || endDate) {
+    where.createdAt = {};
+    if (startDate) where.createdAt.gte = new Date(startDate as string);
+    if (endDate) where.createdAt.lte = new Date(endDate as string);
+  }
+
+  // Search in eventData
+  if (search) {
+    where.OR = [
+      { eventType: { contains: search as string, mode: 'insensitive' } },
+      { severity: { contains: search as string, mode: 'insensitive' } }
+    ];
+  }
+
+  const { skip, take, page: pageNum, limit: limitNum } = calculatePagination(Number(page), Number(limit));
+
+  const [logs, total] = await Promise.all([
+    prisma.deviceLog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take,
+      include: {
+        device: {
+          select: {
+            id: true,
+            deviceId: true,
+            name: true,
+            type: true,
+            location: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        }
+      }
+    }),
+    prisma.deviceLog.count({ where })
+  ]);
+
+  // Transform logs to match frontend expectations (BACKEND TRANSFORMATION)
+  const transformedLogs = logs.map(log => ({
+    id: log.id,
+    timestamp: log.createdAt,
+    createdAt: log.createdAt,
+    deviceId: log.device.deviceId,
+    deviceName: log.device.name,
+    device: log.device.name,  // Alias for compatibility
+    location: log.device.location?.name || null,
+    status: mapEventTypeToStatus(log.eventType),
+    message: formatEventMessage(log.eventType, log.eventData),
+    event: log.eventType,
+    eventType: log.eventType,  // Alias for compatibility
+    user: (log.eventData as any)?.user || null,
+    severity: log.severity
+  }));
+
+  console.log(`✅ Returning ${transformedLogs.length} device logs`);
+  res.json(apiSuccess(transformedLogs, buildPaginationMeta(total, pageNum, limitNum)));
+}));
+
+/**
+ * GET /api/devices/stats/summary
+ * Get device statistics
+ */
+router.get('/stats/summary', requirePermission('devices.view'), asyncHandler(async (req, res) => {
+  const [total, online, offline, lowBattery, byType] = await Promise.all([
+    prisma.device.count(),
+    prisma.device.count({ where: { status: 'online' } }),
+    prisma.device.count({ where: { status: 'offline' } }),
+    prisma.device.count({ where: { status: 'low_battery' } }),
+    prisma.device.groupBy({
+      by: ['type'],
+      _count: true
+    })
+  ]);
+
+  res.json(apiSuccess({
+    total,
+    online,
+    offline,
+    lowBattery,
+    byType: byType.reduce((acc: any, item: any) => {
+      acc[item.type] = item._count;
+      return acc;
+    }, {})
+  }));
+}));
+
+/**
  * GET /api/devices
  * List all devices with optional filters
  */
@@ -102,26 +238,45 @@ router.get('/', requirePermission('devices.view'), asyncHandler(async (req, res)
   console.log('📱 GET /api/devices - Handler called');
   console.log('   Query params:', req.query);
   console.log('   User:', (req as any).user);
-  
-  const { type, status, locationId, crewMemberId } = req.query;
 
+  const { type, status, locationId, crewMemberId, macAddress } = req.query;
+
+  // Build WHERE conditions using Prisma (secure, no SQL injection)
   const where: any = {};
+
   if (type) where.type = type as string;
   if (status) where.status = status as string;
   if (locationId) where.locationId = locationId as string;
   if (crewMemberId) where.crewMemberId = crewMemberId as string;
+  if (macAddress) where.macAddress = macAddress as string;
 
+  // Execute query using Prisma (secure and type-safe)
   const devices = await prisma.device.findMany({
     where,
     include: {
-      location: { select: { id: true, name: true, type: true, floor: true } },
-      crewMember: { select: { id: true, name: true, position: true } }
+      location: {
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          floor: true
+        }
+      },
+      crewMember: {
+        select: {
+          id: true,
+          name: true,
+          position: true
+        }
+      }
     },
-    orderBy: { createdAt: 'desc' }
+    orderBy: {
+      createdAt: 'desc'
+    }
   });
 
   console.log(`✅ Returning ${devices.length} devices`);
-  res.json({ success: true, data: devices });
+  res.json(apiSuccess(devices));
 }));
 
 /**
@@ -142,10 +297,10 @@ router.get('/:id', requirePermission('devices.view'), asyncHandler(async (req, r
   });
 
   if (!device) {
-    return res.status(404).json({ success: false, error: 'Device not found' });
+    return res.status(404).json(apiError('Device not found', 'NOT_FOUND'));
   }
 
-  res.json({ success: true, data: device });
+  res.json(apiSuccess(device));
 }));
 
 /**
@@ -171,7 +326,10 @@ router.post('/', requirePermission('devices.add'), asyncHandler(async (req, res)
     }
   });
 
-  res.status(201).json({ success: true, data: device });
+  // Broadcast device creation to all connected clients
+  websocketService.emitDeviceEvent('created', device);
+
+  res.status(201).json(apiSuccess(device));
 }));
 
 /**
@@ -179,9 +337,45 @@ router.post('/', requirePermission('devices.add'), asyncHandler(async (req, res)
  * Update device
  */
 router.put('/:id', requirePermission('devices.edit'), asyncHandler(async (req, res) => {
+  // Extract valid Prisma fields from req.body
+  const {
+    deviceId, name, type, subType, status,
+    locationId, crewMemberId,
+    batteryLevel, signalStrength, connectionType, lastSeen,
+    config,
+    firmwareVersion, hardwareVersion, macAddress, ipAddress,
+    ...buttonActions // Everything else goes into config
+  } = req.body;
+
+  // Build update data object with only valid Prisma fields
+  const updateData: any = {};
+  if (deviceId !== undefined) updateData.deviceId = deviceId;
+  if (name !== undefined) updateData.name = name;
+  if (type !== undefined) updateData.type = type;
+  if (subType !== undefined) updateData.subType = subType;
+  if (status !== undefined) updateData.status = status;
+  if (locationId !== undefined) updateData.locationId = locationId;
+  if (crewMemberId !== undefined) updateData.crewMemberId = crewMemberId;
+  if (batteryLevel !== undefined) updateData.batteryLevel = batteryLevel;
+  if (signalStrength !== undefined) updateData.signalStrength = signalStrength;
+  if (connectionType !== undefined) updateData.connectionType = connectionType;
+  if (lastSeen !== undefined) updateData.lastSeen = lastSeen;
+  if (firmwareVersion !== undefined) updateData.firmwareVersion = firmwareVersion;
+  if (hardwareVersion !== undefined) updateData.hardwareVersion = hardwareVersion;
+  if (macAddress !== undefined) updateData.macAddress = macAddress;
+  if (ipAddress !== undefined) updateData.ipAddress = ipAddress;
+
+  // Merge button actions into config
+  if (config !== undefined || Object.keys(buttonActions).length > 0) {
+    updateData.config = {
+      ...config,
+      ...buttonActions
+    };
+  }
+
   const device = await prisma.device.update({
     where: { id: req.params.id },
-    data: req.body,
+    data: updateData,
     include: {
       location: true,
       crewMember: true
@@ -200,7 +394,15 @@ router.put('/:id', requirePermission('devices.edit'), asyncHandler(async (req, r
     });
   }
 
-  res.json({ success: true, data: device });
+  // Broadcast device update to all connected clients
+  websocketService.emitDeviceEvent('updated', device);
+
+  // If status changed, also broadcast status change event
+  if (req.body.status) {
+    websocketService.emitDeviceStatusChanged(device);
+  }
+
+  res.json(apiSuccess(device));
 }));
 
 /**
@@ -212,7 +414,7 @@ router.delete('/:id', requirePermission('devices.delete'), asyncHandler(async (r
     where: { id: req.params.id }
   });
 
-  res.json({ success: true, message: 'Device deleted' });
+  res.json(apiSuccess({ deleted: true, id: req.params.id }));
 }));
 
 /**
@@ -234,21 +436,31 @@ router.get('/:id/config', requirePermission('devices.view'), asyncHandler(async 
   });
 
   if (!device) {
-    return res.status(404).json({ success: false, error: 'Device not found' });
+    return res.status(404).json(apiError('Device not found', 'NOT_FOUND'));
   }
 
-  res.json({ success: true, data: device });
+  res.json(apiSuccess(device));
 }));
 
 /**
  * PUT /api/devices/:id/config
- * Update device configuration
+ * Update device configuration and name
  */
 router.put('/:id/config', requirePermission('devices.edit'), asyncHandler(async (req, res) => {
+  const updateData: any = {};
+  
+  // Handle both config and name updates
+  if (req.body.config !== undefined) {
+    updateData.config = req.body.config;
+  }
+  if (req.body.name !== undefined) {
+    updateData.name = req.body.name;
+  }
+  
   const device = await prisma.device.update({
     where: { id: req.params.id },
-    data: { config: req.body.config },
-    select: { id: true, deviceId: true, config: true }
+    data: updateData,
+    select: { id: true, deviceId: true, name: true, config: true }
   });
 
   // Log config change
@@ -256,12 +468,12 @@ router.put('/:id/config', requirePermission('devices.edit'), asyncHandler(async 
     data: {
       deviceId: device.id,
       eventType: 'config_change',
-      eventData: req.body.config,
+      eventData: { ...req.body },
       severity: 'info'
     }
   });
 
-  res.json({ success: true, data: device });
+  res.json(apiSuccess(device));
 }));
 
 /**
@@ -274,7 +486,7 @@ router.post('/:id/test', requirePermission('devices.edit'), asyncHandler(async (
   });
 
   if (!device) {
-    return res.status(404).json({ success: false, error: 'Device not found' });
+    return res.status(404).json(apiError('Device not found', 'NOT_FOUND'));
   }
 
   // Log test signal
@@ -287,19 +499,33 @@ router.post('/:id/test', requirePermission('devices.edit'), asyncHandler(async (
     }
   });
 
-  // TODO: Send actual MQTT message to device
-  // For now, just return success
+  // Send MQTT message to device if it's a smart button
+  if (device.type === 'smart_button' && device.status === 'online') {
+    try {
+      const mqttService = require('../services/mqtt.service').mqttService;
+      await mqttService.sendCommand(device.deviceId, {
+        action: 'test',
+        payload: {
+          led: 'blink',
+          sound: 'beep',
+          duration: 3000
+        }
+      });
+    } catch (error) {
+      console.error('Failed to send MQTT test command:', error);
+    }
+  }
 
-  res.json({ 
-    success: true, 
+  res.json(apiSuccess({
     message: 'Test signal sent to device',
-    data: { deviceId: device.deviceId, testType: 'led_blink' }
-  });
+    deviceId: device.deviceId,
+    testType: 'led_blink'
+  }));
 }));
 
 /**
  * GET /api/devices/:id/logs
- * Get device event logs
+ * Get device event logs with transformation
  */
 router.get('/:id/logs', requirePermission('devices.view'), asyncHandler(async (req, res) => {
   const { limit = 100, eventType } = req.query;
@@ -310,126 +536,39 @@ router.get('/:id/logs', requirePermission('devices.view'), asyncHandler(async (r
   const logs = await prisma.deviceLog.findMany({
     where,
     orderBy: { createdAt: 'desc' },
-    take: Number(limit)
-  });
-
-  res.json({ success: true, data: logs });
-}));
-
-/**
- * GET /api/devices/logs
- * Get all device logs with optional filters
- */
-router.get('/logs', requirePermission('devices.view'), asyncHandler(async (req, res) => {
-  console.log('📱 GET /api/devices/logs - Handler called');
-  console.log('   Query params:', req.query);
-  
-  const {
-    deviceId,
-    status,
-    startDate,
-    endDate,
-    search,
-    page = 1,
-    limit = 50,
-    eventType
-  } = req.query;
-
-  const where: any = {};
-  
-  if (deviceId) where.deviceId = deviceId as string;
-  if (eventType) where.eventType = eventType as string;
-  
-  // Handle status filter - map status to eventType
-  if (status) {
-    switch (status) {
-      case 'online':
-        where.eventType = 'device_online';
-        break;
-      case 'offline':
-        where.eventType = 'device_offline';
-        break;
-      case 'alert':
-        where.eventType = { in: ['battery_low', 'error'] };
-        break;
-      case 'maintenance':
-        where.eventType = 'maintenance';
-        break;
-    }
-  }
-  
-  // Date range filter
-  if (startDate || endDate) {
-    where.createdAt = {};
-    if (startDate) where.createdAt.gte = new Date(startDate as string);
-    if (endDate) where.createdAt.lte = new Date(endDate as string);
-  }
-  
-  // Search in eventData
-  if (search) {
-    where.OR = [
-      { eventType: { contains: search as string, mode: 'insensitive' } },
-      { severity: { contains: search as string, mode: 'insensitive' } }
-    ];
-  }
-
-  const skip = (Number(page) - 1) * Number(limit);
-
-  const [logs, total] = await Promise.all([
-    prisma.deviceLog.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: Number(limit),
-      include: {
-        device: {
-          select: {
-            id: true,
-            deviceId: true,
-            name: true,
-            type: true,
-            location: {
-              select: {
-                id: true,
-                name: true
-              }
-            }
-          }
+    take: Number(limit),
+    include: {
+      device: {
+        select: {
+          deviceId: true,
+          name: true,
+          location: { select: { name: true } }
         }
       }
-    }),
-    prisma.deviceLog.count({ where })
-  ]);
+    }
+  });
 
-  // Transform logs to match frontend expectations
+  // Transform logs on BACKEND before sending to frontend
   const transformedLogs = logs.map(log => ({
     id: log.id,
-    timestamp: log.createdAt,
-    createdAt: log.createdAt,
     deviceId: log.device.deviceId,
     deviceName: log.device.name,
+    device: log.device.name,  // Alias for compatibility
     location: log.device.location?.name || null,
+    eventType: log.eventType,
+    event: log.eventType,  // Alias for compatibility
+    eventData: log.eventData,
     status: mapEventTypeToStatus(log.eventType),
     message: formatEventMessage(log.eventType, log.eventData),
-    event: log.eventType,
-    user: (log.eventData as any)?.user || null,
+    timestamp: log.createdAt,
+    createdAt: log.createdAt,
     severity: log.severity
   }));
 
-  console.log(`✅ Returning ${transformedLogs.length} device logs`);
-  res.json({
-    success: true,
-    data: transformedLogs,
-    pagination: {
-      page: Number(page),
-      limit: Number(limit),
-      total,
-      totalPages: Math.ceil(total / Number(limit))
-    }
-  });
+  res.json(apiSuccess(transformedLogs));
 }));
 
-// Helper functions for device logs
+// Helper functions for device logs (moved to top of file where /logs endpoint is defined)
 function mapEventTypeToStatus(eventType: string): string {
   switch (eventType) {
     case 'device_online':
@@ -470,34 +609,38 @@ function formatEventMessage(eventType: string, eventData: any): string {
 }
 
 /**
- * GET /api/devices/stats
- * Get device statistics
+ * GET /api/devices/me
+ * Get current user's assigned device (watch)
+ * Used by watch app to discover its device ID on first launch
  */
-router.get('/stats/summary', requirePermission('devices.view'), asyncHandler(async (req, res) => {
-  const [total, online, offline, lowBattery, byType] = await Promise.all([
-    prisma.device.count(),
-    prisma.device.count({ where: { status: 'online' } }),
-    prisma.device.count({ where: { status: 'offline' } }),
-    prisma.device.count({ where: { status: 'low_battery' } }),
-    prisma.device.groupBy({
-      by: ['type'],
-      _count: true
-    })
-  ]);
+router.get('/me', asyncHandler(async (req, res) => {
+  const user = (req as any).user;
 
-  res.json({
-    success: true,
-    data: {
-      total,
-      online,
-      offline,
-      lowBattery,
-      byType: byType.reduce((acc: any, item: any) => {
-        acc[item.type] = item._count;
-        return acc;
-      }, {})
+  if (!user) {
+    return res.status(401).json(apiError('Unauthorized', 'UNAUTHORIZED'));
+  }
+
+  // Find crew member for this user
+  const crewMember = await prisma.crewMember.findUnique({
+    where: { userId: user.id },
+    include: {
+      devices: {
+        where: { type: 'watch' },
+        include: {
+          location: true,
+          crewMember: true
+        }
+      }
     }
   });
+
+  if (!crewMember || crewMember.devices.length === 0) {
+    return res.status(404).json(apiError('Watch device not found for this user', 'NOT_FOUND'));
+  }
+
+  const watchDevice = crewMember.devices[0]; // Return first watch
+
+  res.json(apiSuccess(watchDevice));
 }));
 
 export default router;

@@ -23,6 +23,7 @@ import {
   Info,
   Plus,
   X,
+  XCircle,
   Bell,
   Download,
   Upload,
@@ -45,7 +46,9 @@ import {
   ExternalLink,
   GripVertical,
   Edit2,
-  Tag
+  Tag,
+  User,
+  Users
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "../ui/badge";
@@ -60,7 +63,8 @@ import {
   TableRow,
 } from "../ui/table";
 import { YACHT_TIMEZONES, VESSEL_TYPES } from "../../types/system-settings";
-import { useYachtSettingsApi } from "../../hooks/useYachtSettingsApi";
+import { useYachtSettings } from "../../hooks/useYachtSettings";
+import { useUserPreferences } from "../../hooks/useUserPreferences";
 import {
   Alert,
   AlertDescription,
@@ -70,6 +74,14 @@ import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { Progress } from "../ui/progress";
 import { useServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useReorderServiceCategories } from "../../hooks/useServiceCategories";
 import type { ServiceCategory } from "../../hooks/useServiceCategories";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
 
 // Permission categories and their specific permissions
 interface Permission {
@@ -166,12 +178,42 @@ interface SettingsPageProps {
 }
 
 export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
-  const { rolePermissions, updateRolePermissions, userPreferences, updateUserPreferences } = useAppData();
+  const { crewMembers } = useAppData();
   const [activeTab, setActiveTab] = useState(initialTab);
   
-  // Use yacht settings API hook
-  const { settings: yachtSettings, updateSettings: updateYachtSettings, isLoading: isLoadingSettings } = useYachtSettingsApi();
+  // Provide defaults since these are deprecated in AppDataContext
+  const userPreferences = {
+    serviceRequestDisplayMode: 'location' as 'guest-name' | 'location',
+    servingNowTimeout: 5,
+    requestDialogRepeatInterval: 60,
+  };
   
+  const rolePermissions: Record<Role, string[]> = {
+    admin: allPermissions.map(p => p.id), // Admin has all permissions
+    'chief-stewardess': [],
+    stewardess: [],
+    crew: [],
+    eto: ['locations.delete'], // ETO can delete locations
+  };
+  
+  // Deprecated function - removed in favor of backend API
+  const updateUserPreferences = (prefs: any) => {
+    console.warn('updateUserPreferences is deprecated. Use useUserPreferences hook instead.');
+  };
+
+  // Use yacht settings hook with WebSocket support
+  const { settings: yachtSettings, updateSettings: updateYachtSettings, isLoading: isLoadingSettings, isUpdating } = useYachtSettings();
+
+  // Use user preferences API hook for notification settings
+  const {
+    preferences: userPrefs,
+    updateNotifications,
+    isUpdatingNotifications,
+    updateServiceRequests,
+    isUpdatingServiceRequests,
+    refetch: refetchUserPrefs
+  } = useUserPreferences();
+
   // Update active tab when initialTab prop changes
   useEffect(() => {
     setActiveTab(initialTab);
@@ -180,6 +222,7 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   // General Settings State
   const [yachtName, setYachtName] = useState("");
   const [yachtType, setYachtType] = useState("motor-yacht");
+  const [locationName, setLocationName] = useState("");
   const [notifications, setNotifications] = useState(true);
   const [autoBackup, setAutoBackup] = useState(true);
   const [timezone, setTimezone] = useState("Europe/Monaco");
@@ -206,6 +249,14 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   const [quietHoursStart, setQuietHoursStart] = useState("22:00");
   const [quietHoursEnd, setQuietHoursEnd] = useState("07:00");
   
+  // Backend notification settings
+  const [serviceRequests, setServiceRequests] = useState(true);
+  const [emergencyAlerts, setEmergencyAlerts] = useState(true);
+  const [systemMessages, setSystemMessages] = useState(true);
+  const [guestMessages, setGuestMessages] = useState(true);
+  const [crewMessages, setCrewMessages] = useState(true);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
+  
   // System Settings State
   const [serverPort, setServerPort] = useState("8080");
   const [wsPort, setWsPort] = useState("8080");
@@ -222,12 +273,15 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   const [backupLocation, setBackupLocation] = useState("local");
   const [cloudBackupEnabled, setCloudBackupEnabled] = useState(false);
   const [lastBackupTime, setLastBackupTime] = useState<Date | null>(null);
+  const [backupStatus, setBackupStatus] = useState<any>(null);
+  const [systemStatus, setSystemStatus] = useState<any>(null);
   
   // Initialize state from backend settings
   useEffect(() => {
     if (yachtSettings) {
-      setYachtName(yachtSettings.vesselName || "");
-      setYachtType(yachtSettings.vesselType || "motor-yacht");
+      setYachtName(yachtSettings.name || "");
+      setYachtType(yachtSettings.type || "motor-yacht");
+      setLocationName(yachtSettings.locationName || "");
       setTimezone(yachtSettings.timezone || "Europe/Monaco");
       setFloors(yachtSettings.floors || []);
     }
@@ -251,6 +305,13 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   const reorderCategories = useReorderServiceCategories();
   
   const [editingCategory, setEditingCategory] = useState<ServiceCategory | null>(null);
+  const [editingCategoryData, setEditingCategoryData] = useState({
+    name: "",
+    icon: "",
+    color: "#007bff",
+    description: "",
+    isActive: true
+  });
   const [newCategory, setNewCategory] = useState({
     name: "",
     icon: "",
@@ -258,26 +319,35 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
     description: ""
   });
   
+  // When editing category changes, update the form data
+  useEffect(() => {
+    if (editingCategory) {
+      setEditingCategoryData({
+        name: editingCategory.name,
+        icon: editingCategory.icon,
+        color: editingCategory.color,
+        description: editingCategory.description || "",
+        isActive: editingCategory.isActive
+      });
+    }
+  }, [editingCategory]);
+  
   const handleSaveGeneral = async () => {
-    // Save user preferences to context
-    updateUserPreferences({
+    // Save Service Requests preferences to backend API
+    updateServiceRequests({
       serviceRequestDisplayMode,
-      servingNowTimeout,
+      serviceRequestServingTimeout: servingNowTimeout,
       requestDialogRepeatInterval,
     });
-    
-    // Save vessel settings to backend
-    try {
-      await updateYachtSettings({
-        vesselName: yachtName,
-        vesselType: yachtType,
-        timezone: timezone,
-        floors: floors,
-      });
-      toast.success("General settings saved successfully");
-    } catch (error) {
-      toast.error("Failed to save settings");
-    }
+
+    // Save vessel settings to backend (with optimistic updates and WebSocket)
+    updateYachtSettings({
+      name: yachtName,
+      type: yachtType,
+      locationName: locationName,
+      timezone: timezone,
+      floors: floors,
+    });
   };
   
   const handleAddFloor = () => {
@@ -317,43 +387,284 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   };
   
   const handleSavePermissions = () => {
-    // Save each role's permissions
-    (Object.keys(localPermissions) as Role[]).forEach(role => {
-      updateRolePermissions(role, localPermissions[role]);
+    // NOTE: Role permissions UI is currently for reference only
+    // Backend API exists at /api/role-permissions but uses a different format
+    // This feature needs to be connected to the backend API
+    toast.error('Role permission editing is not yet connected to the backend API', {
+      description: 'Contact your system administrator to modify role permissions.'
     });
-    toast.success("Role permissions saved successfully");
   };
   
-  const handleSaveNotifications = () => {
-    // TODO: Save to backend API
-    toast.success("Notification settings saved successfully");
+  // Load system status and settings from backend
+  useEffect(() => {
+    const loadSystemSettings = async () => {
+      try {
+        // Auth handled by HTTP-only cookies (server runs 24/7)
+        const response = await fetch('/api/system-settings', {
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            setSystemStatus(data.status);
+            if (data.settings) {
+              setServerPort(data.settings.serverPort || '8080');
+              setWsPort(data.settings.wsPort || '8080');
+              setApiTimeout(data.settings.apiTimeout || '30');
+              setLogLevel(data.settings.logLevel || 'info');
+              setEnableMetrics(data.settings.enableMetrics ?? true);
+              setEnableDebugMode(data.settings.enableDebugMode ?? false);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load system settings:', error);
+      }
+    };
+
+    loadSystemSettings();
+  }, []);
+
+  // Load backup status and settings from backend
+  useEffect(() => {
+    const loadBackupSettings = async () => {
+      try {
+        // Auth handled by HTTP-only cookies (server runs 24/7)
+        // Load backup settings
+        const settingsRes = await fetch('/api/backup/settings', {
+          credentials: 'include'
+        });
+
+        if (settingsRes.ok) {
+          const contentType = settingsRes.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const data = await settingsRes.json();
+            if (data.settings) {
+              setBackupSchedule(data.settings.backupSchedule || 'daily');
+              setBackupTime(data.settings.backupTime || '02:00');
+              setBackupRetention(String(data.settings.backupRetention || 30));
+              setBackupLocation(data.settings.backupLocation || 'local');
+              setCloudBackupEnabled(data.settings.cloudBackupEnabled ?? false);
+            }
+          }
+        }
+
+        // Load backup status
+        const statusRes = await fetch('/api/backup/status', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (statusRes.ok) {
+          const contentType = statusRes.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const data = await statusRes.json();
+            setBackupStatus(data.status);
+            if (data.status?.lastBackup) {
+              setLastBackupTime(new Date(data.status.lastBackup));
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load backup settings:', error);
+      }
+    };
+
+    loadBackupSettings();
+  }, []);
+
+  // Load notification settings from backend
+  useEffect(() => {
+    const loadNotificationSettings = async () => {
+      setIsLoadingNotifications(true);
+      try {
+        // Auth handled by HTTP-only cookies (server runs 24/7)
+        const response = await fetch('/api/notification-settings', {
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const settings = await response.json();
+            setPushNotifications(settings.pushEnabled ?? true);
+            setServiceRequests(settings.serviceRequests ?? true);
+            setEmergencyAlerts(settings.emergencyAlerts ?? true);
+            setSystemMessages(settings.systemMessages ?? true);
+            setGuestMessages(settings.guestMessages ?? true);
+            setCrewMessages(settings.crewMessages ?? true);
+            setQuietHoursEnabled(settings.quietHoursEnabled ?? false);
+            if (settings.quietHoursStart) setQuietHoursStart(settings.quietHoursStart);
+            if (settings.quietHoursEnd) setQuietHoursEnd(settings.quietHoursEnd);
+          }
+        }
+
+        // Load email notifications and emergency contacts from user preferences API
+        if (userPrefs) {
+          if (userPrefs.emailNotifications !== undefined) {
+            setEmailNotifications(userPrefs.emailNotifications);
+          }
+          if (userPrefs.notificationEmail) {
+            setNotificationEmail(userPrefs.notificationEmail);
+          }
+          if (userPrefs.emergencyContacts) {
+            setEmergencyContacts(userPrefs.emergencyContacts as string[]);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load notification settings:', error);
+      } finally {
+        setIsLoadingNotifications(false);
+      }
+    };
+
+    loadNotificationSettings();
+  }, [yachtSettings, userPrefs]);
+
+  const handleSaveNotifications = async () => {
+    try {
+      // Auth handled by HTTP-only cookies (server runs 24/7)
+      // Save notification settings to backend
+      const response = await fetch('/api/notification-settings', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          pushEnabled: pushNotifications,
+          serviceRequests,
+          emergencyAlerts,
+          systemMessages,
+          guestMessages,
+          crewMessages,
+          quietHoursEnabled,
+          quietHoursStart: quietHoursEnabled ? quietHoursStart : null,
+          quietHoursEnd: quietHoursEnabled ? quietHoursEnd : null
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save notification settings');
+      }
+
+      // Save email notifications and emergency contacts to user preferences API
+      updateNotifications({
+        emailNotifications,
+        notificationEmail: notificationEmail || undefined,
+        emergencyContacts: emergencyContacts.length > 0 ? emergencyContacts : undefined,
+      });
+
+      toast.success("Notification settings saved successfully");
+    } catch (error) {
+      toast.error("Failed to save notification settings");
+      console.error('Error saving notifications:', error);
+    }
   };
   
-  const handleSaveSystem = () => {
-    // TODO: Save to backend API
-    toast.success("System settings saved successfully");
+  const handleSaveSystem = async () => {
+    try {
+      // Auth handled by HTTP-only cookies (server runs 24/7)
+      const response = await fetch('/api/system-settings', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          serverPort,
+          wsPort,
+          databaseUrl,
+          apiTimeout,
+          logLevel,
+          enableMetrics,
+          enableDebugMode
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save system settings');
+      }
+
+      const data = await response.json();
+      toast.success(data.message || "System settings saved successfully");
+    } catch (error) {
+      toast.error("Failed to save system settings");
+      console.error('Error saving system settings:', error);
+    }
   };
   
-  const handleSaveBackup = () => {
-    // TODO: Save to backend API
-    toast.success("Backup settings saved successfully");
+  const handleSaveBackup = async () => {
+    try {
+      // Auth handled by HTTP-only cookies (server runs 24/7)
+      const response = await fetch('/api/backup/settings', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          backupSchedule,
+          backupTime,
+          backupRetention: parseInt(backupRetention),
+          backupLocation,
+          cloudBackupEnabled
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save backup settings');
+      }
+
+      toast.success("Backup settings saved successfully");
+    } catch (error) {
+      toast.error("Failed to save backup settings");
+      console.error('Error saving backup settings:', error);
+    }
   };
-  
+
   const handleRunBackup = async () => {
-    // TODO: Trigger backup via API
+    // Auth handled by HTTP-only cookies (server runs 24/7)
     toast.promise(
-      new Promise((resolve) => setTimeout(resolve, 2000)),
+      fetch('/api/backup/create', {
+        method: 'POST',
+        credentials: 'include'
+      }).then(async (response) => {
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Backup failed');
+        }
+
+        const data = await response.json();
+
+        // Refresh backup status
+        const statusRes = await fetch('/api/backup/status', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (statusRes.ok) {
+          const statusData = await statusRes.json();
+          setBackupStatus(statusData.status);
+          if (statusData.status?.lastBackup) {
+            setLastBackupTime(new Date(statusData.status.lastBackup));
+          }
+        }
+
+        return data;
+      }),
       {
         loading: 'Creating backup...',
         success: 'Backup completed successfully',
-        error: 'Backup failed',
+        error: (error) => error.message || 'Backup failed',
       }
     );
   };
-  
+
   const handleRestoreBackup = async () => {
-    // TODO: Implement restore functionality
-    toast.info("Restore functionality will be available soon");
+    // Show file selection dialog (would need a file picker component)
+    // For now, just show info that user needs to select a backup file
+    toast.info("Please contact administrator to restore from a specific backup file");
   };
   
   // Group permissions by category
@@ -370,35 +681,47 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-3xl grid-cols-6">
-          <TabsTrigger value="general">
-            <SettingsIcon className="h-4 w-4 mr-2" />
-            General
-          </TabsTrigger>
-          <TabsTrigger value="categories">
-            <Tag className="h-4 w-4 mr-2" />
-            Categories
-          </TabsTrigger>
-          <TabsTrigger value="notifications">
-            <Bell className="h-4 w-4 mr-2" />
-            Notifications
-          </TabsTrigger>
-          <TabsTrigger value="roles">
-            <Shield className="h-4 w-4 mr-2" />
-            Permissions
-          </TabsTrigger>
-          <TabsTrigger value="system">
-            <Server className="h-4 w-4 mr-2" />
-            System
-          </TabsTrigger>
-          <TabsTrigger value="backup">
-            <Database className="h-4 w-4 mr-2" />
-            Backup
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-2">
+          <TabsList className="inline-flex w-auto min-w-full">
+            <TabsTrigger value="general" className="flex-shrink-0">
+              <SettingsIcon className="h-4 w-4 mr-2" />
+              General
+            </TabsTrigger>
+            <TabsTrigger value="categories" className="flex-shrink-0">
+              <Tag className="h-4 w-4 mr-2" />
+              Categories
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="flex-shrink-0">
+              <Bell className="h-4 w-4 mr-2" />
+              Notifications
+            </TabsTrigger>
+            <TabsTrigger value="roles" className="flex-shrink-0">
+              <Shield className="h-4 w-4 mr-2" />
+              Permissions
+            </TabsTrigger>
+            <TabsTrigger value="system" className="flex-shrink-0">
+              <Server className="h-4 w-4 mr-2" />
+              System
+            </TabsTrigger>
+            <TabsTrigger value="backup" className="flex-shrink-0">
+              <Database className="h-4 w-4 mr-2" />
+              Backup
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* General Settings Tab */}
         <TabsContent value="general" className="space-y-6">
+          {isLoadingSettings ? (
+            <Card>
+              <CardContent className="py-8">
+                <div className="flex items-center justify-center gap-2">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  <span className="text-sm text-muted-foreground">Loading vessel settings...</span>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
           <div className="grid gap-6">
             <Card>
               <CardHeader>
@@ -432,6 +755,19 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="yacht-location">Current Location</Label>
+                  <Input
+                    id="yacht-location"
+                    value={locationName}
+                    onChange={(e) => setLocationName(e.target.value)}
+                    placeholder="e.g., Monaco Harbor, Port Hercule"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Location name to display in weather widget and other components
+                  </p>
                 </div>
                 
                 <div className="space-y-2">
@@ -581,13 +917,20 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
               </CardContent>
             </Card>
             
-            <div className="flex justify-end">
-              <Button onClick={handleSaveGeneral} disabled={isLoadingSettings}>
+            <div className="flex justify-end gap-4">
+              {isUpdating && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                  Saving changes...
+                </div>
+              )}
+              <Button onClick={handleSaveGeneral} disabled={isLoadingSettings || isUpdating}>
                 <Save className="h-4 w-4 mr-2" />
-                Save General Settings
+                {isUpdating ? 'Saving...' : 'Save General Settings'}
               </Button>
             </div>
           </div>
+          )}
         </TabsContent>
 
         {/* Service Categories Tab */}
@@ -720,13 +1063,108 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
                     </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
+               </CardContent>
+             </Card>
+             
+             {/* Edit Category Dialog */}
+             <Dialog open={!!editingCategory} onOpenChange={(open: boolean) => !open && setEditingCategory(null)}>
+               <DialogContent>
+                 <DialogHeader>
+                   <DialogTitle>Edit Service Category</DialogTitle>
+                   <DialogDescription>
+                     Update the category details below
+                   </DialogDescription>
+                 </DialogHeader>
+                 <div className="space-y-4 py-4">
+                   <div className="space-y-2">
+                     <Label htmlFor="edit-category-name">Category Name</Label>
+                     <Input
+                       id="edit-category-name"
+                       value={editingCategoryData.name}
+                       onChange={(e) => setEditingCategoryData(prev => ({ ...prev, name: e.target.value }))}
+                       placeholder="e.g., Housekeeping"
+                     />
+                   </div>
+                   <div className="space-y-2">
+                     <Label htmlFor="edit-category-icon">Icon Name</Label>
+                     <Input
+                       id="edit-category-icon"
+                       value={editingCategoryData.icon}
+                       onChange={(e) => setEditingCategoryData(prev => ({ ...prev, icon: e.target.value }))}
+                       placeholder="e.g., Home"
+                     />
+                   </div>
+                   <div className="space-y-2">
+                     <Label htmlFor="edit-category-color">Color</Label>
+                     <Input
+                       id="edit-category-color"
+                       type="color"
+                       value={editingCategoryData.color}
+                       onChange={(e) => setEditingCategoryData(prev => ({ ...prev, color: e.target.value }))}
+                     />
+                   </div>
+                   <div className="space-y-2">
+                     <Label htmlFor="edit-category-description">Description</Label>
+                     <Input
+                       id="edit-category-description"
+                       value={editingCategoryData.description}
+                       onChange={(e) => setEditingCategoryData(prev => ({ ...prev, description: e.target.value }))}
+                       placeholder="Optional description"
+                     />
+                   </div>
+                   <div className="flex items-center justify-between">
+                     <Label htmlFor="edit-category-active">Active</Label>
+                     <Switch
+                       id="edit-category-active"
+                       checked={editingCategoryData.isActive}
+                       onCheckedChange={(checked: boolean) => setEditingCategoryData(prev => ({ ...prev, isActive: checked }))}
+                     />
+                   </div>
+                 </div>
+                 <DialogFooter>
+                   <Button variant="outline" onClick={() => setEditingCategory(null)}>
+                     Cancel
+                   </Button>
+                   <Button
+                     onClick={() => {
+                       if (editingCategory && editingCategoryData.name && editingCategoryData.icon) {
+                         updateCategory.mutate({
+                           id: editingCategory.id,
+                           name: editingCategoryData.name,
+                           icon: editingCategoryData.icon,
+                           color: editingCategoryData.color,
+                           description: editingCategoryData.description || undefined,
+                           isActive: editingCategoryData.isActive
+                         }, {
+                           onSuccess: () => {
+                             setEditingCategory(null);
+                             toast.success("Category updated successfully");
+                           },
+                           onError: () => {
+                             toast.error("Failed to update category");
+                           }
+                         });
+                       }
+                     }}
+                     disabled={!editingCategoryData.name || !editingCategoryData.icon || updateCategory.isPending}
+                   >
+                     Save Changes
+                   </Button>
+                 </DialogFooter>
+               </DialogContent>
+             </Dialog>
+           </div>
+         </TabsContent>
 
         {/* Notifications Tab */}
         <TabsContent value="notifications" className="space-y-6">
+          {isLoadingNotifications ? (
+            <Card>
+              <CardContent className="py-8">
+                <div className="text-center text-muted-foreground">Loading notification settings...</div>
+              </CardContent>
+            </Card>
+          ) : (
           <div className="grid gap-6">
             <Card>
               <CardHeader>
@@ -787,6 +1225,101 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
                     />
                   </div>
                 )}
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Notification Types</CardTitle>
+                <CardDescription>
+                  Choose which types of notifications you want to receive
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-2">
+                      <Bell className="h-4 w-4" />
+                      Service Requests
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Notifications for new service requests
+                    </p>
+                  </div>
+                  <Switch
+                    checked={serviceRequests}
+                    onCheckedChange={setServiceRequests}
+                    disabled={!pushNotifications}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      Emergency Alerts
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Critical emergency notifications (always enabled)
+                    </p>
+                  </div>
+                  <Switch
+                    checked={emergencyAlerts}
+                    onCheckedChange={setEmergencyAlerts}
+                    disabled={true}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-2">
+                      <Info className="h-4 w-4" />
+                      System Messages
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      System updates and maintenance alerts
+                    </p>
+                  </div>
+                  <Switch
+                    checked={systemMessages}
+                    onCheckedChange={setSystemMessages}
+                    disabled={!pushNotifications}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Guest Messages
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Direct messages from guests
+                    </p>
+                  </div>
+                  <Switch
+                    checked={guestMessages}
+                    onCheckedChange={setGuestMessages}
+                    disabled={!pushNotifications}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Crew Messages
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Messages from other crew members
+                    </p>
+                  </div>
+                  <Switch
+                    checked={crewMessages}
+                    onCheckedChange={setCrewMessages}
+                    disabled={!pushNotifications}
+                  />
+                </div>
               </CardContent>
             </Card>
             
@@ -886,12 +1419,13 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
             </Card>
             
             <div className="flex justify-end">
-              <Button onClick={handleSaveNotifications}>
+              <Button onClick={handleSaveNotifications} disabled={isLoadingNotifications}>
                 <Save className="h-4 w-4 mr-2" />
                 Save Notification Settings
               </Button>
             </div>
           </div>
+          )}
         </TabsContent>
 
         {/* Roles & Permissions Tab */}
@@ -904,6 +1438,15 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Warning Banner */}
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Feature Not Connected</AlertTitle>
+                <AlertDescription>
+                  This permission matrix is currently for reference only. The backend API exists at <code>/api/role-permissions</code> but uses a different permission format. Contact your system administrator to modify role permissions through the API.
+                </AlertDescription>
+              </Alert>
+
               {/* Info Banner */}
               <Alert>
                 <Info className="h-4 w-4" />
@@ -1117,40 +1660,75 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Database Connection</span>
                     <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      <span className="text-sm text-success">Connected</span>
+                      {systemStatus?.database?.connected ? (
+                        <>
+                          <CheckCircle className="h-4 w-4 text-success" />
+                          <span className="text-sm text-success">{systemStatus.database.status}</span>
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="h-4 w-4 text-error" />
+                          <span className="text-sm text-error">Disconnected</span>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">WebSocket Server</span>
                     <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      <span className="text-sm text-success">Active</span>
+                      {systemStatus?.webSocket?.active ? (
+                        <>
+                          <CheckCircle className="h-4 w-4 text-success" />
+                          <span className="text-sm text-success">{systemStatus.webSocket.status}</span>
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="h-4 w-4 text-error" />
+                          <span className="text-sm text-error">Inactive</span>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">API Server</span>
                     <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      <span className="text-sm text-success">Running on port {serverPort}</span>
+                      {systemStatus?.apiServer?.running ? (
+                        <>
+                          <CheckCircle className="h-4 w-4 text-success" />
+                          <span className="text-sm text-success">{systemStatus.apiServer.status}</span>
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="h-4 w-4 text-error" />
+                          <span className="text-sm text-error">Stopped</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
-                
+
                 <Separator />
-                
+
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">System Uptime</span>
-                    <span className="text-sm text-muted-foreground">14 days, 3 hours</span>
+                    <span className="text-sm text-muted-foreground">
+                      {systemStatus?.uptime?.formatted || 'Loading...'}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Last Restart</span>
-                    <span className="text-sm text-muted-foreground">Oct 8, 2025 at 02:15 UTC</span>
+                    <span className="text-sm text-muted-foreground">
+                      {systemStatus?.lastRestart
+                        ? new Date(systemStatus.lastRestart).toLocaleString()
+                        : 'Loading...'}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">System Version</span>
-                    <span className="text-sm text-muted-foreground">Obedio v1.0.0</span>
+                    <span className="text-sm text-muted-foreground">
+                      Obedio v{systemStatus?.version || '1.0.0'}
+                    </span>
                   </div>
                 </div>
               </CardContent>
@@ -1293,15 +1871,27 @@ export function SettingsPage({ initialTab = "general" }: SettingsPageProps) {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Total Backup Size</span>
-                    <span className="text-sm text-muted-foreground">2.4 GB</span>
+                    <span className="text-sm text-muted-foreground">
+                      {backupStatus?.totalSize
+                        ? `${(backupStatus.totalSize / (1024 ** 3)).toFixed(2)} GB`
+                        : 'Loading...'}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Number of Backups</span>
-                    <span className="text-sm text-muted-foreground">28 backups stored</span>
+                    <span className="text-sm text-muted-foreground">
+                      {backupStatus?.backupCount !== undefined
+                        ? `${backupStatus.backupCount} backup${backupStatus.backupCount !== 1 ? 's' : ''} stored`
+                        : 'Loading...'}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Available Storage</span>
-                    <span className="text-sm text-muted-foreground">48.6 GB free</span>
+                    <span className="text-sm text-muted-foreground">
+                      {backupStatus?.availableSpace
+                        ? `${(backupStatus.availableSpace / (1024 ** 3)).toFixed(1)} GB free`
+                        : 'Loading...'}
+                    </span>
                   </div>
                 </div>
                 

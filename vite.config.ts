@@ -52,6 +52,7 @@ export default defineConfig({
     outDir: 'dist',
   },
   server: {
+    host: '0.0.0.0', // Listen on all network interfaces
     port: 5173,
     open: true,
     hmr: {
@@ -59,6 +60,14 @@ export default defineConfig({
     },
     watch: {
       usePolling: true,
+    },
+    // Proxy API requests to backend (fixes auth cookie persistence on refresh)
+    proxy: {
+      '/api': {
+        target: 'http://10.10.0.207:8080',
+        changeOrigin: true,
+        secure: false,
+      }
     },
   },
 });

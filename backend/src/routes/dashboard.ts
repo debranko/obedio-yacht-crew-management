@@ -1,7 +1,8 @@
 import express from 'express';
 import { prisma } from '../services/db';
 import { authMiddleware, requirePermission } from '../middleware/auth';
-import { asyncHandler } from '../utils/asyncHandler';
+import { asyncHandler } from '../middleware/error-handler';
+import { apiSuccess, apiError } from '../utils/api-response';
 import { z } from 'zod';
 
 const router = express.Router();
@@ -48,10 +49,10 @@ router.get('/layout', authMiddleware, asyncHandler(async (req, res) => {
     });
   }
 
-  res.json({
+  res.json(apiSuccess({
     layout: preferences.dashboardLayout || getDefaultLayout((req as any).user.role),
     activeWidgets: preferences.activeWidgets || getDefaultWidgets((req as any).user.role),
-  });
+  }));
 }));
 
 /**
@@ -64,11 +65,7 @@ router.put('/layout', authMiddleware, asyncHandler(async (req, res) => {
   // Validate request body
   const validation = dashboardLayoutSchema.safeParse(req.body);
   if (!validation.success) {
-    res.status(400).json({ 
-      error: 'Invalid layout data', 
-      details: validation.error.errors 
-    });
-    return;
+    return res.status(400).json(apiError('Invalid layout data', 'VALIDATION_ERROR', validation.error.errors));
   }
 
   const { layouts, activeWidgets } = validation.data;
@@ -88,11 +85,11 @@ router.put('/layout', authMiddleware, asyncHandler(async (req, res) => {
     },
   });
 
-  res.json({
+  res.json(apiSuccess({
     message: 'Dashboard layout saved successfully',
     layout: preferences.dashboardLayout,
     activeWidgets: preferences.activeWidgets,
-  });
+  }));
 }));
 
 /**
@@ -117,11 +114,11 @@ router.post('/reset', authMiddleware, asyncHandler(async (req, res) => {
     },
   });
 
-  res.json({
+  res.json(apiSuccess({
     message: 'Dashboard reset to default layout',
     layout: preferences.dashboardLayout,
     activeWidgets: preferences.activeWidgets,
-  });
+  }));
 }));
 
 /**
@@ -131,11 +128,11 @@ router.post('/reset', authMiddleware, asyncHandler(async (req, res) => {
 router.get('/defaults/:role', requirePermission('settings.manage'), asyncHandler(async (req, res) => {
   const { role } = req.params;
   
-  res.json({
+  res.json(apiSuccess({
     role,
     layout: getDefaultLayout(role),
     activeWidgets: getDefaultWidgets(role),
-  });
+  }));
 }));
 
 // Helper functions for default layouts

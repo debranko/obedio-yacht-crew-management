@@ -10,6 +10,7 @@ import { Assignment, CrewMember, ShiftConfig, ViewMode } from './types';
 import { X, Clock, Search, Users, ChevronDown } from 'lucide-react';
 import { formatDateDisplay } from './utils';
 import { getCrewAvatarUrl } from '../crew-avatars';
+import { getShiftColorSafe } from '../../utils/shift-colors';
 
 // Crew List Component
 interface CrewListProps {
@@ -236,11 +237,12 @@ export function CalendarDayCell({
       {/* Shifts Container - Only show if current month or not month view */}
       {isCurrentMonth && (
         <div>
-          {shifts.map((shift) => (
+          {shifts.map((shift, index) => (
             <ShiftDropZone
               key={shift.id}
               date={date}
               shift={shift}
+              shiftIndex={index}
               assignments={assignments}
               crewMembers={crewMembers}
               onAssign={onAssign}
@@ -257,6 +259,7 @@ export function CalendarDayCell({
 interface ShiftDropZoneProps {
   date: string;
   shift: ShiftConfig;
+  shiftIndex: number;
   assignments: Assignment[];
   crewMembers: CrewMember[];
   onAssign: (crewId: string, date: string, shiftId: string) => void;
@@ -267,6 +270,7 @@ interface ShiftDropZoneProps {
 function ShiftDropZone({
   date,
   shift,
+  shiftIndex,
   assignments,
   crewMembers,
   onAssign,
@@ -287,9 +291,6 @@ function ShiftDropZone({
   const primaryCount = primaryAssignments.length;
   const backupCount = backupAssignments.length;
 
-  const canAddPrimary = primaryCount < shift.primaryCount;
-  const canAddBackup = backupCount < shift.backupCount;
-
   const [{ isOver, canDrop }, drop] = useDrop(() => ({
     accept: 'crew-member',
     canDrop: (item: { crewId: string }) => {
@@ -301,7 +302,7 @@ function ShiftDropZone({
           return false;
         }
       }
-      
+
       // Check if crew member is already assigned to this shift
       const isAlreadyAssigned = currentAssignments.some(
         (a) => a.crewId === item.crewId
@@ -309,8 +310,9 @@ function ShiftDropZone({
       if (isAlreadyAssigned) {
         return false;
       }
-      // Check capacity
-      return canAddPrimary || canAddBackup;
+
+      // Allow manual override - settings don't enforce hard limits
+      return true;
     },
     drop: (item: { crewId: string }) => {
       onAssign(item.crewId, date, shift.id);
@@ -319,7 +321,7 @@ function ShiftDropZone({
       isOver: monitor.isOver(),
       canDrop: monitor.canDrop(),
     }),
-  }), [currentAssignments, canAddPrimary, canAddBackup, date, shift.id, onAssign, crewMembers]);
+  }), [currentAssignments, date, shift.id, onAssign, crewMembers]);
 
   const getCrewById = (id: string) => crewMembers.find((c) => c.id === id);
 
@@ -348,12 +350,14 @@ function ShiftDropZone({
     return '⏰';
   };
 
-  const getShiftBackground = (shiftName: string) => {
-    const name = shiftName.toLowerCase();
-    if (name.includes('morning')) return 'bg-blue-50 dark:bg-blue-950/20';
-    if (name.includes('afternoon')) return 'bg-amber-50 dark:bg-amber-950/20';
-    if (name.includes('night')) return 'bg-indigo-50 dark:bg-indigo-950/20';
-    return 'bg-muted/30';
+  // Convert hex color to rgba with opacity
+  const getShiftBackgroundColor = (color: string) => {
+    // Remove # if present
+    const hex = color.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, 0.08)`;
   };
 
   const renderAssignedCrew = (assignment: Assignment) => {
@@ -445,20 +449,29 @@ function ShiftDropZone({
     );
   };
 
+  // Get the actual color for this shift
+  const shiftColor = getShiftColorSafe(shift.color, shiftIndex);
+
   return (
     <div
       ref={drop}
-      className={`transition-all ${getShiftBackground(shift.name)} ${
+      className={`transition-all border-t border-border/30 ${
         isOver && canDrop ? 'ring-1 ring-primary/30 ring-inset' : ''
       } ${!canDrop && isOver ? 'ring-1 ring-destructive/30 ring-inset' : ''} ${
         viewMode === 'day' ? 'p-2.5' : 'p-2'
       }`}
+      style={{
+        backgroundColor: getShiftBackgroundColor(shiftColor),
+      }}
     >
       {/* Shift Header */}
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-0.5">
           <span className="text-[9px]">{getShiftIcon(shift.name)}</span>
-          <span className={`${viewMode === 'day' ? 'text-sm' : 'text-[10px]'} font-medium text-primary`}>
+          <span
+            className={`${viewMode === 'day' ? 'text-sm' : 'text-[10px]'} font-medium`}
+            style={{ color: shiftColor }}
+          >
             {shift.name}
           </span>
         </div>
@@ -476,7 +489,7 @@ function ShiftDropZone({
       </div>
 
       {/* Add Button / Drop Zone Hint */}
-      {(canAddPrimary || canAddBackup) && currentAssignments.length === 0 && (
+      {currentAssignments.length === 0 && (
         <div className="mt-1">
           <Popover
             open={popoverOpen}

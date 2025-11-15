@@ -3,18 +3,21 @@
  * For Interior department to track different locations within the property
  */
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocations } from "../../hooks/useLocations";
 import { useGuests } from "../../hooks/useGuests";
 import { useGuestMutations } from "../../hooks/useGuestMutations";
+import { useDevices, useDeviceMutations } from "../../hooks/useDevices";
 import { useDND } from "../../hooks/useDND";
+import { useWebSocket } from "../../hooks/useWebSocket";
 import { useAppData } from "../../contexts/AppDataContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { Location, LOCATION_TYPES, LOCATION_STATUS_LABELS } from "../../domain/locations";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
-import { Plus, MapPin, Smartphone, Edit2, Trash2, Search, Image as ImageIcon, X, Upload, BellOff, Bell, Users } from "lucide-react";
+import { Plus, MapPin, Smartphone, Edit2, Trash2, Search, Image as ImageIcon, X, Upload, BellOff, Bell, Users, Wifi, WifiOff } from "lucide-react";
 import { Switch } from "../ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../ui/dialog";
 import { Input } from "../ui/input";
@@ -26,17 +29,31 @@ import { toast } from "sonner";
 import { DNDWidget } from "../dnd-widget";
 
 export function LocationsPage() {
+  const queryClient = useQueryClient();
   const { locations, isLoading, createLocation, updateLocation, deleteLocation } = useLocations();
   const { dndLocations, hasDND } = useDND();
-  
+
+  // WebSocket for real-time updates
+  const { isConnected: wsConnected, on: wsOn, off: wsOff } = useWebSocket();
+
   // Use React Query for guests (real-time updates from database)
-  const { data: guestsData } = useGuests({ page: 1, limit: 1000 });
-  const guests = (guestsData as any)?.items || [];
-  
+  const { data: guestsData, isLoading: isLoadingGuests } = useGuests({ page: 1, limit: 1000 });
+  const guests = guestsData?.items || [];
+
   // Use React Query mutations for database updates
   const { updateGuest: updateGuestMutation } = useGuestMutations();
+
+  // Fetch smart buttons from Device Manager
+  const { data: smartButtons = [], isLoading: isLoadingButtons } = useDevices({ type: 'smart_button' });
+  const { updateDevice: updateDeviceMutation } = useDeviceMutations();
   
-  const { addActivityLog, getGuestByLocationId } = useAppData();
+  // Get functions from AppData context - with null checks
+  const appData = useAppData();
+  const addActivityLog = appData?.addActivityLog || (() => {
+    console.warn('addActivityLog not available');
+  });
+  const getGuestByLocationId = appData?.getGuestByLocationId || (() => undefined);
+  
   const { user } = useAuth();
   
   // Get current user role from auth context
@@ -50,6 +67,7 @@ export function LocationsPage() {
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [imageUrl, setImageUrl] = useState("");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Permission check - only Admin and ETO can delete locations
@@ -81,6 +99,45 @@ export function LocationsPage() {
       doNotDisturb: false
     });
   };
+
+  // WebSocket listeners for real-time location updates
+  useEffect(() => {
+    if (!wsOn || !wsOff) return;
+
+    // Handle location events - invalidate queries to refetch
+    const handleLocationEvent = (data: any) => {
+      console.log('🏠 Location event received:', data);
+
+      // Invalidate location-related queries
+      queryClient.invalidateQueries({ queryKey: ['locations'] });
+      queryClient.invalidateQueries({ queryKey: ['dnd-locations'] });
+    };
+
+    // Handle DND toggle specifically
+    const handleDNDToggle = (data: any) => {
+      console.log('🔕 DND toggled:', data);
+
+      // Invalidate queries to refetch
+      queryClient.invalidateQueries({ queryKey: ['locations'] });
+      queryClient.invalidateQueries({ queryKey: ['dnd-locations'] });
+
+      // Show toast notification
+      toast.info(`DND ${data.doNotDisturb ? 'enabled' : 'disabled'} for ${data.name}`);
+    };
+
+    const unsubscribeCreated = wsOn('location:created', handleLocationEvent);
+    const unsubscribeUpdated = wsOn('location:updated', handleLocationEvent);
+    const unsubscribeDeleted = wsOn('location:deleted', handleLocationEvent);
+    const unsubscribeDND = wsOn('location:dnd-toggled', handleDNDToggle);
+
+    // Cleanup
+    return () => {
+      if (unsubscribeCreated) unsubscribeCreated();
+      if (unsubscribeUpdated) unsubscribeUpdated();
+      if (unsubscribeDeleted) unsubscribeDeleted();
+      if (unsubscribeDND) unsubscribeDND();
+    };
+  }, [wsOn, wsOff, queryClient]);
 
   const handleCreate = async () => {
     if (!formData.name.trim()) {
@@ -114,23 +171,17 @@ export function LocationsPage() {
     "Lower Deck"
   ];
 
-  // Mock smart buttons - will be replaced with real data from Device Manager
-  const mockSmartButtons = [
-    { id: "btn-001", name: "Owner's Stateroom Button", location: "Owner's Stateroom" },
-    { id: "btn-002", name: "VIP Cabin Button", location: "VIP Cabin" },
-    { id: "btn-003", name: "Main Salon Button", location: "Main Salon" },
-    { id: "btn-004", name: "Sun Deck Lounge Button", location: "Sun Deck Lounge" },
-    { id: "btn-005", name: "Gym Button", location: "Gym" },
-    { id: "btn-006", name: "Dining Room Button", location: "Dining Room" },
-    { id: "btn-007", name: "Music Salon Button", location: "Music Salon" },
-    { id: "btn-008", name: "VIP Office Button", location: "VIP Office" },
-    { id: "btn-009", name: "Conference Room Button", location: "Conference Room" },
-    { id: "btn-010", name: "Welcome Salon Button", location: "Welcome Salon" },
-    { id: "btn-011", name: "External Salon Button", location: "External Salon" },
-    { id: "btn-012", name: "Cabin 6 Button", location: "Cabin 6" },
-    { id: "unassigned-1", name: "Unassigned Button #1", location: null },
-    { id: "unassigned-2", name: "Unassigned Button #2", location: null },
-  ];
+  // Map smart buttons to format expected by UI
+  const smartButtonOptions = smartButtons.map(device => ({
+    id: device.id, // Use UUID as ID for location.smartButtonId
+    deviceId: device.deviceId, // ESP32 hardware ID (e.g., "T3S3-000000000000")
+    name: device.name,
+    location: device.location?.name || null, // Current location name
+    locationId: device.locationId || null, // Current location ID
+    status: device.status,
+    batteryLevel: device.batteryLevel,
+    firmwareVersion: device.firmwareVersion
+  }));
 
   const handleEdit = (location: Location) => {
     setSelectedLocation(location);
@@ -158,14 +209,39 @@ export function LocationsPage() {
     }
 
     // Find selected button name
-    const selectedButton = mockSmartButtons.find(b => b.id === formData.smartButtonId);
+    const selectedButton = smartButtonOptions.find(b => b.id === formData.smartButtonId);
 
     // Find guest currently assigned to this location
     const currentGuest = getGuestByLocationId(selectedLocation.id);
     const previousGuestId = currentGuest?.id;
     const newGuestId = formData.assignedGuestId;
 
+    // Find smart button assignment changes
+    const previousButtonId = selectedLocation.smartButtonId;
+    const newButtonId = formData.smartButtonId || undefined;
+
     try {
+      // Handle smart button assignment changes
+      if (previousButtonId !== newButtonId) {
+        // Remove previous button from this location
+        if (previousButtonId) {
+          const previousButton = smartButtonOptions.find(b => b.id === previousButtonId);
+          if (previousButton) {
+            await updateDeviceMutation({ id: previousButtonId, data: { locationId: null } });
+            toast.success(`${previousButton.name} unassigned from ${selectedLocation.name}`);
+          }
+        }
+
+        // Assign new button to this location
+        if (newButtonId) {
+          const newButton = smartButtonOptions.find(b => b.id === newButtonId);
+          if (newButton) {
+            await updateDeviceMutation({ id: newButtonId, data: { locationId: selectedLocation.id } });
+            toast.success(`${newButton.name} assigned to ${selectedLocation.name}`);
+          }
+        }
+      }
+
       // Handle guest assignment changes
       if (previousGuestId !== newGuestId) {
         // Remove previous guest from this location
@@ -281,6 +357,7 @@ export function LocationsPage() {
     setSelectedLocation(location);
     setImageUrl(location.image || "");
     setUploadedImage(null);
+    setUploadedFile(null);
     setIsImageDialogOpen(true);
   };
 
@@ -300,11 +377,15 @@ export function LocationsPage() {
       return;
     }
 
+    // Store the file object for later upload
+    setUploadedFile(file);
+    setImageUrl(""); // Clear URL when file is uploaded
+
+    // Create preview
     const reader = new FileReader();
     reader.onload = (e) => {
       const imageData = e.target?.result as string;
-      setUploadedImage(imageData);
-      setImageUrl(""); // Clear URL when file is uploaded
+      setUploadedImage(imageData); // Preview only
     };
     reader.onerror = () => {
       toast.error('Failed to read image file');
@@ -315,20 +396,47 @@ export function LocationsPage() {
   const handleSaveImage = async () => {
     if (!selectedLocation) return;
 
-    const finalImage = uploadedImage || imageUrl;
-
     try {
+      let finalImageUrl = imageUrl;
+
+      // If a file was uploaded, send it to the backend first
+      if (uploadedFile) {
+        const formData = new FormData();
+        formData.append('image', uploadedFile);
+
+        // Auth handled by HTTP-only cookies (server runs 24/7)
+        const uploadResponse = await fetch('http://localhost:8080/api/upload/image', {
+          method: 'POST',
+          credentials: 'include',
+          body: formData
+        });
+
+        if (!uploadResponse.ok) {
+          const errorData = await uploadResponse.json();
+          throw new Error(errorData.message || 'Failed to upload image');
+        }
+
+        const uploadData = await uploadResponse.json();
+        // Get the URL from the upload response
+        finalImageUrl = `http://localhost:8080${uploadData.data.url}`;
+        console.log('✅ Image uploaded:', finalImageUrl);
+      }
+
+      // Update location with the image URL
       await updateLocation({
         id: selectedLocation.id,
-        image: finalImage || undefined
+        image: finalImageUrl || undefined
       });
-      toast.success(`Image ${finalImage ? 'updated' : 'removed'} for ${selectedLocation.name}`);
+
+      toast.success(`Image ${finalImageUrl ? 'updated' : 'removed'} for ${selectedLocation.name}`);
       setIsImageDialogOpen(false);
       setImageUrl("");
       setUploadedImage(null);
+      setUploadedFile(null);
       setSelectedLocation(null);
-    } catch (error) {
-      toast.error("Failed to update image");
+    } catch (error: any) {
+      console.error('❌ Failed to update image:', error);
+      toast.error(error.message || "Failed to update image");
     }
   };
 
@@ -372,10 +480,10 @@ export function LocationsPage() {
 
   // Note: dndLocations now comes from useDND() hook
 
-  if (isLoading) {
+  if (isLoading || isLoadingGuests) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Loading locations...</p>
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     );
   }
@@ -439,10 +547,25 @@ export function LocationsPage() {
             Manage areas and zones within your property
           </p>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Location
-        </Button>
+        <div className="flex items-center gap-3">
+          {/* WebSocket Status Indicator */}
+          <div
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs ${
+              wsConnected
+                ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+                : 'bg-red-500/10 text-red-700 dark:text-red-400'
+            }`}
+            title={wsConnected ? 'Real-time updates active' : 'Real-time updates offline'}
+          >
+            {wsConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+            <span className="hidden sm:inline">{wsConnected ? 'Live' : 'Offline'}</span>
+          </div>
+
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Location
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -557,15 +680,18 @@ export function LocationsPage() {
                     })()}
 
                     {/* Smart Button Assignment */}
-                    {location.smartButtonId && (
-                      <div className="bg-primary/5 rounded-md p-2">
-                        <div className="flex items-center gap-1.5 text-xs">
-                          <Smartphone className="h-3.5 w-3.5 text-primary" />
-                          <span className="text-muted-foreground">Smart Button:</span>
-                          <span className="font-medium text-foreground">{location.smartButtonId}</span>
+                    {location.smartButtonId && (() => {
+                      const button = smartButtonOptions.find(b => b.id === location.smartButtonId);
+                      return button ? (
+                        <div className="bg-primary/5 rounded-md p-2">
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <Smartphone className="h-3.5 w-3.5 text-primary" />
+                            <span className="text-muted-foreground">Smart Button:</span>
+                            <span className="font-medium text-foreground">{button.name}</span>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      ) : null;
+                    })()}
 
                     {/* Actions */}
                     <div className="flex gap-2">
@@ -687,7 +813,7 @@ export function LocationsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No button assigned</SelectItem>
-                  {mockSmartButtons.map((button) => (
+                  {smartButtonOptions.map((button) => (
                     <SelectItem key={button.id} value={button.id}>
                       <div className="flex items-center gap-2">
                         <Smartphone className="h-3 w-3" />
@@ -913,7 +1039,7 @@ export function LocationsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No button assigned</SelectItem>
-                    {mockSmartButtons.map((button) => (
+                    {smartButtonOptions.map((button) => (
                       <SelectItem key={button.id} value={button.id}>
                         <div className="flex items-center gap-2">
                           <Smartphone className="h-3 w-3" />
@@ -929,7 +1055,7 @@ export function LocationsPage() {
                 {formData.smartButtonId && formData.smartButtonId !== "none" && (
                   <p className="text-xs text-success mt-2 flex items-center gap-1">
                     <Smartphone className="h-3 w-3" />
-                    {mockSmartButtons.find(b => b.id === formData.smartButtonId)?.name} assigned
+                    {smartButtonOptions.find(b => b.id === formData.smartButtonId)?.name} assigned
                   </p>
                 )}
                 {(!formData.smartButtonId || formData.smartButtonId === "none") && (

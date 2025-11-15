@@ -5,9 +5,10 @@ import { useLocations } from '../../hooks/useLocations';
 import { useGuests, useGuestsStats, useGuestsMeta } from '../../hooks/useGuests';
 import { useGuestsQueryParams } from '../../hooks/useGuestsQueryParams';
 import { useGuestMutations } from '../../hooks/useGuestMutations';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { GuestsService } from '../../services/guests';
 import { Button } from '../ui/button';
-import { MoreVertical, Users, Calendar, Star, AlertTriangle, Loader2, BellOff, MapPin, Edit2, Download, Plus, UserCheck } from 'lucide-react';
+import { MoreVertical, Users, Calendar, Star, AlertTriangle, Loader2, BellOff, MapPin, Edit2, Download, Plus, UserCheck, Wifi, WifiOff } from 'lucide-react';
 import { Card } from '../ui/card';
 import GuestsToolbar, { FilterState } from '../guests/GuestsToolbar';
 import { DNDGuestsKpiCard } from '../dnd-guests-kpi-card';
@@ -49,11 +50,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
-import { Skeleton } from '../ui/skeleton';
+import { Skeleton, SkeletonTable, SkeletonStat } from '../ui/skeleton';
 import { toast } from 'sonner';
 import type { Guest } from '../../contexts/AppDataContext';
 import { KpiCard } from '../kpi-card';
-import { GuestStatusWidget } from '../guest-status-widget';
 
 export function GuestsListPage() {
   const queryClient = useQueryClient();
@@ -61,7 +61,10 @@ export function GuestsListPage() {
   const { locations, updateLocation } = useLocations();
   const { qp, set, reset } = useGuestsQueryParams();
   const { deleteGuest, isDeleting } = useGuestMutations();
-  
+
+  // WebSocket for real-time updates
+  const { isConnected: wsConnected, on: wsOn, off: wsOff } = useWebSocket();
+
   // Dialog states
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
@@ -75,6 +78,32 @@ export function GuestsListPage() {
   const { data: guestsData, isLoading: isLoadingGuests } = useGuests(qp);
   const { data: stats, isLoading: isLoadingStats } = useGuestsStats();
   const { data: meta } = useGuestsMeta();
+
+  // WebSocket listeners for real-time guest updates
+  useEffect(() => {
+    if (!wsOn || !wsOff) return;
+
+    // Handle guest events - invalidate queries to refetch
+    const handleGuestEvent = (data: any) => {
+      console.log('👥 Guest event received:', data);
+
+      // Invalidate all guest-related queries
+      queryClient.invalidateQueries({ queryKey: ['guests'] });
+      queryClient.invalidateQueries({ queryKey: ['guests-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['guests-meta'] });
+    };
+
+    const unsubscribeCreated = wsOn('guest:created', handleGuestEvent);
+    const unsubscribeUpdated = wsOn('guest:updated', handleGuestEvent);
+    const unsubscribeDeleted = wsOn('guest:deleted', handleGuestEvent);
+
+    // Cleanup
+    return () => {
+      if (unsubscribeCreated) unsubscribeCreated();
+      if (unsubscribeUpdated) unsubscribeUpdated();
+      if (unsubscribeDeleted) unsubscribeDeleted();
+    };
+  }, [wsOn, wsOff, queryClient]);
 
   // Calculate active filters for UI display
   const activeFilters = useMemo(() => {
@@ -182,7 +211,7 @@ export function GuestsListPage() {
 
   const toggleVip = (guest: Guest, e: React.MouseEvent) => {
     e.stopPropagation();
-    const newType = (guest.type === 'vip' || guest.type === 'owner') ? 'primary' : 'vip';
+    const newType = (guest.type === 'vip' || guest.type === 'owner') ? 'guest' : 'vip';
     updateGuest(guest.id, { type: newType });
     
     // Invalidate queries to refresh data
@@ -331,54 +360,52 @@ export function GuestsListPage() {
         </Card>
       )}
 
-      {/* Compact Status Row: Guest Status (75%) + Dietary Alerts (25%) */}
-      <div className="grid grid-cols-4 gap-4">
-        {/* Guest Status Widget - 3/4 width */}
-        <div className="col-span-3">
-          <GuestStatusWidget 
-            guestsOnboard={stats?.onboard ? stats.onboard > 0 : false}
-            guestCount={stats?.onboard || 0}
-            expectedGuests={stats?.expected || 0}
-            expectedArrival={stats?.expected > 0 ? "Next 7 days" : undefined}
-            onToggle={(onboard) => {
-              console.log('Guest status toggled on guests page:', onboard);
-              // TODO: Connect to state management
-            }}
-          />
-        </div>
-        
-        {/* Dietary Alerts - 1/4 width */}
-        <div className="col-span-1">
-          <KpiCard
-            title="Dietary Alerts"
-            value={isLoadingStats ? "..." : stats?.dietaryAlerts.toString() || "0"}
-            icon={AlertTriangle}
-            iconColor="text-destructive"
-            inlineValue={true}
-            onClick={() => {
-              reset();
-              set({ status: 'onboard', allergy: 'has-allergies' });
-            }}
-            details={
-              stats && stats.dietaryAlerts > 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  Active allergy alerts
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">No active allergies</p>
-              )
-            }
-          />
-        </div>
+      {/* Dietary Alerts */}
+      <div className="max-w-xs">
+        <KpiCard
+          title="Dietary Alerts"
+          value={isLoadingStats ? "..." : stats?.dietaryAlerts.toString() || "0"}
+          icon={AlertTriangle}
+          iconColor="text-destructive"
+          inlineValue={true}
+          onClick={() => {
+            reset();
+            set({ status: 'onboard', allergy: 'has-allergies' });
+          }}
+          details={
+            stats && stats.dietaryAlerts > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Active allergy alerts
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">No active allergies</p>
+            )
+          }
+        />
       </div>
 
       {/* New GuestsToolbar Component */}
       <div className="sticky top-0 z-20 bg-background/95 backdrop-blur -mx-6 lg:-mx-8 px-6 lg:px-8 py-4 border-b border-border">
-        <GuestsToolbar
-          onFiltersChange={handleFiltersChange}
-          onExport={handleExportFromToolbar}
-          onAddGuest={() => setIsAddDialogOpen(true)}
-        />
+        <div className="flex items-center justify-between gap-4">
+          <GuestsToolbar
+            onFiltersChange={handleFiltersChange}
+            onExport={handleExportFromToolbar}
+            onAddGuest={() => setIsAddDialogOpen(true)}
+          />
+
+          {/* WebSocket Status Indicator */}
+          <div
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs ${
+              wsConnected
+                ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+                : 'bg-red-500/10 text-red-700 dark:text-red-400'
+            }`}
+            title={wsConnected ? 'Real-time updates active' : 'Real-time updates offline'}
+          >
+            {wsConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+            <span className="hidden sm:inline">{wsConnected ? 'Live' : 'Offline'}</span>
+          </div>
+        </div>
       </div>
 
       {/* Results Info and Bulk Actions */}
@@ -424,7 +451,7 @@ export function GuestsListPage() {
         {/* Page Size Selector */}
         <Select
           value={qp.limit.toString()}
-          onValueChange={(v) => set({ limit: parseInt(v) })}
+          onValueChange={(v: string) => set({ limit: parseInt(v) })}
         >
           <SelectTrigger className="w-[100px]">
             <SelectValue />
@@ -440,11 +467,8 @@ export function GuestsListPage() {
       {/* Table */}
       <div className="border border-border rounded-lg overflow-hidden bg-card">
         {isLoadingGuests ? (
-          <div className="p-8 space-y-4">
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
+          <div className="p-8">
+            <SkeletonTable rows={8} />
           </div>
         ) : (
           <Table className="table-zebra">
@@ -510,7 +534,7 @@ export function GuestsListPage() {
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Checkbox
                         checked={selectedIds.has(guest.id)}
-                        onCheckedChange={(checked) => {
+                        onCheckedChange={(checked: boolean) => {
                           const newSet = new Set(selectedIds);
                           if (checked) {
                             newSet.add(guest.id);
@@ -533,8 +557,14 @@ export function GuestsListPage() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div>
-                          <div className="font-medium">
+                          <div className="font-medium flex items-center gap-2">
                             {guest.firstName} {guest.lastName}
+                            {guest.doNotDisturb && (
+                              <Badge variant="destructive" className="h-5 px-1.5 flex items-center gap-1">
+                                <BellOff className="h-3 w-3" />
+                                <span className="text-[10px] font-bold">DND</span>
+                              </Badge>
+                            )}
                           </div>
                           {guest.preferredName && (
                             <div className="text-xs text-muted-foreground">
@@ -572,8 +602,18 @@ export function GuestsListPage() {
                     </TableCell>
                     <TableCell>
                       <span className="text-sm">
-                        {guest.locationId 
-                          ? (locations.find(l => l.id === guest.locationId)?.name || '—')
+                        {guest.locationId
+                          ? (() => {
+                              const location = locations.find(l => l.id === guest.locationId);
+                              return location ? (
+                                <span className="flex items-center gap-1">
+                                  {location.name}
+                                  {location.doNotDisturb && (
+                                    <BellOff className="h-3 w-3 text-destructive" />
+                                  )}
+                                </span>
+                              ) : '—';
+                            })()
                           : '—'
                         }
                       </span>

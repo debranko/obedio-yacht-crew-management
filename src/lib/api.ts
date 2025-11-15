@@ -1,70 +1,46 @@
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  // Get auth token from localStorage
-  const token = localStorage.getItem('obedio-auth-token');
-  
-  // Build headers with auth token
+  // Auth handled by HTTP-only cookies (server runs 24/7)
+  // Browser automatically sends cookie with credentials: "include"
   const headers: HeadersInit = {
     "Content-Type": "application/json",
-    ...(token && { Authorization: `Bearer ${token}` }),
     ...(init?.headers || {})
   };
 
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
     headers,
-    credentials: "include",
+    credentials: "include", // Sends HTTP-only cookie automatically
   });
   
   // Handle 401 unauthorized - token might be expired
+  // Note: Token refresh now handled by backend via HTTP-only cookies
   if (res.status === 401) {
-    const refreshToken = localStorage.getItem('obedio-auth-token');
-    if (refreshToken) {
-      try {
-        // Try to refresh the token
-        const refreshRes = await fetch(`${BASE_URL}/auth/refresh`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken }),
-        });
-        
-        if (refreshRes.ok) {
-          const refreshData = await refreshRes.json();
-          if (refreshData.success && refreshData.data?.token) {
-            // Save new token
-            localStorage.setItem('obedio-auth-token', refreshData.data.token);
-            
-            // Retry original request with new token
-            const retryHeaders = {
-              ...headers,
-              Authorization: `Bearer ${refreshData.data.token}`
-            };
-            
-            const retryRes = await fetch(`${BASE_URL}${path}`, {
-              ...init,
-              headers: retryHeaders,
-              credentials: "include",
-            });
-            
-            if (!retryRes.ok) {
-              const text = await retryRes.text().catch(() => "");
-              throw new Error(text || `HTTP ${retryRes.status}`);
-            }
-            return retryRes.json() as Promise<T>;
-          }
-        }
-      } catch (error) {
-        console.error('Token refresh failed:', error);
-      }
-    }
+    // Token is in HTTP-only cookie, frontend can't access it
+    // Just redirect to login or trigger auth:logout event
+    window.dispatchEvent(new CustomEvent('auth:logout'));
   }
   
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(text || `HTTP ${res.status}`);
   }
-  return res.json() as Promise<T>;
+
+  const result = await res.json();
+
+  // Unwrap apiSuccess response format: { success: true, data: {...} }
+  if (result.success && result.data !== undefined) {
+    return result.data as T;
+  }
+
+  // Handle apiError response format: { success: false, error: "...", code: "..." }
+  if (result.success === false) {
+    throw new Error(result.error || 'Request failed');
+  }
+
+  // Fallback for non-standard responses
+  return result as T;
 }
 
 export const api = {

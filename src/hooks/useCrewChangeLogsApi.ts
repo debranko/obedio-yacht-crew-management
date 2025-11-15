@@ -13,9 +13,12 @@ interface CrewChangeLog {
 
 interface CrewChangeLogsResponse {
   data: CrewChangeLog[];
-  total: number;
-  page: number;
-  limit: number;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
 export function useCrewChangeLogs(params?: {
@@ -54,12 +57,22 @@ export function useCreateCrewChangeLog() {
   });
 }
 
+// CrewChange type for bulk creation (roster change detection format)
+interface CrewChange {
+  crewMember: string;
+  changeType: 'added' | 'removed' | 'moved_to_backup' | 'moved_to_primary';
+  date: string;
+  shift: string;
+  details?: string;
+}
+
 export function useBulkCreateCrewChangeLogs() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async (data: Array<Omit<CrewChangeLog, 'id' | 'timestamp'>>) => {
-      return await api.post<{ count: number }>('/crew-change-logs/bulk', data);
+    mutationFn: async (changes: CrewChange[]) => {
+      // Backend expects { changes: [...] }, not array directly
+      return await api.post<{ count: number }>('/crew-change-logs/bulk', { changes });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['crew-change-logs'] });

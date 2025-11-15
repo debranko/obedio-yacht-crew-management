@@ -1,4 +1,8 @@
-FROM node:18-alpine AS builder
+# Multi-stage Dockerfile for OBEDIO Backend
+# Optimized for production deployment
+
+# Stage 1: Dependencies
+FROM node:20-alpine AS dependencies
 
 WORKDIR /app
 
@@ -6,59 +10,68 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install ALL dependencies (including dev deps for building)
-RUN npm ci && npm cache clean --force
-
-# Copy source code
-COPY . .
+# Install dependencies
+RUN npm ci --only=production && npm cache clean --force
 
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Build TypeScript (with noEmitOnError: false in tsconfig)
-RUN npx tsc || echo "TypeScript errors present but files emitted"
-
-# Remove dev dependencies after build
-RUN npm prune --production
-
-# Production image
-FROM node:18-alpine
+# Stage 2: Build
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# Install runtime dependencies including OpenSSL 3
-RUN apk add --no-cache curl netcat-openbsd openssl
+# Copy package files and source
+COPY package*.json ./
+COPY tsconfig.json ./
+COPY src ./src
+COPY prisma ./prisma
 
-# Copy package files first
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/prisma ./prisma
+# Install all dependencies (including dev dependencies for build)
+RUN npm ci
 
-# Copy node_modules and regenerate Prisma for this environment
-COPY --from=builder /app/node_modules ./node_modules
-
-# Regenerate Prisma client for the production image's OpenSSL version
+# Generate Prisma Client
 RUN npx prisma generate
 
-# Copy built application
-COPY --from=builder /app/dist ./dist
+# Build TypeScript
+RUN npm run build
 
-# Copy entrypoint script
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# Stage 3: Production
+FROM node:20-alpine AS production
 
-# Create directories
-RUN mkdir -p /app/logs /app/uploads && \
-    chown -R node:node /app
+# Install PostgreSQL client for backup/restore
+RUN apk add --no-cache postgresql-client
 
-# Switch to non-root user
-USER node
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Copy production dependencies from dependencies stage
+COPY --from=dependencies /app/node_modules ./node_modules
+
+# Copy Prisma schema and migrations
+COPY --from=build /app/prisma ./prisma
+
+# Copy built application from build stage
+COPY --from=build /app/dist ./dist
+
+# Create uploads directory
+RUN mkdir -p uploads
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001 && \
+    chown -R nodejs:nodejs /app
+
+USER nodejs
 
 # Expose port
 EXPOSE 3001
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:3001/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3001/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1
 
-# Use entrypoint script
-ENTRYPOINT ["docker-entrypoint.sh"]
+# Start application
+CMD ["npm", "start"]
