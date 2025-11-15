@@ -4,7 +4,12 @@
       "Bash(\"C:/Users/debra/AppData/Local/Android/Sdk/platform-tools/adb.exe\" shell \"pm grant com.example.obediowear android.permission.ACCESS_FINE_LOCATION\")",
       "Bash(\"C:/Users/debra/AppData/Local/Android/Sdk/platform-tools/adb.exe\" shell \"pm grant com.example.obediowear android.permission.ACCESS_COARSE_LOCATION\")",
       "Bash(\"C:/Users/debra/AppData/Local/Android/Sdk/platform-tools/adb.exe\" shell \"dumpsys package com.example.obediowear | grep -A 3 ''runtime permissions:''\")",
-      "Bash(\"C:/Users/debra/AppData/Local/Android/Sdk/platform-tools/adb.exe\" shell \"am force-stop com.example.obediowear\")"
+      "Bash(\"C:/Users/debra/AppData/Local/Android/Sdk/platform-tools/adb.exe\" shell \"am force-stop com.example.obediowear\")",
+      "Bash(findstr:*)",
+      "Bash(sc query:*)",
+      "Bash(net start mosquitto)",
+      "Bash(pio --version:*)",
+      "Bash(npm run db:seed:*)"
     ],
     "deny": [],
     "ask": []

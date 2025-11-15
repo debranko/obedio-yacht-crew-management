@@ -12,7 +12,7 @@ object ServerConfig {
     private const val TAG = "ServerConfig"
     private const val PREFS_NAME = "obedio_server_config"
     private const val KEY_SERVER_IP = "server_ip"
-    private const val DEFAULT_IP = "10.158.214.151"
+    private const val DEFAULT_IP = "10.10.0.207"
 
     private lateinit var prefs: SharedPreferences
 
