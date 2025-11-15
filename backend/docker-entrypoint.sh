@@ -11,9 +11,14 @@ until nc -z db 5432; do
 done
 echo "✅ Database is ready!"
 
-# Run migrations
-echo "🔄 Running database migrations..."
-npx prisma migrate deploy || npx prisma db push --accept-data-loss
+# Run migrations or push schema
+echo "🔄 Setting up database schema..."
+if npx prisma migrate deploy 2>&1 | grep -q "No migration found"; then
+  echo "📦 No migrations found, pushing schema directly..."
+  npx prisma db push --accept-data-loss
+else
+  echo "✅ Migrations applied"
+fi
 
 # Generate Prisma Client (in case it's not already generated)
 echo "🔧 Generating Prisma Client..."
