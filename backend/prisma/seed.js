@@ -141,7 +141,7 @@ async function main() {
         name: `${location.name} Smart Button`,
         type: 'smart_button',
         macAddress: macAddress,
-        status: 'active',
+        status: 'online',
         locationId: location.id,
         batteryLevel: 85 + Math.floor(Math.random() * 15),
         signalStrength: -40 - Math.floor(Math.random() * 30),
