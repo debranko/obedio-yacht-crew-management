@@ -43,6 +43,9 @@ services:
       REFRESH_TOKEN_EXPIRES_IN: 30d
       FRONTEND_URL: http://10.10.0.10:3000
       SOCKET_IO_CORS_ORIGIN: http://10.10.0.10:3000,http://localhost:3000,http://*:3000
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+      MQTT_CLIENT_ID: obedio-backend
+      MQTT_ENABLED: "true"
     ports:
       - "3001:3001"
     volumes:
@@ -57,6 +60,7 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
       args:
+        VITE_API_URL: http://10.10.0.10:3001/api
         VITE_WS_URL: http://10.10.0.10:3001
     container_name: obedio-frontend
     restart: unless-stopped
@@ -66,6 +70,26 @@ services:
       - "3000:80"
     networks:
       - obedio-network
+
+  # Mosquitto MQTT Broker
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: obedio-mqtt
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    networks:
+      - obedio-network
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 | grep -v Error || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   dbdata:

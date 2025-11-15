@@ -60,10 +60,10 @@ export const YACHT_SETTINGS = {
 export const NETWORK_CONFIG = {
   // Primary Server Config
   primary: {
-    host: 'obedio-server.local',
-    port: 8080,
+    host: process.env.BACKEND_HOST || 'backend',
+    port: parseInt(process.env.PORT || '3001'),
     protocol: 'http',
-    websocket: 'ws://obedio-server.local:8080',
+    websocket: process.env.WS_URL || 'ws://backend:3001',
     healthCheckInterval: 5000, // ms
   },
 
@@ -115,8 +115,8 @@ export const NETWORK_CONFIG = {
 
   // MQTT Broker Config
   mqtt: {
-    enabled: true,
-    broker: 'mqtt://obedio-server.local:1883',
+    enabled: process.env.MQTT_ENABLED === 'true',
+    broker: process.env.MQTT_BROKER_URL || 'mqtt://mosquitto:1883',
     topics: {
       request: 'yacht/+/request',      // yacht/{location}/request
       status: 'yacht/+/status',        // yacht/{location}/status
