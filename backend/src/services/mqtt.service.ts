@@ -293,7 +293,7 @@ class MQTTService {
       }
       // Button-specific functions (from ESP32 spec lines 177-184)
       else if (message.button === 'aux1') {
-        requestType = 'dnd';
+        requestType = 'call_service';
         priority = 'normal';
       }
       else if (message.button === 'aux2') {
@@ -308,10 +308,22 @@ class MQTTService {
         requestType = 'bring_drinks';
         priority = 'normal';
       }
-      // Main button or double tap = Regular service call
+      else if (message.button === 'aux5') {
+        requestType = 'dnd';
+        priority = 'normal';
+      }
+      // Main button - handle touch vs press
       else {
-        requestType = 'call';
-        priority = message.pressType === 'double' ? 'urgent' : 'normal';
+        // Touch and double-touch are separate from physical presses
+        if (message.pressType === 'touch' || message.pressType === 'double-touch') {
+          requestType = message.pressType === 'double-touch' ? 'urgent_call' : 'call';
+          priority = message.pressType === 'double-touch' ? 'urgent' : 'normal';
+        }
+        // Physical button presses
+        else {
+          requestType = 'call';
+          priority = message.pressType === 'double' ? 'urgent' : 'normal';
+        }
       }
 
       // Build service notes with ESP32 details

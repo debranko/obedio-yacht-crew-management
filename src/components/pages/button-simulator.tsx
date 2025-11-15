@@ -147,8 +147,9 @@ export function ButtonSimulatorPage() {
       ? `${guestAtLocation.firstName} ${guestAtLocation.lastName}` 
       : 'Guest';
 
-    // Mock audio URLs
-    const mockAudioUrl = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+    // Mock audio URL - use a reliable test audio file
+    // For production: implement real voice recording and upload to /public/uploads/voice/
+    const mockAudioUrl = 'https://www2.cs.uic.edu/~i101/SoundFiles/preamble10.wav';
 
     // Create actual service request and add to context
     const newRequest = addServiceRequest({

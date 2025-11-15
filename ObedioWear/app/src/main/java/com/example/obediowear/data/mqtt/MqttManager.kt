@@ -6,6 +6,7 @@ import android.util.Log
 import com.example.obediowear.data.model.ServiceRequest
 import com.example.obediowear.utils.DeviceInfoHelper
 import com.example.obediowear.utils.NotificationHelper
+import com.example.obediowear.utils.ServerConfig
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,8 +25,8 @@ object MqttManager {
 
     private const val TAG = "MqttManager"
 
-    // MQTT Broker configuration
-    private const val BROKER_URL = "tcp://192.168.5.152:1883"
+    // MQTT Broker configuration - uses dynamic ServerConfig instead of hardcoded IP
+    // This allows IP to be updated via SharedPreferences without recompiling
 
     // CLIENT_ID is dynamically generated from Android ID (set on first connect)
     private var CLIENT_ID: String = "WEAR-UNKNOWN"
@@ -87,8 +88,12 @@ object MqttManager {
         }
 
         try {
+            // Get dynamic MQTT broker URL from ServerConfig
+            val brokerUrl = ServerConfig.getMqttUrl()
+            Log.d(TAG, "Using MQTT broker: $brokerUrl")
+
             // Create MQTT client
-            mqttClient = MqttAndroidClient(context, BROKER_URL, CLIENT_ID)
+            mqttClient = MqttAndroidClient(context, brokerUrl, CLIENT_ID)
 
             // Set callback for connection events
             mqttClient?.setCallback(object : MqttCallback {
@@ -116,7 +121,7 @@ object MqttManager {
 
             // Connect to broker
             _connectionStatus.value = ConnectionStatus.CONNECTING
-            Log.d(TAG, "Connecting to MQTT broker: $BROKER_URL")
+            Log.d(TAG, "Connecting to MQTT broker: $brokerUrl")
 
             mqttClient?.connect(options, null, object : IMqttActionListener {
                 override fun onSuccess(asyncActionToken: IMqttToken?) {

@@ -37,8 +37,12 @@ const char* BUTTON_MQTT[] = {"main", "aux1", "aux2", "aux3", "aux4", "aux5"};
 #define LED_PIN 17
 #define NUM_LEDS 16
 
-// Shake detection threshold
-#define SHAKE_THRESHOLD 2.5  // G-force threshold for shake
+// Shake detection threshold (increased to reduce sensitivity)
+#define SHAKE_THRESHOLD 3.5  // G-force threshold for shake
+
+// Touch sensor pin for main button (ESP32-S3 capacitive touch)
+#define TOUCH_PIN 1  // GPIO1 - capacitive touch for main button
+#define TOUCH_THRESHOLD 40  // Touch detection threshold
 
 // ==================== GLOBAL OBJECTS ====================
 
@@ -52,11 +56,26 @@ LIS3DHTR<TwoWire> accel;
 
 String deviceId = "BTN-";
 
-// Button debounce
+// Button debounce and press detection
 unsigned long lastDebounceTime[BUTTON_COUNT];
 bool lastButtonState[BUTTON_COUNT] = {HIGH, HIGH, HIGH, HIGH, HIGH, HIGH};
 bool buttonState[BUTTON_COUNT] = {HIGH, HIGH, HIGH, HIGH, HIGH, HIGH};
 const unsigned long debounceDelay = 50;
+
+// Button press timing for double-click and long press
+unsigned long buttonPressTime[BUTTON_COUNT] = {0, 0, 0, 0, 0, 0};
+unsigned long buttonReleaseTime[BUTTON_COUNT] = {0, 0, 0, 0, 0, 0};
+bool buttonPressed[BUTTON_COUNT] = {false, false, false, false, false, false};
+const unsigned long doubleClickWindow = 500;  // 500ms window for double-click
+const unsigned long longPressTime = 700;      // 700ms for long press
+
+// Touch sensor detection
+unsigned long lastTouchTime = 0;
+unsigned long touchPressTime = 0;
+bool touchActive = false;
+bool lastTouchState = false;
+const unsigned long touchDebounce = 50;
+const unsigned long doubleTouchWindow = 500;  // 500ms window for double-touch
 
 // LED animation
 unsigned long previousLEDMillis = 0;
@@ -123,7 +142,7 @@ void registerDevice() {
     doc["deviceId"] = deviceId;
     doc["type"] = "smart_button";
     doc["name"] = "Custom PCB Button";
-    doc["firmwareVersion"] = "v1.0-simple";
+    doc["firmwareVersion"] = "v2.0-enhanced";
     doc["hardwareVersion"] = "ESP32-S3 Custom PCB";
     doc["macAddress"] = WiFi.macAddress();
     doc["ipAddress"] = WiFi.localIP().toString();
@@ -150,7 +169,7 @@ void publishButtonPress(const char* button, const char* pressType) {
     doc["pressType"] = pressType;
     doc["battery"] = 100;
     doc["rssi"] = WiFi.RSSI();
-    doc["firmwareVersion"] = "v1.0-simple";
+    doc["firmwareVersion"] = "v2.0-enhanced";
     doc["timestamp"] = millis();
     doc["sequenceNumber"] = sequenceNumber;
 
@@ -206,25 +225,151 @@ void checkButtons() {
             if (reading != buttonState[i]) {
                 buttonState[i] = reading;
 
-                if (buttonState[i] == LOW) {  // Button pressed
-                    // Flash LEDs white
-                    for (int j = 0; j < NUM_LEDS; j++) {
-                        strip.setPixelColor(j, strip.Color(255, 255, 255));
-                    }
-                    strip.show();
-                    delay(100);
-
-                    // Publish to backend
-                    publishButtonPress(BUTTON_MQTT[i], "single");
+                // Button pressed (transition to LOW)
+                if (buttonState[i] == LOW) {
+                    buttonPressTime[i] = millis();
+                    buttonPressed[i] = true;
 
                     Serial.print("Button ");
                     Serial.print(BUTTON_NAMES[i]);
-                    Serial.println(" pressed");
+                    Serial.println(" pressed down");
+                }
+                // Button released (transition to HIGH)
+                else {
+                    if (buttonPressed[i]) {
+                        unsigned long pressDuration = millis() - buttonPressTime[i];
+                        unsigned long timeSinceLastRelease = millis() - buttonReleaseTime[i];
+
+                        Serial.print("Button ");
+                        Serial.print(BUTTON_NAMES[i]);
+                        Serial.print(" released after ");
+                        Serial.print(pressDuration);
+                        Serial.println("ms");
+
+                        // Determine press type based on duration and timing
+                        String pressType = "single";
+
+                        // Long press detection (held for > 700ms)
+                        if (pressDuration >= longPressTime) {
+                            pressType = "long";
+
+                            // Flash LEDs blue for long press
+                            for (int j = 0; j < NUM_LEDS; j++) {
+                                strip.setPixelColor(j, strip.Color(0, 100, 255));
+                            }
+                            strip.show();
+                            delay(150);
+
+                            publishButtonPress(BUTTON_MQTT[i], pressType.c_str());
+                        }
+                        // Check for double-click (quick press within 500ms window)
+                        else if (timeSinceLastRelease < doubleClickWindow && timeSinceLastRelease > 50) {
+                            pressType = "double";
+
+                            // Flash LEDs yellow for double-click
+                            for (int j = 0; j < NUM_LEDS; j++) {
+                                strip.setPixelColor(j, strip.Color(255, 200, 0));
+                            }
+                            strip.show();
+                            delay(150);
+
+                            publishButtonPress(BUTTON_MQTT[i], pressType.c_str());
+                            buttonReleaseTime[i] = 0;  // Reset to prevent triple-click
+                        }
+                        // Single press - wait to see if it's followed by another press
+                        else {
+                            // For now, immediately send single press
+                            // (Could add delay to detect double-click, but affects responsiveness)
+
+                            // Flash LEDs white for single press
+                            for (int j = 0; j < NUM_LEDS; j++) {
+                                strip.setPixelColor(j, strip.Color(255, 255, 255));
+                            }
+                            strip.show();
+                            delay(100);
+
+                            // Special handling for DND button (aux5 = button index 5)
+                            if (i == 5) {  // T6 / aux5
+                                Serial.println("DND button pressed - toggling DND");
+                                publishButtonPress("aux5", "single");
+                            } else {
+                                publishButtonPress(BUTTON_MQTT[i], "single");
+                            }
+                        }
+
+                        buttonReleaseTime[i] = millis();
+                        buttonPressed[i] = false;
+                    }
                 }
             }
         }
 
         lastButtonState[i] = reading;
+    }
+}
+
+// ==================== TOUCH SENSOR HANDLING ====================
+
+void checkTouch() {
+    // Read capacitive touch value (ESP32-S3 touch sensor)
+    int touchValue = touchRead(TOUCH_PIN);
+    bool touched = (touchValue < TOUCH_THRESHOLD);
+
+    // Debounce touch detection
+    if (touched != lastTouchState) {
+        unsigned long currentTime = millis();
+
+        if ((currentTime - lastTouchTime) > touchDebounce) {
+            lastTouchState = touched;
+            lastTouchTime = currentTime;
+
+            // Touch started
+            if (touched) {
+                touchPressTime = currentTime;
+                touchActive = true;
+
+                Serial.print("Touch detected - value: ");
+                Serial.println(touchValue);
+            }
+            // Touch released
+            else if (touchActive) {
+                unsigned long touchDuration = currentTime - touchPressTime;
+                unsigned long timeSinceLastTouch = currentTime - lastTouchTime;
+
+                Serial.print("Touch released after ");
+                Serial.print(touchDuration);
+                Serial.println("ms");
+
+                // Check for double-touch (within 500ms window)
+                if (timeSinceLastTouch < doubleTouchWindow && timeSinceLastTouch > touchDebounce) {
+                    // Flash LEDs purple for double-touch
+                    for (int j = 0; j < NUM_LEDS; j++) {
+                        strip.setPixelColor(j, strip.Color(200, 0, 255));
+                    }
+                    strip.show();
+                    delay(150);
+
+                    publishButtonPress("main", "double-touch");
+                    Serial.println("Double-touch detected!");
+
+                    lastTouchTime = 0;  // Reset to prevent triple-touch
+                }
+                // Single touch
+                else {
+                    // Flash LEDs cyan for touch
+                    for (int j = 0; j < NUM_LEDS; j++) {
+                        strip.setPixelColor(j, strip.Color(0, 255, 200));
+                    }
+                    strip.show();
+                    delay(100);
+
+                    publishButtonPress("main", "touch");
+                    Serial.println("Single touch detected!");
+                }
+
+                touchActive = false;
+            }
+        }
     }
 }
 
@@ -338,10 +483,13 @@ void loop() {
         setup_wifi();
     }
 
-    // Check buttons
+    // Check buttons (physical presses)
     checkButtons();
 
-    // Check for shake
+    // Check touch sensor (capacitive touch on main button)
+    checkTouch();
+
+    // Check for shake (accelerometer)
     checkShake();
 
     // Update LED animation
