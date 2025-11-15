@@ -45,10 +45,13 @@ const upload = multer({
   }
 });
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+// Initialize OpenAI client (only if API key is available)
+let openai: OpenAI | null = null;
+if (process.env.OPENAI_API_KEY) {
+  openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY
+  });
+}
 
 /**
  * POST /api/transcribe
@@ -56,8 +59,17 @@ const openai = new OpenAI({
  */
 router.post('/', upload.single('audio'), async (req, res) => {
   console.log('📥 Transcribe endpoint hit');
-  
+
   try {
+    // Check if OpenAI is configured
+    if (!openai) {
+      console.log('❌ OpenAI not configured');
+      return res.status(503).json({
+        success: false,
+        message: 'Transcription service not configured. Please set OPENAI_API_KEY environment variable.'
+      });
+    }
+
     if (!req.file) {
       console.log('❌ No file in request');
       return res.status(400).json({
