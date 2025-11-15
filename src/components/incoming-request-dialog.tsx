@@ -4,30 +4,25 @@
  */
 
 import { useEffect, useState } from "react";
-import { 
-  AlertCircle, 
-  Bell, 
-  MapPin, 
-  User, 
+import {
+  AlertCircle,
+  Bell,
+  MapPin,
+  User,
   Clock,
   CheckCircle2,
-  Forward,
   UserCheck,
   Volume2,
   Play,
+  Send,
+  MessageSquare,
   UtensilsCrossed,
-  Package,
-  Home,
-  Shirt,
   Wine,
-  Waves,
-  Wrench,
-  Cog,
   ChevronDown,
   ChevronUp
 } from "lucide-react";
 import { motion } from "motion/react";
-import { ServiceRequest, InteriorTeam } from "../contexts/AppDataContext";
+import { ServiceRequest } from "../contexts/AppDataContext";
 import { useAppData } from "../contexts/AppDataContext";
 import { useWebSocket } from "../hooks/useWebSocket";
 import { useAcceptServiceRequest } from "../hooks/useServiceRequestsApi";
@@ -48,25 +43,12 @@ export function IncomingRequestDialog({
   request,
 }: IncomingRequestDialogProps) {
   const { user } = useAuth();
-  const { delegateServiceRequest, forwardServiceRequest, crewMembers, getCurrentDutyStatus } = useAppData();
+  const { delegateServiceRequest, crewMembers, getCurrentDutyStatus } = useAppData();
   const { mutate: acceptRequest } = useAcceptServiceRequest();
   const [timeAgo, setTimeAgo] = useState<string>("Just now");
   const [showDelegateDropdown, setShowDelegateDropdown] = useState(false);
   const [showAvailableCrew, setShowAvailableCrew] = useState(false);
-  const [showForwardDropdown, setShowForwardDropdown] = useState(false);
   const [playingAudio, setPlayingAudio] = useState(false);
-  
-  // Department/Team options for forwarding
-  const forwardOptions = [
-    { value: 'Galley', label: 'Galley', icon: UtensilsCrossed },
-    { value: 'Laundry', label: 'Laundry', icon: Shirt },
-    { value: 'Engineering', label: 'Engineering', icon: Wrench },
-    { value: 'ETO', label: 'ETO (Technical)', icon: Cog },
-    { value: 'Housekeeping', label: 'Housekeeping', icon: Home },
-    { value: 'Pantry', label: 'Pantry', icon: Package },
-    { value: 'Bar Service', label: 'Bar Service', icon: Wine },
-    { value: 'Deck Service', label: 'Deck Service', icon: Waves },
-  ];
   
   // Get crew organized by duty status
   const dutyStatus = getCurrentDutyStatus();
@@ -103,7 +85,6 @@ export function IncomingRequestDialog({
     if (!isOpen) {
       setShowDelegateDropdown(false);
       setShowAvailableCrew(false);
-      setShowForwardDropdown(false);
     }
   }, [isOpen, request]);
 
@@ -175,20 +156,6 @@ export function IncomingRequestDialog({
     );
   };
 
-  const handleForwardClick = () => {
-    setShowDelegateDropdown(false); // Close delegate if open
-    setShowForwardDropdown(!showForwardDropdown);
-  };
-
-  const handleSelectTeam = (teamValue: string) => {
-    if (!request) return;
-    
-    forwardServiceRequest(request.id, teamValue as InteriorTeam);
-    toast.success(`Request forwarded to ${teamValue}`);
-    setShowForwardDropdown(false);
-    onClose();
-  };
-
   const handlePlayAudio = () => {
     if (!request?.voiceTranscript && !request?.voiceAudioUrl) return;
     
@@ -231,6 +198,31 @@ export function IncomingRequestDialog({
       setTimeout(() => {
         setPlayingAudio(false);
       }, 3000);
+    }
+  };
+
+  const handleQuickResponse = (responseType: 'unclear' | 'on-way') => {
+    if (!request) return;
+
+    // Immediately accept the request
+    handleAccept();
+
+    // Send automated response
+    if (responseType === 'unclear') {
+      toast.info('Auto-response sent', {
+        description: '"Could you please repeat your request?"'
+      });
+
+      // TODO: Integrate with messaging system when available
+      // sendGuestMessage(request.guestId, "Could you please repeat your request?");
+
+    } else if (responseType === 'on-way') {
+      toast.success('Auto-response sent', {
+        description: '"I\'m on my way to assist you!"'
+      });
+
+      // TODO: Integrate with messaging system when available
+      // sendGuestMessage(request.guestId, "I'm on my way to assist you!");
     }
   };
 
@@ -424,6 +416,28 @@ export function IncomingRequestDialog({
                     </button>
                   )}
                 </div>
+
+                {/* Quick Response Buttons - Only for Voice Messages */}
+                <div className="flex gap-2 mt-4 pt-4 border-t border-border">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleQuickResponse('unclear')}
+                    className="flex-1 text-xs"
+                  >
+                    <MessageSquare className="h-3 w-3 mr-1.5" />
+                    Couldn't Understand
+                  </Button>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => handleQuickResponse('on-way')}
+                    className="flex-1 text-xs bg-accent hover:bg-accent/90"
+                  >
+                    <Send className="h-3 w-3 mr-1.5" />
+                    On My Way
+                  </Button>
+                </div>
               </div>
             );
           })()}
@@ -538,48 +552,6 @@ export function IncomingRequestDialog({
               )}
             </motion.div>
           )}
-
-          {/* Forward Dropdown */}
-          {showForwardDropdown && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mb-3 rounded-lg border border-border bg-card overflow-hidden"
-            >
-              <div className="px-3 py-2 bg-muted/30">
-                <p className="text-xs font-medium text-muted-foreground">Forward to Team</p>
-              </div>
-              <div className="divide-y divide-border max-h-64 overflow-y-auto">
-                {forwardOptions.map((option) => {
-                  const Icon = option.icon;
-                  return (
-                    <button
-                      key={option.value}
-                      onClick={() => handleSelectTeam(option.value)}
-                      className="w-full px-3 py-2.5 flex items-center gap-3 hover:bg-muted/50 transition-colors text-left"
-                    >
-                      <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <span className="font-medium">{option.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
-          
-          {/* Secondary Actions */}
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleForwardClick}
-              className="w-full"
-            >
-              <Forward className="h-4 w-4 mr-2" />
-              Forward
-            </Button>
-          </div>
         </div>
       </DialogContent>
     </Dialog>

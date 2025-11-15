@@ -142,7 +142,7 @@ void registerDevice() {
     doc["deviceId"] = deviceId;
     doc["type"] = "smart_button";
     doc["name"] = "Custom PCB Button";
-    doc["firmwareVersion"] = "v2.0-enhanced";
+    doc["firmwareVersion"] = "v2.1-stable";
     doc["hardwareVersion"] = "ESP32-S3 Custom PCB";
     doc["macAddress"] = WiFi.macAddress();
     doc["ipAddress"] = WiFi.localIP().toString();
@@ -169,7 +169,7 @@ void publishButtonPress(const char* button, const char* pressType) {
     doc["pressType"] = pressType;
     doc["battery"] = 100;
     doc["rssi"] = WiFi.RSSI();
-    doc["firmwareVersion"] = "v2.0-enhanced";
+    doc["firmwareVersion"] = "v2.1-stable";
     doc["timestamp"] = millis();
     doc["sequenceNumber"] = sequenceNumber;
 
@@ -487,7 +487,8 @@ void loop() {
     checkButtons();
 
     // Check touch sensor (capacitive touch on main button)
-    checkTouch();
+    // DISABLED: Touch sensor causing timeout errors - needs proper initialization
+    // checkTouch();
 
     // Check for shake (accelerometer)
     checkShake();
