@@ -77,7 +77,8 @@ fi
 
 # Create necessary directories
 print_info "Creating directories..."
-mkdir -p backend/logs backend/uploads
+mkdir -p backend/logs backend/uploads mosquitto/data mosquitto/log
+chmod -R 777 mosquitto 2>/dev/null || true
 print_success "Directories created"
 
 # Build images
@@ -164,6 +165,8 @@ echo "Access the application:"
 echo "  🌐 Frontend:    http://10.10.0.10:3000"
 echo "  🔌 Backend API: http://10.10.0.10:3001"
 echo "  🗄️  Database:   PostgreSQL on port 5432"
+echo "  📡 MQTT Broker: mqtt://10.10.0.10:1883"
+echo "  🔌 MQTT WS:     ws://10.10.0.10:9001"
 echo ""
 echo "Login credentials:"
 echo "  👤 Username: admin"
