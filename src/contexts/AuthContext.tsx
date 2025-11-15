@@ -25,7 +25,7 @@ interface AuthContextType {
   updateUser: (updates: Partial<User>) => void;
 }
 
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -239,7 +239,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       // Re-throw with better message if it's a network error
       if (error instanceof TypeError && error.message.includes('fetch')) {
-        throw new Error('Cannot connect to server. Please check if backend is running on http://localhost:8080');
+        throw new Error(`Cannot connect to server. Please check if backend is running on ${API_BASE_URL.replace('/api', '')}`);
       }
       
       throw error;
