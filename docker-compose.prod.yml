@@ -64,6 +64,7 @@ services:
       args:
         VITE_API_URL: http://10.10.0.10:3001/api
         VITE_WS_URL: http://10.10.0.10:3001
+        VITE_MQTT_BROKER: ws://10.10.0.10:9001
     container_name: obedio-frontend
     restart: unless-stopped
     depends_on:
