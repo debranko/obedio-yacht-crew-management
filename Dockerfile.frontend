@@ -5,11 +5,13 @@ WORKDIR /app
 # Build arguments for environment configuration
 ARG VITE_API_URL=http://10.10.0.10:3001/api
 ARG VITE_WS_URL=http://10.10.0.10:3001
+ARG VITE_MQTT_BROKER=ws://10.10.0.10:9001
 
 # Set environment variables for build
 ENV VITE_API_URL=${VITE_API_URL}
 ENV VITE_WS_ENABLED=true
 ENV VITE_WS_URL=${VITE_WS_URL}
+ENV VITE_MQTT_BROKER=${VITE_MQTT_BROKER}
 
 # Copy package files
 COPY package*.json ./
