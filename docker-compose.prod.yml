@@ -43,6 +43,7 @@ services:
       REFRESH_TOKEN_EXPIRES_IN: 30d
       FRONTEND_URL: http://10.10.0.10:3000
       SOCKET_IO_CORS_ORIGIN: http://10.10.0.10:3000,http://localhost:3000,http://*:3000
+      MQTT_BROKER: mqtt://mosquitto:1883
       MQTT_BROKER_URL: mqtt://mosquitto:1883
       MQTT_CLIENT_ID: obedio-backend
       MQTT_ENABLED: "true"

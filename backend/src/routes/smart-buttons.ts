@@ -92,7 +92,7 @@ router.post('/test/:deviceId', asyncHandler(async (req, res) => {
 router.get('/mqtt-status', asyncHandler(async (req, res) => {
   res.json(apiSuccess({
     connected: mqttService.getConnectionStatus(),
-    broker: process.env.MQTT_BROKER || 'mqtt://localhost:1883'
+    broker: process.env.MQTT_BROKER || 'mqtt://mosquitto:1883'
   }));
 }));
 

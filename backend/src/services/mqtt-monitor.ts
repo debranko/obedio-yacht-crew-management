@@ -38,7 +38,7 @@ class MQTTMonitor {
    * Connect directly to Mosquitto broker
    */
   private connectToMQTT() {
-    const broker = process.env.MQTT_BROKER || 'mqtt://localhost:1883';
+    const broker = process.env.MQTT_BROKER || 'mqtt://mosquitto:1883';
     const clientId = `mqtt-monitor-${Date.now()}`;
 
     console.log(`🔌 MQTT Monitor: Connecting to ${broker}...`);
