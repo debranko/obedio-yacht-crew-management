@@ -26,14 +26,21 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Install runtime dependencies
-RUN apk add --no-cache curl netcat-openbsd
+# Install runtime dependencies including OpenSSL 3
+RUN apk add --no-cache curl netcat-openbsd openssl
 
-# Copy from builder
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma
+# Copy package files first
 COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/prisma ./prisma
+
+# Copy node_modules and regenerate Prisma for this environment
+COPY --from=builder /app/node_modules ./node_modules
+
+# Regenerate Prisma client for the production image's OpenSSL version
+RUN npx prisma generate
+
+# Copy built application
+COPY --from=builder /app/dist ./dist
 
 # Copy entrypoint script
 COPY docker-entrypoint.sh /usr/local/bin/
