@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Obedio Minimal</string>
+    <string name="connection_status">Connection Status</string>
+    <string name="websocket">WebSocket</string>
+    <string name="mqtt">MQTT Broker</string>
+    <string name="api">Backend API</string>
+    <string name="refresh">Refresh</string>
+    <string name="connected">Connected</string>
+    <string name="disconnected">Disconnected</string>
+    <string name="connecting">Connecting</string>
+    <string name="error">Error</string>
+</resources>

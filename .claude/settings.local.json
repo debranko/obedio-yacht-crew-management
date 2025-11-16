@@ -1,10 +1,21 @@
 {
   "permissions": {
     "allow": [
-      "Bash(\"C:/Users/debra/AppData/Local/Android/Sdk/platform-tools/adb.exe\" shell \"pm grant com.example.obediowear android.permission.ACCESS_FINE_LOCATION\")",
-      "Bash(\"C:/Users/debra/AppData/Local/Android/Sdk/platform-tools/adb.exe\" shell \"pm grant com.example.obediowear android.permission.ACCESS_COARSE_LOCATION\")",
-      "Bash(\"C:/Users/debra/AppData/Local/Android/Sdk/platform-tools/adb.exe\" shell \"dumpsys package com.example.obediowear | grep -A 3 ''runtime permissions:''\")",
-      "Bash(\"C:/Users/debra/AppData/Local/Android/Sdk/platform-tools/adb.exe\" shell \"am force-stop com.example.obediowear\")"
+      "Bash(powershell -Command \".\\gradlew.bat assembleDebug\")",
+      "Bash(\"C:\\Users\\debra\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" connect 192.168.5.59:5555)",
+      "Bash(\"C:\\Users\\debra\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" -s adb-C101X3B220410-Q2LfOc._adb-tls-connect._tcp install -r \"c:\\Users\\debra\\OneDrive\\Desktop\\Luxury Minimal Web App Design\\ObedioWear\\app\\build\\outputs\\apk\\debug\\app-debug.apk\")",
+      "Bash(\"C:\\Users\\debra\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" -s adb-C101X3A271199-pMG9i0._adb-tls-connect._tcp install -r \"c:\\Users\\debra\\OneDrive\\Desktop\\Luxury Minimal Web App Design\\ObedioWear\\app\\build\\outputs\\apk\\debug\\app-debug.apk\")",
+      "Bash(dir:*)",
+      "Bash(nul)",
+      "Bash(copy \"c:\\Users\\debra\\OneDrive\\Desktop\\Luxury Minimal Web App Design\\logo.png\" \"c:\\Users\\debra\\OneDrive\\Desktop\\Luxury Minimal Web App Design\\ObedioWear\\app\\src\\main\\res\\mipmap-mdpi\\ic_launcher.png\" /Y)",
+      "Bash(copy:*)",
+      "Bash(\"C:\\Users\\debra\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" -s adb-C101X3A271199-pMG9i0._adb-tls-connect._tcp uninstall com.example.obediowear)",
+      "Bash(\"C:\\Users\\debra\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" -s adb-C101X3B220410-Q2LfOc._adb-tls-connect._tcp uninstall com.example.obediowear)",
+      "Bash(\"C:\\Users\\debra\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" -s adb-C101X3A271199-pMG9i0._adb-tls-connect._tcp install \"c:\\Users\\debra\\OneDrive\\Desktop\\Luxury Minimal Web App Design\\ObedioWear\\app\\build\\outputs\\apk\\debug\\app-debug.apk\")",
+      "Bash(\"C:\\Users\\debra\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" -s adb-C101X3B220410-Q2LfOc._adb-tls-connect._tcp install \"c:\\Users\\debra\\OneDrive\\Desktop\\Luxury Minimal Web App Design\\ObedioWear\\app\\build\\outputs\\apk\\debug\\app-debug.apk\")",
+      "Bash(git add:*)",
+      "Bash(\"C:\\Users\\debra\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" -s adb-C101X3B220410-Q2LfOc._adb-tls-connect._tcp shell \"appops set com.example.obediowear SYSTEM_ALERT_WINDOW allow\")",
+      "Bash(powershell -Command \"cd ''c:\\Users\\debra\\OneDrive\\Desktop\\Luxury Minimal Web App Design\\ObedioWear''; .\\gradlew.bat assembleDebug\")"
     ],
     "deny": [],
     "ask": []

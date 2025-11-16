@@ -1,0 +1,73 @@
+<resources>
+    <string name="app_name">Obedio</string>
+    
+    <!-- Common -->
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="retry">Retry</string>
+    <string name="close">Close</string>
+    <string name="loading">Loading…</string>
+    <string name="error_generic">Something went wrong</string>
+    <string name="no_internet">No internet connection</string>
+    
+    <!-- Auth -->
+    <string name="login_title">Welcome to Obedio</string>
+    <string name="username_hint">Username</string>
+    <string name="password_hint">Password</string>
+    <string name="remember_me">Remember me</string>
+    <string name="login_button">Login</string>
+    <string name="logout">Logout</string>
+    <string name="login_error_empty_credentials">Please enter username and password</string>
+    <string name="login_error_invalid_credentials">Invalid username or password</string>
+    
+    <!-- Dashboard -->
+    <string name="dashboard_title">Dashboard</string>
+    <string name="no_active_requests">No active service requests</string>
+    <string name="accept_nearest">Accept Nearest</string>
+    <string name="active_requests_count">%d active requests</string>
+    
+    <!-- Service Requests -->
+    <string name="service_requests_title">Service Requests</string>
+    <string name="request_created_time">%s ago</string>
+    <string name="accept">Accept</string>
+    <string name="complete">Complete</string>
+    <string name="delegate">Delegate</string>
+    <string name="serving">Serving</string>
+    <string name="priority_emergency">EMERGENCY</string>
+    <string name="priority_urgent">URGENT</string>
+    <string name="priority_normal">Normal</string>
+    <string name="priority_low">Low</string>
+    
+    <!-- Guests -->
+    <string name="guests_title">Guests</string>
+    <string name="guest_search_hint">Search by name or cabin</string>
+    <string name="guest_status_onboard">Onboard</string>
+    <string name="guest_status_departed">Departed</string>
+    
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="theme_system">System Default</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="notifications_enabled">Notifications Enabled</string>
+    <string name="notifications_disabled">Notifications Disabled</string>
+    <string name="biometric_login">Biometric Login</string>
+    <string name="background_sync">Background Sync</string>
+    <string name="version">Version %s</string>
+    
+    <!-- Notifications -->
+    <string name="notification_new_request_title">New Request - %s</string>
+    <string name="notification_emergency_title">🚨 EMERGENCY - %s</string>
+    <string name="notification_urgent_title">🔴 URGENT - %s</string>
+    <string name="notification_message_title">Message from %s</string>
+    <string name="default_notification_channel_id">service_requests</string>
+    
+    <!-- Bottom Navigation -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_requests">Requests</string>
+    <string name="nav_guests">Guests</string>
+    <string name="nav_settings">Settings</string>
+    
+</resources>

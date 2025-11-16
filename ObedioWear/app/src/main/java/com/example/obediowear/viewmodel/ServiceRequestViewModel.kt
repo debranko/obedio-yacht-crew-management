@@ -2,7 +2,6 @@ package com.example.obediowear.viewmodel
 
 import android.app.Application
 import android.content.Context
-import android.os.BatteryManager
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -444,13 +443,9 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
             try {
                 val context = getApplication<Application>().applicationContext
 
-                // Get battery level
-                val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-                val batteryLevel = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-
-                // Signal strength: WiFi RSSI (estimate -60 dBm for now, can be improved)
-                // TODO: Get actual WiFi signal strength from WifiManager
-                val signalStrength = -60
+                // Get battery level and WiFi signal strength from DeviceInfoHelper
+                val batteryLevel = com.example.obediowear.utils.DeviceInfoHelper.getBatteryLevel(context)
+                val signalStrength = com.example.obediowear.utils.DeviceInfoHelper.getWiFiSignalStrength(context)
 
                 // Current timestamp
                 val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {

@@ -1,0 +1,16 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.5"
+        android:scaleY="0.5"
+        android:translateX="27"
+        android:translateY="27">
+        <!-- Simple "O" for Obedio -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M54,20C34.67,20 19,35.67 19,55C19,74.33 34.67,90 54,90C73.33,90 89,74.33 89,55C89,35.67 73.33,20 54,20ZM54,80C40.19,80 29,68.81 29,55C29,41.19 40.19,30 54,30C67.81,30 79,41.19 79,55C79,68.81 67.81,80 54,80Z"/>
+    </group>
+</vector>
