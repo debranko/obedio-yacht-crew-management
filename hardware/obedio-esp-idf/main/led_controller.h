@@ -82,6 +82,20 @@ esp_err_t led_start_rainbow_task(uint32_t priority, uint32_t stack_size);
  */
 esp_err_t led_stop_rainbow_task(void);
 
+/**
+ * @brief Update static LED color with brightness scaling
+ *
+ * Sets all LEDs to the specified RGB color with brightness applied.
+ * Brightness is scaled: actual_value = (color_value * brightness) / 255
+ *
+ * @param r Red component (0-255)
+ * @param g Green component (0-255)
+ * @param b Blue component (0-255)
+ * @param brightness Brightness level (0-255)
+ * @return ESP_OK on success
+ */
+esp_err_t led_update_static(uint8_t r, uint8_t g, uint8_t b, uint8_t brightness);
+
 #ifdef __cplusplus
 }
 #endif

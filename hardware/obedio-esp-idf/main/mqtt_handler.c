@@ -42,6 +42,9 @@ static device_config_t s_device_config = {
     .t3_topic = "tasmota_obedio/cmnd/POWER",
     .t3_payload = "TOGGLE",
     .led_brightness = LED_BRIGHTNESS,
+    .led_red = LED_RED,             // Use constant from config.h
+    .led_green = LED_GREEN,         // Use constant from config.h
+    .led_blue = LED_BLUE,           // Use constant from config.h
     .shake_threshold = SHAKE_THRESHOLD,
     .touch_threshold = TOUCH_THRESHOLD_PERCENT,
 };
@@ -71,8 +74,9 @@ static void ota_task(void *pvParameters)
         ESP_LOGE(TAG, "OTA update failed!");
         led_flash(LED_COLOR_RED, 1000);
 
-        // Restart LED animation if OTA failed
-        led_start_rainbow_task(3, 3072);
+        // Restore static LED display if OTA failed (config values will be reloaded by MQTT handler)
+        led_update_static(s_device_config.led_red, s_device_config.led_green,
+                         s_device_config.led_blue, s_device_config.led_brightness);
     }
 
     // Free the URL string
@@ -195,6 +199,30 @@ static esp_err_t config_load_from_nvs(void)
         ESP_LOGI(TAG, "Loaded LED brightness: %d", led_brightness);
     }
 
+    // Load LED red component
+    uint8_t led_red = s_device_config.led_red;
+    err = nvs_get_u8(nvs_handle, NVS_KEY_LED_RED, &led_red);
+    if (err == ESP_OK) {
+        s_device_config.led_red = led_red;
+        ESP_LOGI(TAG, "Loaded LED red: %d", led_red);
+    }
+
+    // Load LED green component
+    uint8_t led_green = s_device_config.led_green;
+    err = nvs_get_u8(nvs_handle, NVS_KEY_LED_GREEN, &led_green);
+    if (err == ESP_OK) {
+        s_device_config.led_green = led_green;
+        ESP_LOGI(TAG, "Loaded LED green: %d", led_green);
+    }
+
+    // Load LED blue component
+    uint8_t led_blue = s_device_config.led_blue;
+    err = nvs_get_u8(nvs_handle, NVS_KEY_LED_BLUE, &led_blue);
+    if (err == ESP_OK) {
+        s_device_config.led_blue = led_blue;
+        ESP_LOGI(TAG, "Loaded LED blue: %d", led_blue);
+    }
+
     nvs_close(nvs_handle);
     ESP_LOGI(TAG, "Configuration loaded from NVS");
     return ESP_OK;
@@ -227,6 +255,11 @@ static esp_err_t config_save_to_nvs(void)
 
     // Save LED brightness
     nvs_set_u8(nvs_handle, NVS_KEY_LED_BRIGHTNESS, s_device_config.led_brightness);
+
+    // Save LED RGB components
+    nvs_set_u8(nvs_handle, NVS_KEY_LED_RED, s_device_config.led_red);
+    nvs_set_u8(nvs_handle, NVS_KEY_LED_GREEN, s_device_config.led_green);
+    nvs_set_u8(nvs_handle, NVS_KEY_LED_BLUE, s_device_config.led_blue);
 
     // Commit changes
     err = nvs_commit(nvs_handle);
@@ -288,6 +321,9 @@ static esp_err_t mqtt_publish_config_status(void)
     cJSON_AddStringToObject(root, "t3Topic", s_device_config.t3_topic);
     cJSON_AddStringToObject(root, "t3Payload", s_device_config.t3_payload);
     cJSON_AddNumberToObject(root, "ledBrightness", s_device_config.led_brightness);
+    cJSON_AddNumberToObject(root, "ledRed", s_device_config.led_red);
+    cJSON_AddNumberToObject(root, "ledGreen", s_device_config.led_green);
+    cJSON_AddNumberToObject(root, "ledBlue", s_device_config.led_blue);
     cJSON_AddNumberToObject(root, "shakeThreshold", (int)(s_device_config.shake_threshold * 100));
     cJSON_AddNumberToObject(root, "touchThreshold", s_device_config.touch_threshold);
 
@@ -376,6 +412,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 cJSON *json = cJSON_ParseWithLength(event->data, event->data_len);
                 if (json != NULL) {
                     bool config_changed = false;
+                    bool led_settings_changed = false;
 
                     // Update heartbeat interval
                     cJSON *hb_interval = cJSON_GetObjectItem(json, "heartbeatInterval");
@@ -423,14 +460,54 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                     if (led_brightness != NULL && cJSON_IsNumber(led_brightness)) {
                         s_device_config.led_brightness = (uint8_t)led_brightness->valueint;
                         config_changed = true;
+                        led_settings_changed = true;
                         ESP_LOGI(TAG, "LED brightness updated to %d", s_device_config.led_brightness);
+                    }
+
+                    // Update LED red component
+                    cJSON *led_red = cJSON_GetObjectItem(json, "ledRed");
+                    if (led_red != NULL && cJSON_IsNumber(led_red)) {
+                        s_device_config.led_red = (uint8_t)led_red->valueint;
+                        config_changed = true;
+                        led_settings_changed = true;
+                        ESP_LOGI(TAG, "LED red updated to %d", s_device_config.led_red);
+                    }
+
+                    // Update LED green component
+                    cJSON *led_green = cJSON_GetObjectItem(json, "ledGreen");
+                    if (led_green != NULL && cJSON_IsNumber(led_green)) {
+                        s_device_config.led_green = (uint8_t)led_green->valueint;
+                        config_changed = true;
+                        led_settings_changed = true;
+                        ESP_LOGI(TAG, "LED green updated to %d", s_device_config.led_green);
+                    }
+
+                    // Update LED blue component
+                    cJSON *led_blue = cJSON_GetObjectItem(json, "ledBlue");
+                    if (led_blue != NULL && cJSON_IsNumber(led_blue)) {
+                        s_device_config.led_blue = (uint8_t)led_blue->valueint;
+                        config_changed = true;
+                        led_settings_changed = true;
+                        ESP_LOGI(TAG, "LED blue updated to %d", s_device_config.led_blue);
                     }
 
                     // Save config to NVS if anything changed
                     if (config_changed) {
                         config_save_to_nvs();
                         mqtt_publish_config_status();
-                        led_flash(LED_COLOR_GREEN, 200);  // Green flash to indicate config updated
+
+                        // If LED settings changed, immediately update the LED display
+                        if (led_settings_changed) {
+                            ESP_LOGI(TAG, "Updating LED display with new RGB(%d,%d,%d) brightness=%d",
+                                     s_device_config.led_red, s_device_config.led_green,
+                                     s_device_config.led_blue, s_device_config.led_brightness);
+                            led_update_static(s_device_config.led_red,
+                                            s_device_config.led_green,
+                                            s_device_config.led_blue,
+                                            s_device_config.led_brightness);
+                        } else {
+                            led_flash(LED_COLOR_GREEN, 200);  // Green flash for non-LED config updates
+                        }
                     }
 
                     cJSON_Delete(json);

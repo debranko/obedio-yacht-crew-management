@@ -137,6 +137,25 @@ static const char* BUTTON_MQTT[BUTTON_COUNT] = {
 #define LED_BRIGHTNESS          CONFIG_OBEDIO_LED_BRIGHTNESS
 #endif
 
+// Default LED RGB color (all red)
+#ifndef CONFIG_OBEDIO_LED_RED
+#define LED_RED                 255
+#else
+#define LED_RED                 CONFIG_OBEDIO_LED_RED
+#endif
+
+#ifndef CONFIG_OBEDIO_LED_GREEN
+#define LED_GREEN               0
+#else
+#define LED_GREEN               CONFIG_OBEDIO_LED_GREEN
+#endif
+
+#ifndef CONFIG_OBEDIO_LED_BLUE
+#define LED_BLUE                0
+#else
+#define LED_BLUE                CONFIG_OBEDIO_LED_BLUE
+#endif
+
 #define LED_INTERVAL_MS         150  // Rainbow animation speed
 
 // ==================== TOUCH SENSOR CONFIGURATION ====================
@@ -254,6 +273,9 @@ static const char* BUTTON_MQTT[BUTTON_COUNT] = {
 #define NVS_KEY_DEVICE_NAME     "dev_name"
 #define NVS_KEY_LOCATION_ID     "location_id"
 #define NVS_KEY_LED_BRIGHTNESS  "led_bright"
+#define NVS_KEY_LED_RED         "led_red"
+#define NVS_KEY_LED_GREEN       "led_green"
+#define NVS_KEY_LED_BLUE        "led_blue"
 #define NVS_KEY_SHAKE_THRESH    "shake_thresh"
 #define NVS_KEY_TOUCH_THRESH    "touch_thresh"
 #define NVS_KEY_HEARTBEAT_INT   "hb_interval"
@@ -333,7 +355,10 @@ typedef struct {
     char mqtt_uri[128];
     char device_name[64];
     char location_id[64];
-    uint8_t led_brightness;
+    uint8_t led_brightness;           // LED brightness (0-255, default 128)
+    uint8_t led_red;                  // LED red component (0-255, default 255)
+    uint8_t led_green;                // LED green component (0-255, default 0)
+    uint8_t led_blue;                 // LED blue component (0-255, default 0)
     float shake_threshold;
     uint8_t touch_threshold;
     uint32_t heartbeat_interval_sec;  // Heartbeat interval in seconds (5-300s, default 30s)

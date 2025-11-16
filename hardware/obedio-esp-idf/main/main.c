@@ -555,13 +555,14 @@ void app_main(void)
     }
     */
 
-    // Step 19: Create LED rainbow task
-    ESP_LOGI(TAG, "Starting LED rainbow task...");
-    ret = led_start_rainbow_task(3, 3072);
+    // Step 19: Initialize static LED display with default color (config will override via MQTT)
+    ESP_LOGI(TAG, "Initializing static LED display with default color RGB(%d,%d,%d) brightness=%d...",
+             LED_RED, LED_GREEN, LED_BLUE, LED_BRIGHTNESS);
+    ret = led_update_static(LED_RED, LED_GREEN, LED_BLUE, LED_BRIGHTNESS);
     if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "LED rainbow task started (priority 3, stack 3072)");
+        ESP_LOGI(TAG, "Static LED display initialized successfully");
     } else {
-        ESP_LOGW(TAG, "Failed to start LED rainbow task");
+        ESP_LOGW(TAG, "Failed to initialize static LED display");
     }
 
     // Step 20: Create MQTT heartbeat timer (30 seconds)

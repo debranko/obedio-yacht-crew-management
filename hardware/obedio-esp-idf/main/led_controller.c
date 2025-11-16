@@ -212,3 +212,22 @@ esp_err_t led_stop_rainbow_task(void)
     ESP_LOGI(TAG, "Rainbow task stopped");
     return ESP_OK;
 }
+
+esp_err_t led_update_static(uint8_t r, uint8_t g, uint8_t b, uint8_t brightness)
+{
+    if (led_strip == NULL) {
+        ESP_LOGE(TAG, "LED strip not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    // Apply brightness scaling: actual_value = (color_value * brightness) / 255
+    uint8_t scaled_r = (r * brightness) / 255;
+    uint8_t scaled_g = (g * brightness) / 255;
+    uint8_t scaled_b = (b * brightness) / 255;
+
+    ESP_LOGI(TAG, "Updating static LEDs: RGB(%d,%d,%d) brightness=%d -> scaled RGB(%d,%d,%d)",
+             r, g, b, brightness, scaled_r, scaled_g, scaled_b);
+
+    // Set all LEDs to the scaled color
+    return led_set_all(scaled_r, scaled_g, scaled_b);
+}
