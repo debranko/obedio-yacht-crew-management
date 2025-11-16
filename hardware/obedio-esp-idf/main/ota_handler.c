@@ -8,7 +8,10 @@
 #include "esp_log.h"
 #include "esp_ota_ops.h"
 #include "esp_https_ota.h"
+#include "esp_http_client.h"
 #include "esp_system.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include <string.h>
 
 static const char *TAG = "OTA";
@@ -230,4 +233,53 @@ esp_err_t ota_cancel_update(void)
 
     ESP_LOGI(TAG, "OTA update cancelled");
     return ESP_OK;
+}
+
+esp_err_t ota_update_from_url(const char *url)
+{
+    if (url == NULL) {
+        ESP_LOGE(TAG, "OTA URL is NULL");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    ESP_LOGI(TAG, "Starting OTA update from URL: %s", url);
+    ESP_LOGI(TAG, "This may take several minutes...");
+
+    // Configure OTA - disable cert verification for HTTP
+    esp_http_client_config_t config = {
+        .url = url,
+        .timeout_ms = 120000,  // 120 second timeout (2 minutes)
+        .keep_alive_enable = true,
+        .buffer_size = 4096,
+        .buffer_size_tx = 4096,
+        .skip_cert_common_name_check = true,  // Allow HTTP
+    };
+
+    esp_https_ota_config_t ota_config = {
+        .http_config = &config,
+    };
+
+    ESP_LOGI(TAG, "Starting download...");
+
+    // Perform OTA update
+    esp_err_t err = esp_https_ota(&ota_config);
+
+    ESP_LOGI(TAG, "Download completed with result: %s", esp_err_to_name(err));
+
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "OTA update completed successfully!");
+        ESP_LOGI(TAG, "Rebooting in 3 seconds...");
+
+        // Give time for log output
+        vTaskDelay(pdMS_TO_TICKS(3000));
+
+        // Reboot to new firmware
+        esp_restart();
+
+        // Should never reach here
+        return ESP_OK;
+    } else {
+        ESP_LOGE(TAG, "OTA update failed: %s", esp_err_to_name(err));
+        return err;
+    }
 }

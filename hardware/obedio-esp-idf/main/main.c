@@ -8,12 +8,15 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "nvs_flash.h"
 #include "driver/i2c.h"
+#include "lwip/sockets.h"
+#include "lwip/netdb.h"
 
 #include "config.h"
 #include "device_manager.h"
@@ -35,6 +38,11 @@ static const char *TAG = "MAIN";
 static bool is_recording = false;
 static int64_t recording_start_time = 0;  // Timestamp when recording started (microseconds)
 
+// UDP logging
+static int udp_log_socket = -1;
+static struct sockaddr_in udp_log_addr;
+static vprintf_like_t original_vprintf = NULL;
+
 // Forward declarations
 static void button_press_callback(const char *button, press_type_t type);
 static void touch_press_callback(press_type_t type);
@@ -42,6 +50,8 @@ static void shake_detected_callback(void);
 static esp_err_t i2c_bus_init(void);
 static void startup_led_animation(void);
 static void heartbeat_timer_callback(void *arg);
+static esp_err_t init_udp_logging(const char *host, uint16_t port);
+static int udp_vprintf(const char *fmt, va_list args);
 
 /**
  * Initialize I2C bus for all peripherals
@@ -240,6 +250,58 @@ static void heartbeat_timer_callback(void *arg)
 }
 
 /**
+ * UDP vprintf handler - sends logs via UDP
+ */
+static int udp_vprintf(const char *fmt, va_list args)
+{
+    char log_buffer[512];
+    int len = vsnprintf(log_buffer, sizeof(log_buffer), fmt, args);
+
+    // Also print to serial
+    if (original_vprintf) {
+        va_list args_copy;
+        va_copy(args_copy, args);
+        original_vprintf(fmt, args_copy);
+        va_end(args_copy);
+    }
+
+    // Send via UDP if socket is valid
+    if (udp_log_socket >= 0 && len > 0) {
+        sendto(udp_log_socket, log_buffer, len, 0,
+               (struct sockaddr *)&udp_log_addr, sizeof(udp_log_addr));
+    }
+
+    return len;
+}
+
+/**
+ * Initialize UDP logging
+ */
+static esp_err_t init_udp_logging(const char *host, uint16_t port)
+{
+    ESP_LOGI(TAG, "Initializing UDP logging to %s:%d", host, port);
+
+    // Create UDP socket
+    udp_log_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (udp_log_socket < 0) {
+        ESP_LOGE(TAG, "Failed to create UDP socket");
+        return ESP_FAIL;
+    }
+
+    // Configure destination address
+    memset(&udp_log_addr, 0, sizeof(udp_log_addr));
+    udp_log_addr.sin_family = AF_INET;
+    udp_log_addr.sin_port = htons(port);
+    inet_pton(AF_INET, host, &udp_log_addr.sin_addr);
+
+    // Redirect vprintf to UDP
+    original_vprintf = esp_log_set_vprintf(udp_vprintf);
+
+    ESP_LOGI(TAG, "UDP logging enabled - logs streaming to %s:%d", host, port);
+    return ESP_OK;
+}
+
+/**
  * Main application entry point
  */
 void app_main(void)
@@ -359,6 +421,13 @@ void app_main(void)
             ESP_LOGI(TAG, "Connect to WiFi network and visit http://192.168.4.1 to configure");
         } else {
             ESP_LOGI(TAG, "WiFi initialized in STA mode");
+
+            // Initialize UDP logging for wireless debugging
+            ESP_LOGI(TAG, "Enabling wireless UDP logging...");
+            ret = init_udp_logging("10.10.0.10", 5555);
+            if (ret != ESP_OK) {
+                ESP_LOGW(TAG, "UDP logging failed to initialize (continuing without it)");
+            }
         }
     }
 
@@ -385,17 +454,13 @@ void app_main(void)
     */
 
     // Step 15: Initialize OTA handler
-    // TEMPORARILY DISABLED - will re-enable after web server is fixed
-    ESP_LOGW(TAG, "OTA handler DISABLED temporarily");
-    /*
     ESP_LOGI(TAG, "Initializing OTA handler...");
     ret = ota_handler_init();
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "OTA handler initialization failed");
     } else {
-        ESP_LOGI(TAG, "OTA handler initialized");
+        ESP_LOGI(TAG, "OTA handler initialized - MQTT OTA updates enabled");
     }
-    */
 
     // Step 16: Initialize button handler and create task
     ESP_LOGI(TAG, "Initializing button handler...");

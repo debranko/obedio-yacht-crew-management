@@ -6,6 +6,8 @@
 #include "mqtt_handler.h"
 #include "wifi_manager.h"
 #include "config.h"
+#include "ota_handler.h"
+#include "led_controller.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -29,6 +31,31 @@ static esp_mqtt_client_handle_t s_mqtt_client = NULL;
 static bool s_is_connected = false;
 static uint32_t s_sequence_number = 0;
 static TimerHandle_t s_heartbeat_timer = NULL;
+static char *s_pending_ota_url = NULL;
+
+/**
+ * @brief OTA task - runs OTA update in separate task to avoid blocking MQTT
+ */
+static void ota_task(void *pvParameters)
+{
+    char *firmware_url = (char *)pvParameters;
+
+    ESP_LOGI(TAG, "OTA task started, updating from: %s", firmware_url);
+
+    // Perform OTA update (will reboot if successful)
+    esp_err_t ret = ota_update_from_url(firmware_url);
+
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "OTA update failed!");
+        led_flash(LED_COLOR_RED, 1000);
+    }
+
+    // Free the URL string
+    free(firmware_url);
+
+    // Delete this task
+    vTaskDelete(NULL);
+}
 
 /**
  * @brief Get current timestamp in milliseconds
@@ -100,6 +127,12 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             ESP_LOGI(TAG, "MQTT connected to broker");
             s_is_connected = true;
 
+            // Subscribe to OTA topic
+            char ota_topic[128];
+            snprintf(ota_topic, sizeof(ota_topic), "obedio/button/%s/ota", wifi_get_device_id());
+            int msg_id = esp_mqtt_client_subscribe(s_mqtt_client, ota_topic, 1);
+            ESP_LOGI(TAG, "Subscribed to OTA topic: %s (msg_id=%d)", ota_topic, msg_id);
+
             // Register device on connection
             mqtt_register_device();
             break;
@@ -125,6 +158,56 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             ESP_LOGI(TAG, "MQTT data received");
             ESP_LOGI(TAG, "Topic: %.*s", event->topic_len, event->topic);
             ESP_LOGI(TAG, "Data: %.*s", event->data_len, event->data);
+
+            // Check if this is an OTA message
+            if (strstr(event->topic, "/ota") != NULL) {
+                ESP_LOGI(TAG, "OTA update request received!");
+
+                // Flash purple LEDs to indicate OTA starting
+                led_flash(LED_COLOR_PURPLE, 500);
+
+                // Parse JSON payload to get URL
+                cJSON *json = cJSON_ParseWithLength(event->data, event->data_len);
+                if (json != NULL) {
+                    cJSON *url_obj = cJSON_GetObjectItem(json, "url");
+                    if (url_obj != NULL && cJSON_IsString(url_obj)) {
+                        const char *firmware_url = url_obj->valuestring;
+                        ESP_LOGI(TAG, "Firmware URL: %s", firmware_url);
+
+                        // Copy URL string (will be freed by OTA task)
+                        char *url_copy = strdup(firmware_url);
+                        if (url_copy != NULL) {
+                            // Create OTA task with large stack (8KB) to avoid watchdog issues
+                            BaseType_t ret = xTaskCreate(
+                                ota_task,
+                                "ota_task",
+                                8192,  // 8KB stack
+                                url_copy,
+                                5,  // High priority
+                                NULL
+                            );
+
+                            if (ret != pdPASS) {
+                                ESP_LOGE(TAG, "Failed to create OTA task!");
+                                led_flash(LED_COLOR_RED, 1000);
+                                free(url_copy);
+                            } else {
+                                ESP_LOGI(TAG, "OTA task created successfully");
+                            }
+                        } else {
+                            ESP_LOGE(TAG, "Failed to allocate memory for OTA URL");
+                            led_flash(LED_COLOR_RED, 500);
+                        }
+                    } else {
+                        ESP_LOGE(TAG, "OTA message missing 'url' field");
+                        led_flash(LED_COLOR_RED, 500);
+                    }
+                    cJSON_Delete(json);
+                } else {
+                    ESP_LOGE(TAG, "Failed to parse OTA JSON");
+                    led_flash(LED_COLOR_RED, 500);
+                }
+            }
             break;
 
         case MQTT_EVENT_ERROR:

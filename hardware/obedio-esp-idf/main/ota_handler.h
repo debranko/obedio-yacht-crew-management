@@ -92,6 +92,20 @@ int ota_get_progress(void);
  */
 esp_err_t ota_cancel_update(void);
 
+/**
+ * @brief Perform OTA update from HTTP/HTTPS URL
+ *
+ * Downloads firmware from the specified URL and flashes it to the OTA partition.
+ * Shows progress via LED animations. Automatically reboots on success.
+ *
+ * @param url HTTP or HTTPS URL to firmware binary file
+ * @return ESP_OK on success, error code otherwise
+ *
+ * @note This function blocks until update completes or fails
+ * @note Device will reboot automatically after successful update
+ */
+esp_err_t ota_update_from_url(const char *url);
+
 #ifdef __cplusplus
 }
 #endif
