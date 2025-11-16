@@ -1,6 +1,18 @@
 # OBEDIO Smart Button - ESP-IDF Firmware
 
-ESP32-S3 firmware for custom PCB smart button with voice recording, web interface, and OTA updates.
+**Status**: ✅ **FULLY FUNCTIONAL** - Button detection and MQTT reporting working
+**Version**: v3.0-esp-idf
+**Last Updated**: November 16, 2025
+
+ESP32-S3 firmware for custom PCB smart button with MQTT integration for yacht crew management.
+
+## 🚀 Quick Start
+
+**Choose your platform**:
+- **Windows**: See [WINDOWS_SETUP.md](WINDOWS_SETUP.md) for complete setup guide
+- **Mac/Linux**: See "Build & Flash" section below
+
+**Current Status**: See [WORKING_STATUS.md](WORKING_STATUS.md) for detailed feature status
 
 ## Hardware
 
@@ -9,19 +21,31 @@ ESP32-S3 firmware for custom PCB smart button with voice recording, web interfac
 - **Accelerometer**: LIS3DHTR via I2C (0x19)
 - **LEDs**: 16x WS2812B NeoPixel (GPIO17)
 - **Touch**: Capacitive touch sensor (GPIO1)
-- **Microphone**: I2S MEMS (INMP441)
-- **Speaker**: I2S amplifier (MAX98357A)
+- **Microphone**: I2S MEMS (INMP441) - *Currently disabled*
+- **Speaker**: I2S amplifier (MAX98357A) - *Currently disabled*
 
-## Features
+## ✅ Working Features (November 16, 2025)
 
-- ✅ 6 physical buttons + capacitive touch
-- ✅ Voice recording (up to 20s, ADPCM compressed)
-- ✅ MQTT integration with backend
-- ✅ Web interface (config, debug, status)
-- ✅ OTA firmware updates
-- ✅ mDNS discovery (`obedio-{MAC}.local`)
-- ✅ NVS configuration storage
-- ✅ Factory reset (hold T6 on boot)
+- ✅ **6 physical buttons** (T1-T6) - all working perfectly
+- ✅ **Capacitive touch sensor** - single/double touch
+- ✅ **MQTT integration** - all button presses sent to broker
+- ✅ **White running light** - LED animation showing device status
+- ✅ **WiFi connection** - connects to "Obedio" network automatically
+- ✅ **mDNS discovery** (`obedio-{MAC}.local`)
+- ✅ **Heartbeat** - MQTT message every 30 seconds
+- ✅ **Short vs Long press detection** - different events for <0.5s vs ≥0.5s
+- ✅ **NVS configuration storage**
+- ✅ **Factory reset** (hold T6 on boot)
+
+## ❌ Temporarily Disabled Features
+
+These features have code implemented but are disabled due to technical issues:
+
+- ❌ **Voice recording** - Causes watchdog timeout (code in `audio_recorder.c`)
+- ❌ **Web interface** - Causes heap corruption (code in `web_server.c`)
+- ❌ **OTA firmware updates** - Depends on web server (code in `ota_handler.c`)
+
+**Note**: Button logic still differentiates short press (button event) vs long press (voice event), but doesn't actually record audio yet.
 
 ## Network Configuration
 

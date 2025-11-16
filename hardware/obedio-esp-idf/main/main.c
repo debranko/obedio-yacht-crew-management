@@ -95,83 +95,46 @@ static void button_press_callback(const char *button, press_type_t type)
 {
     ESP_LOGI(TAG, "Button callback: %s, type: %d", button, type);
 
-    // Handle main button PRESS - start recording immediately
-    if (strcmp(button, "main") == 0 && type == PRESS_TYPE_PRESS) {
-        ESP_LOGI(TAG, "Main button pressed - starting voice recording");
-
-        // Start recording immediately on press
-        esp_err_t ret = audio_start_recording();
-        if (ret == ESP_OK) {
-            is_recording = true;
-            recording_start_time = esp_timer_get_time();  // Store start time (microseconds)
-            led_flash(LED_COLOR_BLUE, 0);  // Continuous blue while recording
-            ESP_LOGI(TAG, "Voice recording started");
-        } else {
-            ESP_LOGE(TAG, "Failed to start voice recording");
-            led_flash(LED_COLOR_RED, 200);  // Red flash = error
-        }
+    // Handle T1 (main) button PRESS - track start time
+    if (strcmp(button, "T1") == 0 && type == PRESS_TYPE_PRESS) {
+        ESP_LOGI(TAG, "T1 (main) button pressed - tracking for duration");
+        is_recording = true;  // Use this flag to track button is held
+        recording_start_time = esp_timer_get_time();  // Store start time (microseconds)
         return;
     }
 
-    // Handle release - check duration to decide what to do
-    if (is_recording && strcmp(button, "main") == 0 && type == PRESS_TYPE_SINGLE) {
+    // Handle T1 (main) button RELEASE - check duration to decide short vs long press
+    if (is_recording && strcmp(button, "T1") == 0 && type == PRESS_TYPE_SINGLE) {
         // Calculate press duration in milliseconds
         int64_t current_time = esp_timer_get_time();
         int64_t duration_ms = (current_time - recording_start_time) / 1000;
-
-        ESP_LOGI(TAG, "Main button released after %lld ms", duration_ms);
-
-        uint8_t *adpcm_data = NULL;
-        size_t len = 0;
-        float audio_duration = 0.0f;
-
-        // Stop recording and get the data
-        esp_err_t ret = audio_stop_recording(&adpcm_data, &len, &audio_duration);
         is_recording = false;
 
+        ESP_LOGI(TAG, "T1 (main) button released after %lld ms", duration_ms);
+
         if (duration_ms < 500) {
-            // Short press (< 0.5s) - Discard recording and send notification instead
-            ESP_LOGI(TAG, "Short press - discarding recording, sending notification");
-
-            if (adpcm_data != NULL) {
-                free(adpcm_data);
-            }
-
-            // Send normal button notification
+            // Short press (< 0.5s) - Send normal button notification
+            ESP_LOGI(TAG, "Short press - sending button notification");
             led_flash(LED_COLOR_WHITE, 100);
-            mqtt_publish_button_press(button, "single");
+            mqtt_publish_button_press("main", "single");
             ESP_LOGI(TAG, "Button notification sent: main - single");
         } else {
-            // Long press (>= 0.5s) - Publish voice message
-            ESP_LOGI(TAG, "Long press - publishing voice message");
-
-            if (ret == ESP_OK && adpcm_data != NULL && len > 0) {
-                // Publish voice message via MQTT
-                ret = mqtt_publish_voice(adpcm_data, len, audio_duration);
-                if (ret == ESP_OK) {
-                    led_flash(LED_COLOR_GREEN, 200);  // Green = sent successfully
-                    ESP_LOGI(TAG, "Voice message published (%.2fs, %zu bytes)", audio_duration, len);
-                } else {
-                    led_flash(LED_COLOR_RED, 200);  // Red = send failed
-                    ESP_LOGE(TAG, "Failed to publish voice message");
-                }
-
-                // Free the allocated buffer
-                free(adpcm_data);
-            } else {
-                ESP_LOGE(TAG, "Failed to stop recording or no data");
-                led_flash(LED_COLOR_RED, 200);
-            }
+            // Long press (>= 0.5s) - Send voice event (without actual audio for now)
+            ESP_LOGI(TAG, "Long press - sending voice event");
+            led_flash(LED_COLOR_BLUE, 200);  // Blue = voice event
+            mqtt_publish_button_press("main", "voice");
+            ESP_LOGI(TAG, "Voice event sent: main - voice");
         }
         return;
     }
 
-    // Ignore PRESS events entirely when recording
-    if (is_recording) {
-        return;  // Don't publish anything while recording
+    // IMPORTANT: Filter out ALL T1 (main button) events that aren't handled above
+    // This prevents LONG press events from being published while button is held
+    if (strcmp(button, "T1") == 0) {
+        return;  // Don't publish any other T1 events
     }
 
-    // Ignore PRESS_TYPE_PRESS for non-main buttons (only used to start recording)
+    // Ignore PRESS_TYPE_PRESS for all other buttons (T2-T6)
     if (type == PRESS_TYPE_PRESS) {
         return;
     }
@@ -409,6 +372,9 @@ void app_main(void)
     }
 
     // Step 14: Initialize web server
+    // TEMPORARILY DISABLED - causing heap corruption crash
+    ESP_LOGW(TAG, "Web server DISABLED temporarily");
+    /*
     ESP_LOGI(TAG, "Initializing web server...");
     ret = web_server_start();
     if (ret != ESP_OK) {
@@ -416,8 +382,12 @@ void app_main(void)
     } else {
         ESP_LOGI(TAG, "Web server initialized");
     }
+    */
 
     // Step 15: Initialize OTA handler
+    // TEMPORARILY DISABLED - will re-enable after web server is fixed
+    ESP_LOGW(TAG, "OTA handler DISABLED temporarily");
+    /*
     ESP_LOGI(TAG, "Initializing OTA handler...");
     ret = ota_handler_init();
     if (ret != ESP_OK) {
@@ -425,6 +395,7 @@ void app_main(void)
     } else {
         ESP_LOGI(TAG, "OTA handler initialized");
     }
+    */
 
     // Step 16: Initialize button handler and create task
     ESP_LOGI(TAG, "Initializing button handler...");

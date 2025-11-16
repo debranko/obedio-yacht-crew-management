@@ -334,10 +334,15 @@ esp_err_t mqtt_publish_voice(const uint8_t *audio_data, size_t len, float durati
     char topic[128];
     snprintf(topic, sizeof(topic), MQTT_TOPIC_VOICE_FMT, wifi_get_device_id());
 
-    // Publish
-    int msg_id = esp_mqtt_client_publish(s_mqtt_client, topic, json_str, 0, 1, 0);
+    // Calculate JSON length
+    size_t json_len = strlen(json_str);
+    ESP_LOGI(TAG, "Voice message JSON size: %zu bytes (audio: %zu bytes)", json_len, len);
 
-    ESP_LOGI(TAG, "Published voice message: %.2fs, %zu bytes (msg_id=%d)", duration, len, msg_id);
+    // Publish with explicit length to support large payloads
+    int msg_id = esp_mqtt_client_publish(s_mqtt_client, topic, json_str, json_len, 1, 0);
+
+    ESP_LOGI(TAG, "Published voice message: %.2fs, %zu bytes audio, %zu bytes JSON (msg_id=%d)",
+             duration, len, json_len, msg_id);
 
     free(json_str);
 
