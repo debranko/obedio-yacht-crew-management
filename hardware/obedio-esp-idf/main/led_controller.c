@@ -136,10 +136,12 @@ esp_err_t led_clear(void)
 
 void led_rainbow_task(void *pvParameters)
 {
-    ESP_LOGI(TAG, "Starting circle animation task (single BLUE LED at 50%%)");
+    ESP_LOGI(TAG, "Starting circle animation task (single RED LED at 50%%)");
 
     uint8_t position = 0;
-    const uint8_t blue_brightness = 128;  // 50% brightness
+    const uint8_t red_r = 128;  // 50% brightness RED
+    const uint8_t red_g = 0;
+    const uint8_t red_b = 0;
 
     while (1) {
         if (led_strip != NULL) {
@@ -148,8 +150,8 @@ void led_rainbow_task(void *pvParameters)
                 led_strip_set_pixel(led_strip, i, 0, 0, 0);
             }
 
-            // Set single BLUE LED at current position
-            led_strip_set_pixel(led_strip, position, 0, 0, blue_brightness);
+            // Set single RED LED at current position
+            led_strip_set_pixel(led_strip, position, red_r, red_g, red_b);
 
             // Refresh strip
             led_strip_refresh(led_strip);
