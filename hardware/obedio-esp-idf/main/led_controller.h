@@ -74,6 +74,14 @@ void led_rainbow_task(void *pvParameters);
  */
 esp_err_t led_start_rainbow_task(uint32_t priority, uint32_t stack_size);
 
+/**
+ * @brief Stop LED rainbow animation task (for OTA updates)
+ *
+ * Stops the rainbow animation task and clears all LEDs
+ * @return ESP_OK on success
+ */
+esp_err_t led_stop_rainbow_task(void);
+
 #ifdef __cplusplus
 }
 #endif

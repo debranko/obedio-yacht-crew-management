@@ -42,12 +42,24 @@ static void ota_task(void *pvParameters)
 
     ESP_LOGI(TAG, "OTA task started, updating from: %s", firmware_url);
 
+    // Stop LED animation to prevent flash cache access during OTA
+    ESP_LOGI(TAG, "Stopping LED task before OTA...");
+    led_stop_rainbow_task();
+
+    // Wait a moment for LED task to fully stop
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    ESP_LOGI(TAG, "LED task stopped, starting OTA download...");
+
     // Perform OTA update (will reboot if successful)
     esp_err_t ret = ota_update_from_url(firmware_url);
 
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "OTA update failed!");
         led_flash(LED_COLOR_RED, 1000);
+
+        // Restart LED animation if OTA failed
+        led_start_rainbow_task(3, 3072);
     }
 
     // Free the URL string

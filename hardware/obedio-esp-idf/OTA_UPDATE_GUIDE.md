@@ -242,9 +242,41 @@ ssh obedio@10.10.0.10 "nc -ul 5555"
 4. Implement firmware version checking
 5. Rate limit OTA commands
 
+## Current Status (2025-11-16)
+
+### ✅ WORKING
+- MQTT-triggered OTA command reception
+- HTTP firmware download (fixed with `HTTP_TRANSPORT_OVER_TCP`)
+- LED task suspension during OTA (prevents cache access crash)
+- Firmware upload to NUC and NGINX serving
+- OTA download completes successfully (~60 seconds for 990KB)
+- New firmware boots and runs
+
+### ⚠️ IN PROGRESS
+- **Rollback issue**: New firmware boots successfully but rolls back to factory partition
+  - Root cause: ESP-IDF rollback protection activating
+  - New firmware needs to call `esp_ota_mark_app_valid_cancel_rollback()` early enough
+  - May need to adjust rollback timeout or validation timing
+
+### 🔧 Fixes Applied
+1. **HTTP transport fix** (ota_handler.c:251):
+   ```c
+   .transport_type = HTTP_TRANSPORT_OVER_TCP  // Enables plain HTTP
+   ```
+
+2. **Cache access crash fix** (mqtt_handler.c:46-50):
+   ```c
+   led_stop_rainbow_task();  // Stop LED task before OTA
+   vTaskDelay(pdMS_TO_TICKS(100));  // Wait for task to stop
+   ```
+
+3. **LED task management** (led_controller.c:194-210):
+   - Added `led_stop_rainbow_task()` function
+   - Properly deletes task handle and clears LEDs
+
 ## Next Steps
 
-- [ ] Debug HTTP download issue (currently failing)
+- [ ] Fix rollback validation timing issue
 - [ ] Enable UDP wireless logging
 - [ ] Add firmware version tracking
 - [ ] Implement OTA progress reporting via MQTT

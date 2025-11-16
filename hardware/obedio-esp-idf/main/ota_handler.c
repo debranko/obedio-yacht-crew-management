@@ -245,14 +245,14 @@ esp_err_t ota_update_from_url(const char *url)
     ESP_LOGI(TAG, "Starting OTA update from URL: %s", url);
     ESP_LOGI(TAG, "This may take several minutes...");
 
-    // Configure OTA - disable cert verification for HTTP
+    // Configure OTA for plain HTTP (not HTTPS)
     esp_http_client_config_t config = {
         .url = url,
+        .transport_type = HTTP_TRANSPORT_OVER_TCP,  // Plain HTTP (not SSL)
         .timeout_ms = 120000,  // 120 second timeout (2 minutes)
         .keep_alive_enable = true,
         .buffer_size = 4096,
         .buffer_size_tx = 4096,
-        .skip_cert_common_name_check = true,  // Allow HTTP
     };
 
     esp_https_ota_config_t ota_config = {

@@ -163,10 +163,11 @@ void led_rainbow_task(void *pvParameters)
     }
 }
 
+// Static task handle accessible by both start and stop functions
+static TaskHandle_t rainbow_task_handle = NULL;
+
 esp_err_t led_start_rainbow_task(uint32_t priority, uint32_t stack_size)
 {
-    static TaskHandle_t rainbow_task_handle = NULL;
-
     if (rainbow_task_handle != NULL) {
         ESP_LOGW(TAG, "Rainbow task already running");
         return ESP_OK;
@@ -187,5 +188,23 @@ esp_err_t led_start_rainbow_task(uint32_t priority, uint32_t stack_size)
     }
 
     ESP_LOGI(TAG, "Rainbow task started");
+    return ESP_OK;
+}
+
+esp_err_t led_stop_rainbow_task(void)
+{
+    if (rainbow_task_handle == NULL) {
+        ESP_LOGW(TAG, "Rainbow task not running");
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Stopping rainbow task for OTA");
+    vTaskDelete(rainbow_task_handle);
+    rainbow_task_handle = NULL;
+
+    // Clear all LEDs before stopping
+    led_clear();
+
+    ESP_LOGI(TAG, "Rainbow task stopped");
     return ESP_OK;
 }
