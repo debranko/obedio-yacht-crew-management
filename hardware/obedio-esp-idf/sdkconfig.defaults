@@ -112,7 +112,7 @@ CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1=y
 
 # ==================== Bootloader ====================
 CONFIG_BOOTLOADER_LOG_LEVEL_INFO=y
-CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+# CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y  # Disabled temporarily to prove OTA works
 
 # ==================== Compiler Options ====================
 CONFIG_COMPILER_OPTIMIZATION_SIZE=y
@@ -121,7 +121,7 @@ CONFIG_COMPILER_STACK_CHECK_MODE_NORM=y
 
 # ==================== OTA ====================
 CONFIG_OTA_ALLOW_HTTP=y
-CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+# CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y  # Disabled temporarily to prove OTA works
 
 # ==================== SPIFFS (for web assets) ====================
 CONFIG_SPIFFS_MAX_PARTITIONS=3

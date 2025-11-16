@@ -245,18 +245,31 @@ ssh obedio@10.10.0.10 "nc -ul 5555"
 ## Current Status (2025-11-16)
 
 ### ✅ WORKING
-- MQTT-triggered OTA command reception
+- MQTT-triggered OTA command reception via `obedio/button/{DEVICE_ID}/ota`
 - HTTP firmware download (fixed with `HTTP_TRANSPORT_OVER_TCP`)
-- LED task suspension during OTA (prevents cache access crash)
-- Firmware upload to NUC and NGINX serving
+- LED task suspension during OTA (prevents flash cache access crash)
+- Firmware upload to NUC and NGINX serving at `http://10.10.0.10:3000/firmware.bin`
 - OTA download completes successfully (~60 seconds for 990KB)
-- New firmware boots and runs
+- Deployment automation script (`deploy_ota_firmware.sh`)
 
-### ⚠️ IN PROGRESS
-- **Rollback issue**: New firmware boots successfully but rolls back to factory partition
-  - Root cause: ESP-IDF rollback protection activating
-  - New firmware needs to call `esp_ota_mark_app_valid_cancel_rollback()` early enough
-  - May need to adjust rollback timeout or validation timing
+### ⚠️ KNOWN ISSUE - Boot Partition Persistence
+**Symptom**: New firmware downloads and flashes successfully but device continues running old firmware after reboot
+
+**Attempted fixes**:
+1. ✅ Added `esp_ota_mark_app_valid_cancel_rollback()` after WiFi connects (main.c:433)
+2. ✅ Disabled rollback protection temporarily (`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=n`)
+3. ❌ Still persisting old firmware - indicates deeper boot partition selection issue
+
+**Root cause**: Unknown - requires serial debugging to see bootloader partition selection
+- Possibly OTA not setting boot partition correctly
+- Possibly bootloader not respecting OTA partition selection
+- Need to check running partition logs on next boot
+
+**Next steps**:
+- [ ] Connect serial and capture full boot logs after OTA
+- [ ] Verify `esp_ota_set_boot_partition()` is called successfully
+- [ ] Check bootloader logs for partition selection reasoning
+- [ ] Consider flashing bootloader directly if partition table corrupted
 
 ### 🔧 Fixes Applied
 1. **HTTP transport fix** (ota_handler.c:251):
