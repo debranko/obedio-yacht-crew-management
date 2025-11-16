@@ -77,7 +77,7 @@ router.get('/all', authMiddleware, asyncHandler(async (req: any, res) => {
     },
     notifications: notificationSettings ? {
       pushEnabled: notificationSettings.pushEnabled,
-      serviceRequests: notificationSettings.serviceRequests,
+      serviceRequests: notificationSettings.servicerequests,
       emergencyAlerts: notificationSettings.emergencyAlerts,
       systemMessages: notificationSettings.systemMessages,
       guestMessages: notificationSettings.guestMessages,

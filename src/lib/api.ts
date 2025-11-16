@@ -1,4 +1,5 @@
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api";
+// Use relative path to leverage Vite proxy (same-origin for cookie support)
+const BASE_URL = "/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   // Auth handled by HTTP-only cookies (server runs 24/7)

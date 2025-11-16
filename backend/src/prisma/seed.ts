@@ -312,7 +312,6 @@ async function seed() {
           priority: 'normal',
           status: 'pending',
           voiceTranscript: 'Could we have a bottle of champagne and some fresh towels brought to the sun deck please?',
-          cabinImage: 'https://images.unsplash.com/photo-1753505889211-9cfbac527474?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080'
         }
       }),
       prisma.serviceRequest.create({
@@ -326,7 +325,6 @@ async function seed() {
           priority: 'urgent',
           status: 'pending',
           voiceTranscript: 'We would like evening turndown service at 8 PM.',
-          cabinImage: 'https://images.unsplash.com/photo-1597126729864-51740ac05236?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080'
         }
       })
     ]);
@@ -341,7 +339,7 @@ async function seed() {
           date: today,
           type: 'PRIMARY',
           shiftId: 'morning',
-          crewId: 'crew-1'
+          crewMemberId: 'crew-1'
         }
       }),
       prisma.assignment.create({
@@ -349,7 +347,7 @@ async function seed() {
           date: today,
           type: 'PRIMARY',
           shiftId: 'afternoon',
-          crewId: 'crew-2'
+          crewMemberId: 'crew-2'
         }
       }),
       prisma.assignment.create({
@@ -357,7 +355,7 @@ async function seed() {
           date: today,
           type: 'BACKUP',
           shiftId: 'morning',
-          crewId: 'crew-3'
+          crewMemberId: 'crew-3'
         }
       })
     ]);

@@ -19,7 +19,8 @@ interface AuthResponse {
   message?: string;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// Use relative path to leverage Vite proxy (same-origin for cookie support)
+const API_BASE_URL = '/api';
 
 class AuthService {
   constructor() {

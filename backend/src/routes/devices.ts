@@ -32,7 +32,7 @@ router.get('/discover', asyncHandler(async (req, res) => {
           floor: true
         }
       },
-      crewMember: {
+      crewmember: {
         select: {
           id: true,
           name: true,
@@ -46,7 +46,7 @@ router.get('/discover', asyncHandler(async (req, res) => {
     return res.status(404).json(apiError('Device not found', 'NOT_FOUND'));
   }
 
-  console.log(`📱 Device discovery: ${device.name} (MAC: ${macAddress}) assigned to ${device.crewMember?.name || 'nobody'}`);
+  console.log(`📱 Device discovery: ${device.name} (MAC: ${macAddress}) assigned to ${device.crewmember?.name || 'nobody'}`);
   res.json(apiSuccess(device));
 }));
 
@@ -262,7 +262,7 @@ router.get('/', requirePermission('devices.view'), asyncHandler(async (req, res)
           floor: true
         }
       },
-      crewMember: {
+      crewmember: {
         select: {
           id: true,
           name: true,
@@ -288,7 +288,7 @@ router.get('/:id', requirePermission('devices.view'), asyncHandler(async (req, r
     where: { id: req.params.id },
     include: {
       location: true,
-      crewMember: true,
+      crewmember: true,
       logs: {
         orderBy: { createdAt: 'desc' },
         take: 50
@@ -312,7 +312,7 @@ router.post('/', requirePermission('devices.add'), asyncHandler(async (req, res)
     data: req.body,
     include: {
       location: true,
-      crewMember: true
+      crewmember: true
     }
   });
 
@@ -378,7 +378,7 @@ router.put('/:id', requirePermission('devices.edit'), asyncHandler(async (req, r
     data: updateData,
     include: {
       location: true,
-      crewMember: true
+      crewmember: true
     }
   });
 
@@ -628,7 +628,7 @@ router.get('/me', asyncHandler(async (req, res) => {
         where: { type: 'watch' },
         include: {
           location: true,
-          crewMember: true
+          crewmember: true
         }
       }
     }

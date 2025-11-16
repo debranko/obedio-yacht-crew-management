@@ -121,7 +121,7 @@ class MQTTMonitor {
   /**
    * Update device info
    */
-  private updateDevice(deviceId: string, data: any) {
+  public updateDevice(deviceId: string, data: any) {
     const device = {
       deviceId,
       ...data,

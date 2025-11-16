@@ -123,7 +123,7 @@ router.get('/completed', authMiddleware, asyncHandler(async (req: Request, res: 
         guest: true,
         location: true,
         category: true,
-        CrewMember: true  // Include crew member who completed the request
+        crewmember: true  // Include crew member who completed the request
       },
       orderBy: { updatedAt: 'desc' },
       take,
@@ -141,7 +141,7 @@ router.get('/completed', authMiddleware, asyncHandler(async (req: Request, res: 
       const duration = Math.floor((completedAt.getTime() - acceptedAt.getTime()) / 1000);
 
       // Get crew member name
-      const crewMemberName = req.CrewMember?.name || req.assignedTo || 'Staff';
+      const crewMemberName = req.crewmember?.name || req.assignedTo || 'Staff';
 
       // Map location name to cabin image
       const cabinImage = req.location?.name ? `/images/locations/${req.location.name}.jpg` : undefined;
@@ -158,7 +158,7 @@ router.get('/completed', authMiddleware, asyncHandler(async (req: Request, res: 
           priority: req.priority,
           timestamp: createdAt,
           voiceTranscript: req.voiceTranscript,
-          voiceAudioUrl: req.voiceAudioUrl,
+          // voiceAudioUrl: req.voiceAudioUrl,
           status: req.status,
           assignedTo: crewMemberName,
           categoryId: req.categoryId,

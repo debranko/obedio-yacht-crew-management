@@ -65,7 +65,7 @@ export class DatabaseService {
       this.prisma.crewMember.count(),
       this.prisma.guest.count(),
       this.prisma.location.count(),
-      this.prisma.serviceRequest.count({ where: { status: 'PENDING' } }),
+      this.prisma.serviceRequest.count({ where: { status: 'pending' } }),
       this.prisma.device.count()
     ]);
 
@@ -141,8 +141,7 @@ export class DatabaseService {
     }
     
     const payload = { userId: user.id, username: user.username, role: user.role };
-    const options: SignOptions = { expiresIn: (process.env.AUTH_EXPIRES_IN || '7d') as string };
-    const token = jwt.sign(payload, secret, options);
+    const token = jwt.sign(payload, secret, { expiresIn: (process.env.AUTH_EXPIRES_IN || '7d') as any });
 
     return {
       user: {
@@ -201,7 +200,7 @@ export class DatabaseService {
             isActive: true
           }
         },
-        deviceAssignments: {
+        deviceassignments: {
           include: {
             device: true
           }
@@ -282,8 +281,8 @@ export class DatabaseService {
         where,
         include: {
           location: true,
-          serviceRequests: {
-            where: { status: 'PENDING' },
+          servicerequests: {
+            where: { status: 'pending' },
             take: 5
           }
         },
@@ -330,13 +329,13 @@ export class DatabaseService {
     return this.prisma.location.findMany({
       include: {
         guests: {
-          where: { status: 'ONBOARD' }
+          where: { status: 'onboard' }
         },
         devices: true,
         _count: {
           select: {
-            serviceRequests: {
-              where: { status: 'PENDING' }
+            servicerequests: {
+              where: { status: 'pending' }
             }
           }
         }
@@ -430,7 +429,7 @@ export class DatabaseService {
           guest: true,
           location: true,
           category: true,
-          CrewMember: true  // Include assigned crew member details
+          crewmember: true  // Include assigned crew member details
         },
         orderBy: { createdAt: 'desc' },
         skip,
@@ -455,7 +454,7 @@ export class DatabaseService {
         guest: true,
         location: true,
         category: true,
-        CrewMember: true  // Include assigned crew member details
+        crewmember: true  // Include assigned crew member details
       }
     });
 
@@ -471,7 +470,7 @@ export class DatabaseService {
         type: 'service_request',
         action: 'Request Created',
         details: `Service request created: ${priorityLabel} priority from ${guestName} at ${locationName}`,
-        userId: newRequest.CrewMember?.userId || null,
+        userId: newRequest.crewmember?.userId || null,
         locationId: newRequest.locationId,
         guestId: newRequest.guestId,
         metadata: JSON.stringify({
@@ -530,7 +529,7 @@ export class DatabaseService {
         guest: true,
         location: true,
         category: true,
-        CrewMember: true  // Include assigned crew member details
+        crewmember: true  // Include assigned crew member details
       }
     });
 
@@ -572,7 +571,7 @@ export class DatabaseService {
         guest: true,
         location: true,
         category: true,
-        CrewMember: true  // Include assigned crew member details
+        crewmember: true  // Include assigned crew member details
       }
     });
 
@@ -603,7 +602,7 @@ export class DatabaseService {
           type: 'service_request',
           action: 'Request Completed',
           details: `${request.assignedTo || 'Crew'} completed service request from ${request.guest ? request.guest.firstName + ' ' + request.guest.lastName : request.guestName || 'Guest'} at ${request.location?.name || request.guestCabin || 'Unknown'}`,
-          userId: request.CrewMember?.userId || null,
+          userId: request.crewmember?.userId || null,
           locationId: request.locationId,
           guestId: request.guestId,
           metadata: JSON.stringify({
@@ -650,7 +649,7 @@ export class DatabaseService {
 
     const location = await this.prisma.location.findFirst({
       where: { smartButtonId: device.deviceId },
-      include: { guests: { where: { status: 'ONBOARD' } } }
+      include: { guests: { where: { status: 'onboard' } } }
     });
 
     if (!location) {
@@ -674,8 +673,8 @@ export class DatabaseService {
             cabinId: location.id,
             locationId: location.id,
             guestId: guest?.id,
-            requestType: 'CALL',
-            priority: 'NORMAL',
+            requestType: 'call',
+            priority: 'normal',
             voiceTranscript: data.isLongPress
               ? `Voice message (${data.voiceDuration?.toFixed(1)}s): Service request`
               : undefined,
@@ -797,7 +796,7 @@ export class DatabaseService {
         location: true,
         assignments: {
           include: {
-            crewMember: true
+            crewmember: true
           }
         }
       },
@@ -832,10 +831,10 @@ export class DatabaseService {
     return this.prisma.location.findUnique({
       where: { id },
       include: {
-        guests: { where: { status: 'ONBOARD' } },
+        guests: { where: { status: 'onboard' } },
         devices: true,
-        serviceRequests: {
-          where: { status: 'PENDING' },
+        servicerequests: {
+          where: { status: 'pending' },
           take: 10,
           orderBy: { createdAt: 'desc' }
         }
@@ -847,7 +846,7 @@ export class DatabaseService {
     return this.prisma.location.findMany({
       where: { doNotDisturb: true },
       include: {
-        guests: { where: { status: 'ONBOARD' } }
+        guests: { where: { status: 'onboard' } }
       },
       orderBy: { name: 'asc' }
     });

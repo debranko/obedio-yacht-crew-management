@@ -46,7 +46,7 @@ dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
-const PORT = process.env.PORT || 8080;
+const PORT = parseInt(process.env.PORT || '8080', 10);
 
 // Security Headers - Helmet protects against common vulnerabilities
 app.use(helmet({

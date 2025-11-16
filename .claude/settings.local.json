@@ -9,7 +9,9 @@
       "Bash(sc query:*)",
       "Bash(net start mosquitto)",
       "Bash(pio --version:*)",
-      "Bash(npm run db:seed:*)"
+      "Bash(npm run db:seed:*)",
+      "Bash(git checkout:*)",
+      "Bash(npx prisma:*)"
     ],
     "deny": [],
     "ask": []

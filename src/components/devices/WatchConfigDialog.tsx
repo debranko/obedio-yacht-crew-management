@@ -49,7 +49,7 @@ export function WatchConfigDialog({
   const { crewMembers, isLoading: isLoadingCrew } = useCrewMembers();
 
   const [crewMemberId, setCrewMemberId] = useState<string>(
-    device?.crewMemberId || device?.crewMember?.id || ''
+    device?.crewmemberId || device?.crewmember?.id || ''
   );
 
   const handleSave = () => {
@@ -64,7 +64,7 @@ export function WatchConfigDialog({
     onClose();
   };
 
-  const isAssigned = !!device?.crewMember;
+  const isAssigned = !!device?.crewmember;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -119,8 +119,8 @@ export function WatchConfigDialog({
                 <User className="h-4 w-4 text-green-700" />
                 <span className="text-sm font-semibold text-green-900">Currently Assigned To</span>
               </div>
-              <p className="text-base font-semibold text-green-800">{device?.crewMember?.name}</p>
-              <p className="text-sm text-green-700">{device?.crewMember?.position || 'Crew Member'}</p>
+              <p className="text-base font-semibold text-green-800">{device?.crewmember?.name}</p>
+              <p className="text-sm text-green-700">{device?.crewmember?.position || 'Crew Member'}</p>
             </div>
           )}
 
@@ -183,7 +183,7 @@ export function WatchConfigDialog({
           </Button>
           <Button
             onClick={handleSave}
-            disabled={!crewMemberId || crewMemberId === device?.crewMember?.id}
+            disabled={!crewMemberId || crewMemberId === device?.crewmember?.id}
           >
             <User className="h-4 w-4 mr-2" />
             {isAssigned ? 'Reassign Watch' : 'Assign Watch'}

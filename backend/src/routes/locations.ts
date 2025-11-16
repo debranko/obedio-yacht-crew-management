@@ -27,7 +27,7 @@ r.get('/:id', asyncHandler(async (req, res) => {
     where: { id: req.params.id },
     include: {
       guests: true,
-      serviceRequests: true
+      servicerequests: true
     }
   });
 
@@ -96,7 +96,7 @@ r.delete('/:id', requirePermission('locations.delete'), asyncHandler(async (req,
     where: { id: req.params.id },
     include: {
       guests: true,
-      serviceRequests: true
+      servicerequests: true
     }
   });
 
@@ -107,7 +107,7 @@ r.delete('/:id', requirePermission('locations.delete'), asyncHandler(async (req,
     });
   }
 
-  if (location.guests.length > 0 || location.serviceRequests.length > 0) {
+  if (location.guests.length > 0 || location.servicerequests.length > 0) {
     return res.status(400).json({
       success: false,
       message: 'Cannot delete location with assigned guests or service requests'
@@ -135,7 +135,7 @@ r.post('/:id/toggle-dnd', asyncHandler(async (req, res) => {
     },
     include: {
       guests: true,
-      serviceRequests: true
+      servicerequests: true
     }
   });
 

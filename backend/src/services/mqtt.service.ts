@@ -5,6 +5,7 @@
 
 import mqtt, { MqttClient } from 'mqtt';
 import { prisma } from './db';
+import { ServiceRequestType } from '@prisma/client';
 import { Server as SocketIOServer } from 'socket.io';
 import { mqttMonitor } from './mqtt-monitor';
 
@@ -279,49 +280,49 @@ class MQTTService {
       // Backend derives: priority + requestType
 
       let priority: 'normal' | 'urgent' | 'emergency' = 'normal';
-      let requestType = 'call';
+      let requestType: ServiceRequestType = ServiceRequestType.call;
 
       // Shake detection = Emergency (from ESP32 spec line 186-191)
       if (message.pressType === 'shake') {
         priority = 'emergency';
-        requestType = 'emergency';
+        requestType = ServiceRequestType.emergency;
       }
       // Long press = Voice recording (from ESP32 spec line 174)
       else if (message.pressType === 'long') {
-        requestType = 'voice';
+        requestType = ServiceRequestType.voice;
         priority = 'normal';
       }
       // Button-specific functions (from ESP32 spec lines 177-184)
       else if (message.button === 'aux1') {
-        requestType = 'call_service';
+        requestType = ServiceRequestType.service;
         priority = 'normal';
       }
       else if (message.button === 'aux2') {
-        requestType = 'lights';
+        requestType = ServiceRequestType.lights;
         priority = 'normal';
       }
       else if (message.button === 'aux3') {
-        requestType = 'prepare_food';
+        requestType = ServiceRequestType.prepare_food;
         priority = 'normal';
       }
       else if (message.button === 'aux4') {
-        requestType = 'bring_drinks';
+        requestType = ServiceRequestType.bring_drinks;
         priority = 'normal';
       }
       else if (message.button === 'aux5') {
-        requestType = 'dnd';
+        requestType = ServiceRequestType.dnd;
         priority = 'normal';
       }
       // Main button - handle touch vs press
       else {
         // Touch and double-touch are separate from physical presses
         if (message.pressType === 'touch' || message.pressType === 'double-touch') {
-          requestType = message.pressType === 'double-touch' ? 'urgent_call' : 'call';
+          requestType = message.pressType === 'double-touch' ? ServiceRequestType.emergency : ServiceRequestType.call;
           priority = message.pressType === 'double-touch' ? 'urgent' : 'normal';
         }
         // Physical button presses
         else {
-          requestType = 'call';
+          requestType = ServiceRequestType.call;
           priority = message.pressType === 'double' ? 'urgent' : 'normal';
         }
       }
@@ -805,7 +806,7 @@ class MQTTService {
             crewMemberId: serviceRequest.assignedToId // Specific crew member only
           },
           include: {
-            crewMember: true
+            crewmember: true
           }
         });
 
@@ -814,7 +815,7 @@ class MQTTService {
           return;
         }
 
-        console.log(`✅ Found ${watches.length} watch(es) for assigned crew member (${watches[0].crewMember?.name})`);
+        console.log(`✅ Found ${watches.length} watch(es) for assigned crew member (${watches[0].crewmember?.name})`);
 
       } else {
         // CASE 2: Request is NOT assigned - notify all ON-DUTY crew members
@@ -825,12 +826,12 @@ class MQTTService {
           where: {
             type: 'watch',
             crewMemberId: { not: null }, // Only watches assigned to crew
-            crewMember: {
+            crewmember: {
               status: 'on-duty' // Only notify on-duty crew members
             }
           },
           include: {
-            crewMember: true
+            crewmember: true
           }
         });
 
@@ -859,7 +860,7 @@ class MQTTService {
         };
 
         this.publish(notificationTopic, notification);
-        console.log(`📳 Notification sent to ${watch.crewMember?.name || 'crew'}'s watch (${watch.deviceId})`);
+        console.log(`📳 Notification sent to ${watch.crewmember?.name || 'crew'}'s watch (${watch.deviceId})`);
       }
 
     } catch (error) {
@@ -899,23 +900,23 @@ class MQTTService {
       // Find the watch device and crew member
       const watch = await prisma.device.findUnique({
         where: { deviceId },
-        include: { crewMember: true }
+        include: { crewmember: true }
       });
 
-      if (!watch || !watch.crewMember) {
+      if (!watch || !watch.crewmember) {
         console.error(`❌ Watch or crew member not found for device: ${deviceId}`);
         return;
       }
 
-      console.log(`✅ ${watch.crewMember.name} acknowledged request ${requestId}`);
+      console.log(`✅ ${watch.crewmember.name} acknowledged request ${requestId}`);
 
       // Update service request status to "serving" (crew is now serving the guest)
       const updatedRequest = await prisma.serviceRequest.update({
         where: { id: requestId },
         data: {
           status: 'serving',
-          assignedToId: watch.crewMember.id, // Assign to the crew member who acknowledged
-          assignedTo: watch.crewMember.name, // Also set the name
+          assignedToId: watch.crewmember.id, // Assign to the crew member who acknowledged
+          assignedTo: watch.crewmember.name, // Also set the name
           acceptedAt: new Date(), // Mark when it was accepted
         },
         include: {
@@ -924,7 +925,7 @@ class MQTTService {
         }
       });
 
-      console.log(`✅ Service request updated to "serving" - assigned to ${watch.crewMember.name}`);
+      console.log(`✅ Service request updated to "serving" - assigned to ${watch.crewmember.name}`);
 
       // Log the acknowledge action
       await prisma.deviceLog.create({
@@ -934,8 +935,8 @@ class MQTTService {
           eventData: {
             requestId,
             action,
-            crewMemberId: watch.crewMember.id,
-            crewMemberName: watch.crewMember.name,
+            crewMemberId: watch.crewmember.id,
+            crewMemberName: watch.crewmember.name,
             timestamp: message.timestamp
           },
           severity: 'info'
@@ -948,8 +949,8 @@ class MQTTService {
         data: {
           type: 'service_request',
           action: 'Request Accepted',
-          details: `${watch.crewMember.name} accepted service request from ${serviceRequest.guest ? serviceRequest.guest.firstName + ' ' + serviceRequest.guest.lastName : serviceRequest.guestName || 'Guest'} at ${serviceRequest.location?.name || serviceRequest.guestCabin || 'Unknown'}`,
-          userId: watch.crewMember.userId,
+          details: `${watch.crewmember.name} accepted service request from ${serviceRequest.guest ? serviceRequest.guest.firstName + ' ' + serviceRequest.guest.lastName : serviceRequest.guestName || 'Guest'} at ${serviceRequest.location?.name || serviceRequest.guestCabin || 'Unknown'}`,
+          userId: watch.crewmember.userId,
           locationId: serviceRequest.locationId,
           guestId: serviceRequest.guestId,
           deviceId: watch.id,
@@ -971,7 +972,7 @@ class MQTTService {
       this.publish(this.TOPICS.SERVICE_UPDATE, {
         requestId,
         status: 'serving',
-        assignedTo: watch.crewMember.name,
+        assignedTo: watch.crewmember.name,
         acknowledgedAt: new Date().toISOString()
       });
 

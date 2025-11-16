@@ -38,8 +38,8 @@ export function useDeviceLogs(params?: DeviceLogParams) {
     queryKey: ['device-logs', params],
     queryFn: async () => {
       // Auth handled by HTTP-only cookies (server runs 24/7)
-      const apiUrl = import.meta.env.VITE_API_URL || '/api';
-      const response = await fetch(`${apiUrl}${endpoint}`, {
+      // Use relative path to leverage Vite proxy (same-origin for cookie support)
+      const response = await fetch(`/api${endpoint}`, {
         headers: {
           'Content-Type': 'application/json',
         },

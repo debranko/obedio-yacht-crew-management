@@ -29,7 +29,8 @@ export interface LocationFilters {
 }
 
 class LocationsService {
-  private baseUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8080/api'}/locations`;
+  // Use relative path to leverage Vite proxy (same-origin for cookie support)
+  private baseUrl = '/api/locations';
 
   /**
    * Make authenticated API request

@@ -25,7 +25,6 @@
     "noFallthroughCasesInSwitch": false,
     "noUncheckedIndexedAccess": false,
     "noEmitOnError": false,
-    "suppressImplicitAnyIndexErrors": true,
     "types": ["node"]
   },
   "include": [

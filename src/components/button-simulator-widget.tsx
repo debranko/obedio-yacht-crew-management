@@ -437,8 +437,8 @@ export function ButtonSimulatorWidget() {
 
       console.log('📤 Sending audio to backend for transcription...');
 
-      const apiUrl = import.meta.env.VITE_API_URL || '/api';
-      const response = await fetch(`${apiUrl}/transcribe`, {
+      // Use relative path to leverage Vite proxy (same-origin for cookie support)
+      const response = await fetch('/api/transcribe', {
         method: 'POST',
         body: formData
       });

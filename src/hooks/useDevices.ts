@@ -20,7 +20,7 @@ export interface Device {
     floor?: string;
   };
   crewMemberId?: string;
-  crewMember?: {
+  crewmember?: {
     id: string;
     name: string;
     position: string;

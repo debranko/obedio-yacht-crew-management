@@ -43,7 +43,8 @@ export interface GuestMetaResponse {
 }
 
 export class GuestsService {
-  private static baseUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8080/api'}/guests`;
+  // Use relative path to leverage Vite proxy (same-origin for cookie support)
+  private static baseUrl = '/api/guests';
 
   /**
    * Make authenticated API request

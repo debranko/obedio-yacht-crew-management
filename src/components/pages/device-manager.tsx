@@ -72,7 +72,7 @@ interface Device {
   type: DeviceType;
   status: DeviceStatus;
   location?: { id: string; name: string };
-  crewMember?: { id: string; name: string };
+  crewmember?: { id: string; name: string };
   batteryLevel?: number;
   signalStrength?: number;
   lastSeen?: string;
@@ -282,7 +282,7 @@ export function DeviceManagerPage() {
         device.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         device.deviceId.toLowerCase().includes(searchQuery.toLowerCase()) ||
         device.location?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        device.crewMember?.name.toLowerCase().includes(searchQuery.toLowerCase());
+        device.crewmember?.name.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesType = selectedType === "all" || device.type === selectedType;
       const matchesStatus = selectedStatus === "all" || device.status === selectedStatus;
@@ -462,7 +462,7 @@ export function DeviceManagerPage() {
         },
         body: JSON.stringify({
           locationId: assignDevice.location?.id || null,
-          crewMemberId: assignDevice.crewMember?.id || null
+          crewMemberId: assignDevice.crewmember?.id || null
         })
       });
 
@@ -1173,11 +1173,11 @@ export function DeviceManagerPage() {
               <div className="space-y-2">
                 <Label>Assign to Crew Member</Label>
                 <Select
-                  value={assignDevice.crewMember?.id || "none"}
+                  value={assignDevice.crewmember?.id || "none"}
                   onValueChange={(value: string) =>
                     setAssignDevice({
                       ...assignDevice,
-                      crewMember: value === "none" ? undefined : crewMembers.find(c => c.id === value)
+                      crewmember: value === "none" ? undefined : crewMembers.find(c => c.id === value)
                     })
                   }
                 >
@@ -1324,8 +1324,8 @@ function DeviceCard({
           {device.location && (
             <p>Location: <span className="font-medium">{device.location.name}</span></p>
           )}
-          {device.crewMember && (
-            <p>Assigned to: <span className="font-medium">{device.crewMember.name}</span></p>
+          {device.crewmember && (
+            <p>Assigned to: <span className="font-medium">{device.crewmember.name}</span></p>
           )}
         </div>
 

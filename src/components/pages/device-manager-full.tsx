@@ -358,10 +358,10 @@ export function DeviceManagerPage() {
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  {device.crewMember ? (
+                  {device.crewmember ? (
                     <div className="flex items-center gap-1">
                       <User className="h-3 w-3 text-gray-500" />
-                      <span>{device.crewMember.name}</span>
+                      <span>{device.crewmember.name}</span>
                     </div>
                   ) : (
                     <span className="text-gray-400">Unassigned</span>
@@ -556,10 +556,10 @@ export function DeviceManagerPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {device.crewMember ? (
+                    {device.crewmember ? (
                       <div className="flex items-center gap-1">
                         <User className="h-3 w-3 text-gray-500" />
-                        <span>{device.crewMember.name}</span>
+                        <span>{device.crewmember.name}</span>
                       </div>
                     ) : (
                       <span className="text-gray-400">Unassigned</span>

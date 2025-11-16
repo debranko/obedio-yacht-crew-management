@@ -3,7 +3,9 @@
  * Centralized API calls to backend
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// Use relative path to leverage Vite proxy (same-origin for cookie support)
+// Vite proxy forwards /api to backend (configured in vite.config.ts)
+const API_BASE_URL = '/api';
 
 interface ApiResponse<T> {
   success: boolean;

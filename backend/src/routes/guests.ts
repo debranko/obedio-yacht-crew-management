@@ -216,7 +216,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
   const data = await prisma.guest.findUnique({
     where: { id },
     include: {
-      serviceRequests: true
+      servicerequests: true
     }
   });
 
