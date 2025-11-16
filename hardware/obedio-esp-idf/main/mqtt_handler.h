@@ -138,4 +138,18 @@ bool mqtt_is_connected(void);
  */
 esp_err_t mqtt_app_stop(void);
 
+/**
+ * @brief Publish Tasmota light toggle command
+ *
+ * Publishes directly to Tasmota MQTT topic to toggle light.
+ * Topic: tasmota_obedio/cmnd/POWER
+ * Payload: TOGGLE
+ *
+ * This is used by the T3 (Light) button to directly control
+ * Tasmota devices without going through the backend/frontend.
+ *
+ * @return ESP_OK on success, error code otherwise
+ */
+esp_err_t mqtt_publish_tasmota_toggle(void);
+
 #endif // MQTT_HANDLER_H

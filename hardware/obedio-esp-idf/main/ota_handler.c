@@ -38,27 +38,18 @@ esp_err_t ota_handler_init(void)
     ESP_LOGI(TAG, "Running partition: %s at offset 0x%lx",
              running_partition->label, running_partition->address);
 
-    // Check if we need to validate the current partition
-    esp_ota_img_states_t ota_state;
-    esp_err_t err = esp_ota_get_state_partition(running_partition, &ota_state);
-    if (err == ESP_OK) {
-        if (ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
-            ESP_LOGW(TAG, "New firmware detected, validating...");
-
-            // Mark current firmware as valid
-            err = esp_ota_mark_app_valid_cancel_rollback();
-            if (err == ESP_OK) {
-                ESP_LOGI(TAG, "Firmware validated successfully");
-            } else {
-                ESP_LOGE(TAG, "Failed to validate firmware: %s", esp_err_to_name(err));
-                return err;
-            }
-        } else if (ota_state == ESP_OTA_IMG_VALID) {
-            ESP_LOGI(TAG, "Firmware already validated");
-        } else if (ota_state == ESP_OTA_IMG_INVALID || ota_state == ESP_OTA_IMG_ABORTED) {
-            ESP_LOGW(TAG, "Invalid firmware state detected");
-        }
-    }
+    // REMOVED: Duplicate OTA validation - this is now handled in main.c early boot
+    // Validation MUST happen before WiFi initialization to prevent watchdog timeout
+    // See main.c app_main() for the primary validation logic (lines 330-368)
+    //
+    // Original code (COMMENTED OUT):
+    // esp_ota_img_states_t ota_state;
+    // esp_err_t err = esp_ota_get_state_partition(running_partition, &ota_state);
+    // if (err == ESP_OK) {
+    //     if (ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
+    //         esp_ota_mark_app_valid_cancel_rollback();
+    //     }
+    // }
 
     // Check for rollback capability
     const esp_partition_t *last_invalid_partition = esp_ota_get_last_invalid_partition();

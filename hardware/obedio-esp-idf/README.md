@@ -32,9 +32,11 @@ ESP32-S3 firmware for custom PCB smart button with MQTT integration for yacht cr
 - ✅ **White running light** - LED animation showing device status
 - ✅ **WiFi connection** - connects to "Obedio" network automatically
 - ✅ **mDNS discovery** (`obedio-{MAC}.local`)
-- ✅ **Heartbeat** - MQTT message every 30 seconds
+- ✅ **Enhanced heartbeat** - MQTT message with diagnostics (IP, SSID, heap, partition, etc.)
+- ✅ **MQTT configuration** - runtime settings via MQTT (see [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md))
+- ✅ **OTA firmware updates** - wireless updates via MQTT (see [OTA_UPDATE_GUIDE.md](OTA_UPDATE_GUIDE.md))
 - ✅ **Short vs Long press detection** - different events for <0.5s vs ≥0.5s
-- ✅ **NVS configuration storage**
+- ✅ **NVS configuration storage** - settings persist across reboots
 - ✅ **Factory reset** (hold T6 on boot)
 
 ## ❌ Temporarily Disabled Features
@@ -43,9 +45,11 @@ These features have code implemented but are disabled due to technical issues:
 
 - ❌ **Voice recording** - Causes watchdog timeout (code in `audio_recorder.c`)
 - ❌ **Web interface** - Causes heap corruption (code in `web_server.c`)
-- ❌ **OTA firmware updates** - Depends on web server (code in `ota_handler.c`)
 
 **Note**: Button logic still differentiates short press (button event) vs long press (voice event), but doesn't actually record audio yet.
+
+**Previously Disabled, Now Fixed**:
+- ✅ **OTA firmware updates** - WORKING as of 2025-11-16 (via MQTT, not web interface)
 
 ## Network Configuration
 
@@ -140,6 +144,27 @@ idf.py -p /dev/ttyACM0 flash monitor
 ```
 
 **Topic**: `obedio/button/{deviceId}/press`
+
+### Enhanced Heartbeat (New in v3.0)
+```json
+{
+  "deviceId": "BTN-6DB9AC",
+  "timestamp": 4122299,
+  "uptime": 33521,
+  "rssi": -41,
+  "battery": 100,
+  "firmwareVersion": "v3.0-esp-idf",
+  "buildHash": "BUILD-Nov 16 2025-12:41:51",
+  "ipAddress": "10.10.0.195",
+  "mqttConnected": true,
+  "wifiSSID": "Obedio",
+  "freeHeap": 7667200,
+  "runningPartition": "ota_1"
+}
+```
+
+**Topic**: `obedio/device/heartbeat`
+**Frequency**: Configurable (default 30 seconds) - see [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)
 
 ### Voice Recording
 ```json

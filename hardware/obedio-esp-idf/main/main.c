@@ -145,6 +145,17 @@ static void button_press_callback(const char *button, press_type_t type)
         return;  // Don't publish any other T1 events
     }
 
+    // SPECIAL CASE: T3 (Light button) - Direct Tasmota control
+    // Publishes directly to "tasmota_obedio/cmnd/POWER" with "TOGGLE"
+    // Does NOT publish to backend/frontend - local device-to-device control only
+    if (strcmp(button, "T3") == 0 && (type == PRESS_TYPE_SINGLE || type == PRESS_TYPE_LONG)) {
+        ESP_LOGI(TAG, "T3 (Light) button pressed - sending Tasmota TOGGLE");
+        led_flash(LED_COLOR_YELLOW, 100);  // Yellow flash to indicate light command
+        mqtt_publish_tasmota_toggle();
+        ESP_LOGI(TAG, "Tasmota toggle command sent - no backend event");
+        return;  // Skip normal button press publication
+    }
+
     // Ignore PRESS_TYPE_PRESS for all other buttons (T2-T6)
     if (type == PRESS_TYPE_PRESS) {
         return;
@@ -313,22 +324,48 @@ void app_main(void)
     ESP_LOGI(TAG, "===========================================");
     ESP_LOGI(TAG, "  Obedio Yacht Crew Management Device");
     ESP_LOGI(TAG, "  Firmware Version: %s", FIRMWARE_VERSION);
+    ESP_LOGI(TAG, "  BUILD HASH: %s", FIRMWARE_BUILD_HASH);
     ESP_LOGI(TAG, "  Hardware Version: %s", HARDWARE_VERSION);
     ESP_LOGI(TAG, "===========================================");
 
     // CRITICAL: Validate OTA update IMMEDIATELY on boot (before WiFi, within watchdog timeout)
+    ESP_LOGI(TAG, "=== OTA Validation Check ===");
     const esp_partition_t *running = esp_ota_get_running_partition();
+    const esp_partition_t *boot = esp_ota_get_boot_partition();
+
+    ESP_LOGI(TAG, "Running partition: %s (offset: 0x%lx, size: 0x%lx)",
+             running->label, running->address, running->size);
+    ESP_LOGI(TAG, "Boot partition: %s (offset: 0x%lx, size: 0x%lx)",
+             boot->label, boot->address, boot->size);
+
     esp_ota_img_states_t ota_state;
-    if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK) {
-        if (ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
-            ESP_LOGI(TAG, "⚠️  PENDING_VERIFY state - validating OTA update NOW (before WiFi)");
+    esp_err_t state_ret = esp_ota_get_state_partition(running, &ota_state);
+
+    if (state_ret == ESP_OK) {
+        ESP_LOGI(TAG, "OTA state value: %d (0=NEW, 1=PENDING_VERIFY, 2=VALID, 3=ABORTED, 4=INVALID, -1=UNDEFINED)", ota_state);
+
+        // Validate if firmware is NEW, PENDING_VERIFY, or UNDEFINED
+        if (ota_state == ESP_OTA_IMG_PENDING_VERIFY ||
+            ota_state == ESP_OTA_IMG_NEW ||
+            ota_state == ESP_OTA_IMG_UNDEFINED) {
+
+            ESP_LOGI(TAG, "⚠️  Firmware needs validation - calling mark_app_valid NOW");
             esp_err_t mark_ret = esp_ota_mark_app_valid_cancel_rollback();
+
             if (mark_ret == ESP_OK) {
-                ESP_LOGI(TAG, "✅ OTA validated successfully - rollback canceled!");
+                ESP_LOGI(TAG, "✅ OTA VALIDATED SUCCESSFULLY - rollback canceled!");
             } else {
-                ESP_LOGE(TAG, "❌ OTA validation failed: %s", esp_err_to_name(mark_ret));
+                ESP_LOGE(TAG, "❌ OTA validation FAILED: %s", esp_err_to_name(mark_ret));
             }
+        } else if (ota_state == ESP_OTA_IMG_VALID) {
+            ESP_LOGI(TAG, "✅ Firmware already marked as VALID - no action needed");
+        } else {
+            ESP_LOGW(TAG, "⚠️  Unexpected OTA state: %d", ota_state);
         }
+    } else {
+        ESP_LOGW(TAG, "Could not get OTA state: %s - calling validation as fallback", esp_err_to_name(state_ret));
+        esp_err_t mark_ret = esp_ota_mark_app_valid_cancel_rollback();
+        ESP_LOGI(TAG, "Fallback validation result: %s", esp_err_to_name(mark_ret));
     }
 
     // Step 1: Initialize NVS flash

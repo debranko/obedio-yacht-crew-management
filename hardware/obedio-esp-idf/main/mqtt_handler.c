@@ -18,6 +18,8 @@
 #include "esp_system.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "esp_wifi.h"
+#include "esp_ota_ops.h"
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "mqtt_client.h"
@@ -32,6 +34,17 @@ static bool s_is_connected = false;
 static uint32_t s_sequence_number = 0;
 static TimerHandle_t s_heartbeat_timer = NULL;
 static char *s_pending_ota_url = NULL;
+
+// Device configuration (runtime settings)
+static device_config_t s_device_config = {
+    .heartbeat_interval_sec = 30,   // Default 30 seconds
+    .sleep_timeout_sec = 30,        // Default 30 seconds (for debugging)
+    .t3_topic = "tasmota_obedio/cmnd/POWER",
+    .t3_payload = "TOGGLE",
+    .led_brightness = LED_BRIGHTNESS,
+    .shake_threshold = SHAKE_THRESHOLD,
+    .touch_threshold = TOUCH_THRESHOLD_PERCENT,
+};
 
 /**
  * @brief OTA task - runs OTA update in separate task to avoid blocking MQTT
@@ -128,6 +141,181 @@ static char* base64_encode(const uint8_t *data, size_t len)
 }
 
 /**
+ * @brief Load device configuration from NVS
+ */
+static esp_err_t config_load_from_nvs(void)
+{
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs_handle);
+
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "NVS not found, using defaults");
+        return ESP_OK;  // Not an error, just use defaults
+    }
+
+    // Load heartbeat interval
+    uint32_t hb_interval = s_device_config.heartbeat_interval_sec;
+    err = nvs_get_u32(nvs_handle, NVS_KEY_HEARTBEAT_INT, &hb_interval);
+    if (err == ESP_OK) {
+        if (hb_interval >= 5 && hb_interval <= 300) {
+            s_device_config.heartbeat_interval_sec = hb_interval;
+            ESP_LOGI(TAG, "Loaded heartbeat interval: %lu sec", hb_interval);
+        }
+    }
+
+    // Load sleep timeout
+    uint32_t sleep_timeout = s_device_config.sleep_timeout_sec;
+    err = nvs_get_u32(nvs_handle, NVS_KEY_SLEEP_TIMEOUT, &sleep_timeout);
+    if (err == ESP_OK) {
+        if (sleep_timeout >= 10 && sleep_timeout <= 300) {
+            s_device_config.sleep_timeout_sec = sleep_timeout;
+            ESP_LOGI(TAG, "Loaded sleep timeout: %lu sec", sleep_timeout);
+        }
+    }
+
+    // Load T3 topic
+    size_t required_size = sizeof(s_device_config.t3_topic);
+    err = nvs_get_str(nvs_handle, NVS_KEY_T3_TOPIC, s_device_config.t3_topic, &required_size);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "Loaded T3 topic: %s", s_device_config.t3_topic);
+    }
+
+    // Load T3 payload
+    required_size = sizeof(s_device_config.t3_payload);
+    err = nvs_get_str(nvs_handle, NVS_KEY_T3_PAYLOAD, s_device_config.t3_payload, &required_size);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "Loaded T3 payload: %s", s_device_config.t3_payload);
+    }
+
+    // Load LED brightness
+    uint8_t led_brightness = s_device_config.led_brightness;
+    err = nvs_get_u8(nvs_handle, NVS_KEY_LED_BRIGHTNESS, &led_brightness);
+    if (err == ESP_OK) {
+        s_device_config.led_brightness = led_brightness;
+        ESP_LOGI(TAG, "Loaded LED brightness: %d", led_brightness);
+    }
+
+    nvs_close(nvs_handle);
+    ESP_LOGI(TAG, "Configuration loaded from NVS");
+    return ESP_OK;
+}
+
+/**
+ * @brief Save device configuration to NVS
+ */
+static esp_err_t config_save_to_nvs(void)
+{
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to open NVS for writing: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    // Save heartbeat interval
+    nvs_set_u32(nvs_handle, NVS_KEY_HEARTBEAT_INT, s_device_config.heartbeat_interval_sec);
+
+    // Save sleep timeout
+    nvs_set_u32(nvs_handle, NVS_KEY_SLEEP_TIMEOUT, s_device_config.sleep_timeout_sec);
+
+    // Save T3 topic
+    nvs_set_str(nvs_handle, NVS_KEY_T3_TOPIC, s_device_config.t3_topic);
+
+    // Save T3 payload
+    nvs_set_str(nvs_handle, NVS_KEY_T3_PAYLOAD, s_device_config.t3_payload);
+
+    // Save LED brightness
+    nvs_set_u8(nvs_handle, NVS_KEY_LED_BRIGHTNESS, s_device_config.led_brightness);
+
+    // Commit changes
+    err = nvs_commit(nvs_handle);
+    nvs_close(nvs_handle);
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to commit NVS: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    ESP_LOGI(TAG, "Configuration saved to NVS");
+    return ESP_OK;
+}
+
+/**
+ * @brief Update heartbeat timer with new interval
+ */
+static esp_err_t config_update_heartbeat_timer(void)
+{
+    if (s_heartbeat_timer == NULL) {
+        ESP_LOGW(TAG, "Heartbeat timer not initialized");
+        return ESP_FAIL;
+    }
+
+    // Stop timer
+    xTimerStop(s_heartbeat_timer, 0);
+
+    // Change timer period (convert seconds to ticks)
+    uint32_t interval_ms = s_device_config.heartbeat_interval_sec * 1000;
+    xTimerChangePeriod(s_heartbeat_timer, pdMS_TO_TICKS(interval_ms), 0);
+
+    // Restart timer
+    xTimerStart(s_heartbeat_timer, 0);
+
+    ESP_LOGI(TAG, "Heartbeat timer updated to %lu seconds", s_device_config.heartbeat_interval_sec);
+    return ESP_OK;
+}
+
+/**
+ * @brief Publish current configuration status
+ */
+static esp_err_t mqtt_publish_config_status(void)
+{
+    if (s_mqtt_client == NULL || !s_is_connected) {
+        ESP_LOGW(TAG, "MQTT not connected, cannot publish config status");
+        return ESP_FAIL;
+    }
+
+    // Create JSON object
+    cJSON *root = cJSON_CreateObject();
+    if (root == NULL) {
+        ESP_LOGE(TAG, "Failed to create JSON object");
+        return ESP_FAIL;
+    }
+
+    // Add configuration fields
+    cJSON_AddNumberToObject(root, "heartbeatInterval", s_device_config.heartbeat_interval_sec);
+    cJSON_AddNumberToObject(root, "sleepTimeout", s_device_config.sleep_timeout_sec);
+    cJSON_AddStringToObject(root, "t3Topic", s_device_config.t3_topic);
+    cJSON_AddStringToObject(root, "t3Payload", s_device_config.t3_payload);
+    cJSON_AddNumberToObject(root, "ledBrightness", s_device_config.led_brightness);
+    cJSON_AddNumberToObject(root, "shakeThreshold", (int)(s_device_config.shake_threshold * 100));
+    cJSON_AddNumberToObject(root, "touchThreshold", s_device_config.touch_threshold);
+
+    // Convert to string
+    char *json_str = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+
+    if (json_str == NULL) {
+        ESP_LOGE(TAG, "Failed to serialize JSON");
+        return ESP_FAIL;
+    }
+
+    // Build topic: obedio/button/{deviceId}/config/status
+    char topic[128];
+    snprintf(topic, sizeof(topic), "obedio/button/%s/config/status", wifi_get_device_id());
+
+    // Publish
+    int msg_id = esp_mqtt_client_publish(s_mqtt_client, topic, json_str, 0, 1, 0);
+
+    ESP_LOGI(TAG, "Published config status (msg_id=%d)", msg_id);
+    ESP_LOGD(TAG, "Config: %s", json_str);
+
+    free(json_str);
+
+    return (msg_id >= 0) ? ESP_OK : ESP_FAIL;
+}
+
+/**
  * @brief MQTT event handler
  */
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
@@ -145,8 +333,17 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             int msg_id = esp_mqtt_client_subscribe(s_mqtt_client, ota_topic, 1);
             ESP_LOGI(TAG, "Subscribed to OTA topic: %s (msg_id=%d)", ota_topic, msg_id);
 
+            // Subscribe to config/set topic
+            char config_topic[128];
+            snprintf(config_topic, sizeof(config_topic), "obedio/button/%s/config/set", wifi_get_device_id());
+            msg_id = esp_mqtt_client_subscribe(s_mqtt_client, config_topic, 1);
+            ESP_LOGI(TAG, "Subscribed to config topic: %s (msg_id=%d)", config_topic, msg_id);
+
             // Register device on connection
             mqtt_register_device();
+
+            // Publish current configuration
+            mqtt_publish_config_status();
             break;
 
         case MQTT_EVENT_DISCONNECTED:
@@ -171,8 +368,79 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             ESP_LOGI(TAG, "Topic: %.*s", event->topic_len, event->topic);
             ESP_LOGI(TAG, "Data: %.*s", event->data_len, event->data);
 
+            // Check if this is a config/set message
+            if (strstr(event->topic, "/config/set") != NULL) {
+                ESP_LOGI(TAG, "Configuration update received!");
+
+                // Parse JSON payload
+                cJSON *json = cJSON_ParseWithLength(event->data, event->data_len);
+                if (json != NULL) {
+                    bool config_changed = false;
+
+                    // Update heartbeat interval
+                    cJSON *hb_interval = cJSON_GetObjectItem(json, "heartbeatInterval");
+                    if (hb_interval != NULL && cJSON_IsNumber(hb_interval)) {
+                        uint32_t new_interval = (uint32_t)hb_interval->valueint;
+                        if (new_interval >= 5 && new_interval <= 300) {
+                            s_device_config.heartbeat_interval_sec = new_interval;
+                            config_update_heartbeat_timer();
+                            config_changed = true;
+                            ESP_LOGI(TAG, "Heartbeat interval updated to %lu sec", new_interval);
+                        }
+                    }
+
+                    // Update sleep timeout
+                    cJSON *sleep_timeout = cJSON_GetObjectItem(json, "sleepTimeout");
+                    if (sleep_timeout != NULL && cJSON_IsNumber(sleep_timeout)) {
+                        uint32_t new_timeout = (uint32_t)sleep_timeout->valueint;
+                        if (new_timeout >= 10 && new_timeout <= 300) {
+                            s_device_config.sleep_timeout_sec = new_timeout;
+                            config_changed = true;
+                            ESP_LOGI(TAG, "Sleep timeout updated to %lu sec", new_timeout);
+                        }
+                    }
+
+                    // Update T3 topic
+                    cJSON *t3_topic = cJSON_GetObjectItem(json, "t3Topic");
+                    if (t3_topic != NULL && cJSON_IsString(t3_topic)) {
+                        strncpy(s_device_config.t3_topic, t3_topic->valuestring, sizeof(s_device_config.t3_topic) - 1);
+                        s_device_config.t3_topic[sizeof(s_device_config.t3_topic) - 1] = '\0';
+                        config_changed = true;
+                        ESP_LOGI(TAG, "T3 topic updated to %s", s_device_config.t3_topic);
+                    }
+
+                    // Update T3 payload
+                    cJSON *t3_payload = cJSON_GetObjectItem(json, "t3Payload");
+                    if (t3_payload != NULL && cJSON_IsString(t3_payload)) {
+                        strncpy(s_device_config.t3_payload, t3_payload->valuestring, sizeof(s_device_config.t3_payload) - 1);
+                        s_device_config.t3_payload[sizeof(s_device_config.t3_payload) - 1] = '\0';
+                        config_changed = true;
+                        ESP_LOGI(TAG, "T3 payload updated to %s", s_device_config.t3_payload);
+                    }
+
+                    // Update LED brightness
+                    cJSON *led_brightness = cJSON_GetObjectItem(json, "ledBrightness");
+                    if (led_brightness != NULL && cJSON_IsNumber(led_brightness)) {
+                        s_device_config.led_brightness = (uint8_t)led_brightness->valueint;
+                        config_changed = true;
+                        ESP_LOGI(TAG, "LED brightness updated to %d", s_device_config.led_brightness);
+                    }
+
+                    // Save config to NVS if anything changed
+                    if (config_changed) {
+                        config_save_to_nvs();
+                        mqtt_publish_config_status();
+                        led_flash(LED_COLOR_GREEN, 200);  // Green flash to indicate config updated
+                    }
+
+                    cJSON_Delete(json);
+                } else {
+                    ESP_LOGE(TAG, "Failed to parse config JSON");
+                    led_flash(LED_COLOR_RED, 500);
+                }
+            }
             // Check if this is an OTA message
-            if (strstr(event->topic, "/ota") != NULL) {
+            else if (strstr(event->topic, "/ota") != NULL) {
                 ESP_LOGI(TAG, "OTA update request received!");
 
                 // Flash purple LEDs to indicate OTA starting
@@ -278,6 +546,9 @@ static void heartbeat_timer_callback(TimerHandle_t xTimer)
 
 esp_err_t mqtt_app_start(void)
 {
+    // Load device configuration from NVS
+    config_load_from_nvs();
+
     // Load MQTT URI
     char mqtt_uri[128] = {0};
     load_mqtt_uri(mqtt_uri, sizeof(mqtt_uri));
@@ -313,9 +584,10 @@ esp_err_t mqtt_app_start(void)
 
     ESP_LOGI(TAG, "MQTT client started");
 
-    // Create heartbeat timer (30 second interval)
+    // Create heartbeat timer with configured interval
+    uint32_t heartbeat_interval_ms = s_device_config.heartbeat_interval_sec * 1000;
     s_heartbeat_timer = xTimerCreate("heartbeat",
-                                     pdMS_TO_TICKS(HEARTBEAT_INTERVAL_MS),
+                                     pdMS_TO_TICKS(heartbeat_interval_ms),
                                      pdTRUE,  // Auto-reload
                                      NULL,
                                      heartbeat_timer_callback);
@@ -463,6 +735,7 @@ esp_err_t mqtt_register_device(void)
     cJSON_AddStringToObject(root, "type", "smart_button");
     cJSON_AddStringToObject(root, "name", "OBEDIO Smart Button");
     cJSON_AddStringToObject(root, "firmwareVersion", FIRMWARE_VERSION);
+    cJSON_AddStringToObject(root, "buildHash", FIRMWARE_BUILD_HASH);
     cJSON_AddStringToObject(root, "hardwareVersion", HARDWARE_VERSION);
     cJSON_AddStringToObject(root, "macAddress", wifi_get_mac_address());
     cJSON_AddStringToObject(root, "ipAddress", wifi_get_ip_address());
@@ -511,12 +784,44 @@ esp_err_t mqtt_send_heartbeat(void)
         return ESP_FAIL;
     }
 
-    // Add fields
+    // Add basic fields
     cJSON_AddStringToObject(root, "deviceId", wifi_get_device_id());
     cJSON_AddNumberToObject(root, "timestamp", get_timestamp_ms());
     cJSON_AddNumberToObject(root, "uptime", get_uptime_ms());
     cJSON_AddNumberToObject(root, "rssi", wifi_get_rssi());
     cJSON_AddNumberToObject(root, "battery", get_battery_percentage());
+    cJSON_AddStringToObject(root, "firmwareVersion", FIRMWARE_VERSION);
+    cJSON_AddStringToObject(root, "buildHash", FIRMWARE_BUILD_HASH);
+
+    // Enhanced diagnostic fields with safe error handling
+    // Network info
+    const char *ip = wifi_get_ip_address();
+    if (ip != NULL && strlen(ip) > 0) {
+        cJSON_AddStringToObject(root, "ipAddress", ip);
+    }
+    cJSON_AddBoolToObject(root, "mqttConnected", s_is_connected);
+
+    // WiFi SSID - with error handling
+    wifi_config_t wifi_config;
+    memset(&wifi_config, 0, sizeof(wifi_config));
+    esp_err_t wifi_err = esp_wifi_get_config(WIFI_IF_STA, &wifi_config);
+    if (wifi_err == ESP_OK && wifi_config.sta.ssid[0] != '\0') {
+        cJSON_AddStringToObject(root, "wifiSSID", (char*)wifi_config.sta.ssid);
+    } else if (wifi_err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to get WiFi SSID: %s", esp_err_to_name(wifi_err));
+    }
+
+    // System info
+    uint32_t free_heap = esp_get_free_heap_size();
+    cJSON_AddNumberToObject(root, "freeHeap", free_heap);
+
+    // Running partition - with error handling
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    if (running != NULL && running->label[0] != '\0') {
+        cJSON_AddStringToObject(root, "runningPartition", running->label);
+    } else if (running == NULL) {
+        ESP_LOGW(TAG, "Failed to get running partition info");
+    }
 
     // Convert to string
     char *json_str = cJSON_PrintUnformatted(root);
@@ -535,6 +840,29 @@ esp_err_t mqtt_send_heartbeat(void)
     free(json_str);
 
     return (msg_id >= 0) ? ESP_OK : ESP_FAIL;
+}
+
+esp_err_t mqtt_publish_tasmota_toggle(void)
+{
+    if (s_mqtt_client == NULL || !s_is_connected) {
+        ESP_LOGW(TAG, "MQTT not connected, cannot send Tasmota command");
+        return ESP_FAIL;
+    }
+
+    // Use configured T3 topic and payload
+    const char *topic = s_device_config.t3_topic;
+    const char *payload = s_device_config.t3_payload;
+
+    // Publish with QoS 1 (at least once delivery)
+    int msg_id = esp_mqtt_client_publish(s_mqtt_client, topic, payload, strlen(payload), 1, 0);
+
+    if (msg_id >= 0) {
+        ESP_LOGI(TAG, "Published T3 command '%s' to %s (msg_id=%d)", payload, topic, msg_id);
+        return ESP_OK;
+    } else {
+        ESP_LOGE(TAG, "Failed to publish T3 command");
+        return ESP_FAIL;
+    }
 }
 
 bool mqtt_is_connected(void)

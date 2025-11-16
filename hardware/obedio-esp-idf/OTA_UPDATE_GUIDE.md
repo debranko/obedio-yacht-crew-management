@@ -244,32 +244,57 @@ ssh obedio@10.10.0.10 "nc -ul 5555"
 
 ## Current Status (2025-11-16)
 
-### ✅ WORKING
+### ✅ FULLY WORKING
 - MQTT-triggered OTA command reception via `obedio/button/{DEVICE_ID}/ota`
 - HTTP firmware download (fixed with `HTTP_TRANSPORT_OVER_TCP`)
 - LED task suspension during OTA (prevents flash cache access crash)
 - Firmware upload to NUC and NGINX serving at `http://10.10.0.10:3000/firmware.bin`
-- OTA download completes successfully (~60 seconds for 990KB)
+- OTA download completes successfully (~60 seconds for 975KB)
 - Deployment automation script (`deploy_ota_firmware.sh`)
+- **Firmware updates and persists correctly** - buildHash verification confirms successful deployment
+- Enhanced heartbeat with diagnostic information (IP, SSID, partition, heap, etc.)
 
-### ⚠️ KNOWN ISSUE - Boot Partition Persistence
-**Symptom**: New firmware downloads and flashes successfully but device continues running old firmware after reboot
+### ✅ FIXED - OTA Update Issues (2025-11-16)
 
-**Attempted fixes**:
-1. ✅ Added `esp_ota_mark_app_valid_cancel_rollback()` after WiFi connects (main.c:433)
-2. ✅ Disabled rollback protection temporarily (`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=n`)
-3. ❌ Still persisting old firmware - indicates deeper boot partition selection issue
+**Previous Issue**: OTA updates were failing - new firmware wouldn't run after deployment
 
-**Root cause**: Unknown - requires serial debugging to see bootloader partition selection
-- Possibly OTA not setting boot partition correctly
-- Possibly bootloader not respecting OTA partition selection
-- Need to check running partition logs on next boot
+**Root Cause**: Enhanced heartbeat code with WiFi/OTA API calls (`esp_wifi_get_config()`, `esp_ota_get_running_partition()`) lacked proper error handling, causing the currently running broken firmware to fail when processing OTA updates.
 
-**Next steps**:
-- [ ] Connect serial and capture full boot logs after OTA
-- [ ] Verify `esp_ota_set_boot_partition()` is called successfully
-- [ ] Check bootloader logs for partition selection reasoning
-- [ ] Consider flashing bootloader directly if partition table corrupted
+**Solution Applied**:
+1. **Temporary simplification**: Removed problematic API calls to deploy working firmware
+2. **Safe error handling**: Re-added enhanced features with comprehensive error handling:
+   - Added `memset()` before `wifi_config_t` structure
+   - Added NULL checks and validation before using pointers
+   - Added error logging for debugging
+   - Fixed array bounds check (changed `label != NULL` to `label[0] != '\0'`)
+
+**Code Fix** (mqtt_handler.c:796-824):
+```c
+// WiFi SSID - with safe error handling
+wifi_config_t wifi_config;
+memset(&wifi_config, 0, sizeof(wifi_config));
+esp_err_t wifi_err = esp_wifi_get_config(WIFI_IF_STA, &wifi_config);
+if (wifi_err == ESP_OK && wifi_config.sta.ssid[0] != '\0') {
+    cJSON_AddStringToObject(root, "wifiSSID", (char*)wifi_config.sta.ssid);
+} else if (wifi_err != ESP_OK) {
+    ESP_LOGW(TAG, "Failed to get WiFi SSID: %s", esp_err_to_name(wifi_err));
+}
+
+// Running partition - with safe error handling
+const esp_partition_t *running = esp_ota_get_running_partition();
+if (running != NULL && running->label[0] != '\0') {
+    cJSON_AddStringToObject(root, "runningPartition", running->label);
+} else if (running == NULL) {
+    ESP_LOGW(TAG, "Failed to get running partition info");
+}
+```
+
+**Verification**:
+- Build hash successfully updated: `12:14:44` → `12:39:07` → `12:41:51`
+- All enhanced heartbeat fields working correctly
+- Device running on `ota_1` partition
+- IP address: `10.10.0.195`
+- Free heap: 7,667,200 bytes
 
 ### 🔧 Fixes Applied
 1. **HTTP transport fix** (ota_handler.c:251):
@@ -289,11 +314,14 @@ ssh obedio@10.10.0.10 "nc -ul 5555"
 
 ## Next Steps
 
-- [ ] Fix rollback validation timing issue
+- [x] Fix OTA update persistence issue (COMPLETED 2025-11-16)
+- [x] Add firmware build hash verification (COMPLETED 2025-11-16)
+- [x] Implement enhanced heartbeat diagnostics (COMPLETED 2025-11-16)
+- [x] Add MQTT configuration system (COMPLETED 2025-11-16 - see [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md))
 - [ ] Enable UDP wireless logging
-- [ ] Add firmware version tracking
 - [ ] Implement OTA progress reporting via MQTT
 - [ ] Add pre-OTA validation checks
+- [ ] Add firmware signature verification
 
 ## Support
 

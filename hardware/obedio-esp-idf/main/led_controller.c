@@ -136,10 +136,12 @@ esp_err_t led_clear(void)
 
 void led_rainbow_task(void *pvParameters)
 {
-    ESP_LOGI(TAG, "Starting circle animation task (single RED LED at 50%%)");
+    ESP_LOGI(TAG, "Starting single RED LED animation - CLOCKWISE rotation (OTA verification)");
 
     uint8_t position = 0;
-    const uint8_t red_r = 128;  // 50% brightness RED
+
+    // Single RED LED at 75% brightness
+    const uint8_t red_r = 192;
     const uint8_t red_g = 0;
     const uint8_t red_b = 0;
 
@@ -156,12 +158,12 @@ void led_rainbow_task(void *pvParameters)
             // Refresh strip
             led_strip_refresh(led_strip);
 
-            // Move to next position
-            position = (position + 1) % NUM_LEDS;
+            // Move to next position CLOCKWISE (for OTA verification)
+            position = (position == 0) ? (NUM_LEDS - 1) : (position - 1);
         }
 
-        // Update every 100ms for smooth animation
-        vTaskDelay(pdMS_TO_TICKS(100));
+        // Update every 80ms
+        vTaskDelay(pdMS_TO_TICKS(80));
     }
 }
 

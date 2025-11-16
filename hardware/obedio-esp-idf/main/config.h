@@ -19,6 +19,7 @@
 
 // ==================== FIRMWARE VERSION ====================
 #define FIRMWARE_VERSION        "v3.0-esp-idf"
+#define FIRMWARE_BUILD_HASH     "BUILD-" __DATE__ "-" __TIME__  // Unique build identifier
 #define HARDWARE_VERSION        "ESP32-S3 Custom PCB v1.0"
 
 // ==================== NETWORK CONFIGURATION ====================
@@ -255,6 +256,10 @@ static const char* BUTTON_MQTT[BUTTON_COUNT] = {
 #define NVS_KEY_LED_BRIGHTNESS  "led_bright"
 #define NVS_KEY_SHAKE_THRESH    "shake_thresh"
 #define NVS_KEY_TOUCH_THRESH    "touch_thresh"
+#define NVS_KEY_HEARTBEAT_INT   "hb_interval"
+#define NVS_KEY_SLEEP_TIMEOUT   "sleep_timeout"
+#define NVS_KEY_T3_TOPIC        "t3_topic"
+#define NVS_KEY_T3_PAYLOAD      "t3_payload"
 
 // ==================== FACTORY RESET ====================
 // Hold T6 (DND button) for 10 seconds on boot to factory reset
@@ -331,6 +336,10 @@ typedef struct {
     uint8_t led_brightness;
     float shake_threshold;
     uint8_t touch_threshold;
+    uint32_t heartbeat_interval_sec;  // Heartbeat interval in seconds (5-300s, default 30s)
+    uint32_t sleep_timeout_sec;       // Sleep timeout in seconds (10-300s, default 30s)
+    char t3_topic[128];               // T3 button MQTT topic (default: "tasmota_obedio/cmnd/POWER")
+    char t3_payload[64];              // T3 button MQTT payload (default: "TOGGLE")
     bool factory_reset_pending;
 } device_config_t;
 
