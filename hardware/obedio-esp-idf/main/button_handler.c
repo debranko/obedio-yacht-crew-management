@@ -8,6 +8,7 @@
 
 #include "button_handler.h"
 #include "mcp23017.h"
+#include "mqtt_handler.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -123,7 +124,7 @@ static void process_button(uint8_t button_index) {
         TickType_t hold_duration = current_time - state->press_start_time;
         uint32_t hold_duration_ms = hold_duration * portTICK_PERIOD_MS;
 
-        if (hold_duration_ms >= LONG_PRESS_TIME_MS) {
+        if (hold_duration_ms >= mqtt_get_long_press_threshold()) {
             state->long_press_sent = true;
             state->waiting_for_double = false;  // Cancel any double-click wait
             ESP_LOGI(TAG, "Button %s: LONG PRESS", BUTTON_NAMES[button_index]);

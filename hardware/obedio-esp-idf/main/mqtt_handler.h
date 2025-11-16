@@ -152,4 +152,51 @@ esp_err_t mqtt_app_stop(void);
  */
 esp_err_t mqtt_publish_tasmota_toggle(void);
 
+/**
+ * @brief Get current LED configuration (RGB and brightness)
+ *
+ * Retrieves the current LED color and brightness settings from device config.
+ *
+ * @param r Pointer to store red component (0-255)
+ * @param g Pointer to store green component (0-255)
+ * @param b Pointer to store blue component (0-255)
+ * @param brightness Pointer to store brightness level (0-255)
+ */
+void mqtt_get_led_config(uint8_t *r, uint8_t *g, uint8_t *b, uint8_t *brightness);
+
+/**
+ * @brief Get current long press threshold
+ *
+ * Retrieves the current long press threshold in milliseconds from device config.
+ *
+ * @return Long press threshold in milliseconds (200-2000ms, default 700ms)
+ */
+uint32_t mqtt_get_long_press_threshold(void);
+
+/**
+ * @brief Send offline status message before intentional disconnect
+ *
+ * Publishes an offline status message to the MQTT broker before the device
+ * intentionally goes offline (e.g., before OTA reboot, sleep, shutdown).
+ *
+ * Uses MQTT Last Will and Testament (LWT) pattern:
+ * - Topic: obedio/button/{deviceId}/status
+ * - LWT message (automatic): {"status": "offline", "reason": "connection_lost"}
+ * - Online message (after connect): {"status": "online", ...device info...}
+ * - Offline message (before disconnect): {"status": "offline", "reason": "reboot|ota|sleep"}
+ *
+ * Format:
+ * {
+ *   "status": "offline",
+ *   "deviceId": "BTN-XXXXXX",
+ *   "reason": "sleep|reboot|ota|shutdown",
+ *   "timestamp": 1699876543210,
+ *   "uptime": 123456
+ * }
+ *
+ * @param reason Reason for going offline ("sleep", "reboot", "ota", "shutdown")
+ * @return ESP_OK on success, error code otherwise
+ */
+esp_err_t mqtt_send_offline_status(const char *reason);
+
 #endif // MQTT_HANDLER_H

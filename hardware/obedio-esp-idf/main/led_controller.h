@@ -96,6 +96,48 @@ esp_err_t led_stop_rainbow_task(void);
  */
 esp_err_t led_update_static(uint8_t r, uint8_t g, uint8_t b, uint8_t brightness);
 
+/**
+ * @brief Flash all LEDs blue for button press confirmation
+ *
+ * Displays all LEDs in blue at maximum brightness for a short duration
+ * to confirm successful MQTT message send. Then restores the configured
+ * static LED color.
+ *
+ * @param r Current configured red component (0-255)
+ * @param g Current configured green component (0-255)
+ * @param b Current configured blue component (0-255)
+ * @param brightness Current configured brightness level (0-255)
+ * @return ESP_OK on success
+ */
+esp_err_t led_flash_blue_confirm(uint8_t r, uint8_t g, uint8_t b, uint8_t brightness);
+
+/**
+ * @brief Start rotating single blue LED animation for recording
+ *
+ * Starts a FreeRTOS task that displays a single blue LED rotating in circles
+ * to indicate that the center button long press (recording) is active.
+ *
+ * @param priority Task priority
+ * @param stack_size Task stack size in bytes
+ * @return ESP_OK on success
+ */
+esp_err_t led_start_recording_animation(uint32_t priority, uint32_t stack_size);
+
+/**
+ * @brief Stop recording animation and restore configured color
+ *
+ * Stops the rotating blue LED animation, flashes all LEDs blue briefly
+ * to confirm the recording action completed, then restores the configured
+ * static LED color.
+ *
+ * @param r Configured red component to restore (0-255)
+ * @param g Configured green component to restore (0-255)
+ * @param b Configured blue component to restore (0-255)
+ * @param brightness Configured brightness level to restore (0-255)
+ * @return ESP_OK on success
+ */
+esp_err_t led_stop_recording_animation(uint8_t r, uint8_t g, uint8_t b, uint8_t brightness);
+
 #ifdef __cplusplus
 }
 #endif

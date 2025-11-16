@@ -11,6 +11,7 @@ idf_component_register(
         "web_server.c"
         "ota_handler.c"
         "device_manager.c"
+        "power_manager.c"
     INCLUDE_DIRS
         "."
     REQUIRES

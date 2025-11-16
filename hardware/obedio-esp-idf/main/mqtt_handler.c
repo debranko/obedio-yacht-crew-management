@@ -39,6 +39,7 @@ static char *s_pending_ota_url = NULL;
 static device_config_t s_device_config = {
     .heartbeat_interval_sec = 30,   // Default 30 seconds
     .sleep_timeout_sec = 30,        // Default 30 seconds (for debugging)
+    .long_press_threshold_ms = LONG_PRESS_TIME_MS,  // Default 700ms
     .t3_topic = "tasmota_obedio/cmnd/POWER",
     .t3_payload = "TOGGLE",
     .led_brightness = LED_BRIGHTNESS,
@@ -223,6 +224,16 @@ static esp_err_t config_load_from_nvs(void)
         ESP_LOGI(TAG, "Loaded LED blue: %d", led_blue);
     }
 
+    // Load long press threshold
+    uint32_t long_press_ms = s_device_config.long_press_threshold_ms;
+    err = nvs_get_u32(nvs_handle, NVS_KEY_LONG_PRESS_MS, &long_press_ms);
+    if (err == ESP_OK) {
+        if (long_press_ms >= 200 && long_press_ms <= 2000) {
+            s_device_config.long_press_threshold_ms = long_press_ms;
+            ESP_LOGI(TAG, "Loaded long press threshold: %lu ms", long_press_ms);
+        }
+    }
+
     nvs_close(nvs_handle);
     ESP_LOGI(TAG, "Configuration loaded from NVS");
     return ESP_OK;
@@ -260,6 +271,9 @@ static esp_err_t config_save_to_nvs(void)
     nvs_set_u8(nvs_handle, NVS_KEY_LED_RED, s_device_config.led_red);
     nvs_set_u8(nvs_handle, NVS_KEY_LED_GREEN, s_device_config.led_green);
     nvs_set_u8(nvs_handle, NVS_KEY_LED_BLUE, s_device_config.led_blue);
+
+    // Save long press threshold
+    nvs_set_u32(nvs_handle, NVS_KEY_LONG_PRESS_MS, s_device_config.long_press_threshold_ms);
 
     // Commit changes
     err = nvs_commit(nvs_handle);
@@ -318,6 +332,7 @@ static esp_err_t mqtt_publish_config_status(void)
     // Add configuration fields
     cJSON_AddNumberToObject(root, "heartbeatInterval", s_device_config.heartbeat_interval_sec);
     cJSON_AddNumberToObject(root, "sleepTimeout", s_device_config.sleep_timeout_sec);
+    cJSON_AddNumberToObject(root, "longPressThreshold", s_device_config.long_press_threshold_ms);
     cJSON_AddStringToObject(root, "t3Topic", s_device_config.t3_topic);
     cJSON_AddStringToObject(root, "t3Payload", s_device_config.t3_payload);
     cJSON_AddNumberToObject(root, "ledBrightness", s_device_config.led_brightness);
@@ -362,6 +377,32 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT connected to broker");
             s_is_connected = true;
+
+            // Publish "online" status message to override LWT
+            char status_topic[128];
+            snprintf(status_topic, sizeof(status_topic), "obedio/button/%s/status", wifi_get_device_id());
+
+            // Create online status message
+            cJSON *status_json = cJSON_CreateObject();
+            if (status_json != NULL) {
+                cJSON_AddStringToObject(status_json, "status", "online");
+                cJSON_AddStringToObject(status_json, "deviceId", wifi_get_device_id());
+                cJSON_AddStringToObject(status_json, "firmwareVersion", FIRMWARE_VERSION);
+                cJSON_AddStringToObject(status_json, "buildHash", FIRMWARE_BUILD_HASH);
+                cJSON_AddStringToObject(status_json, "ipAddress", wifi_get_ip_address());
+                cJSON_AddNumberToObject(status_json, "rssi", wifi_get_rssi());
+                cJSON_AddNumberToObject(status_json, "timestamp", get_timestamp_ms());
+                cJSON_AddNumberToObject(status_json, "uptime", get_uptime_ms());
+
+                char *status_str = cJSON_PrintUnformatted(status_json);
+                cJSON_Delete(status_json);
+
+                if (status_str != NULL) {
+                    int status_msg_id = esp_mqtt_client_publish(s_mqtt_client, status_topic, status_str, 0, 1, 1);
+                    ESP_LOGI(TAG, "Published online status (msg_id=%d)", status_msg_id);
+                    free(status_str);
+                }
+            }
 
             // Subscribe to OTA topic
             char ota_topic[128];
@@ -489,6 +530,17 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                         config_changed = true;
                         led_settings_changed = true;
                         ESP_LOGI(TAG, "LED blue updated to %d", s_device_config.led_blue);
+                    }
+
+                    // Update long press threshold
+                    cJSON *long_press_threshold = cJSON_GetObjectItem(json, "longPressThreshold");
+                    if (long_press_threshold != NULL && cJSON_IsNumber(long_press_threshold)) {
+                        uint32_t new_threshold = (uint32_t)long_press_threshold->valueint;
+                        if (new_threshold >= 200 && new_threshold <= 2000) {
+                            s_device_config.long_press_threshold_ms = new_threshold;
+                            config_changed = true;
+                            ESP_LOGI(TAG, "Long press threshold updated to %lu ms", new_threshold);
+                        }
                     }
 
                     // Save config to NVS if anything changed
@@ -632,11 +684,28 @@ esp_err_t mqtt_app_start(void)
 
     ESP_LOGI(TAG, "Connecting to MQTT broker: %s", mqtt_uri);
 
-    // Configure MQTT client
+    // Build LWT topic and message
+    static char lwt_topic[128];
+    static char lwt_message[256];
+    snprintf(lwt_topic, sizeof(lwt_topic), "obedio/button/%s/status", wifi_get_device_id());
+    snprintf(lwt_message, sizeof(lwt_message),
+             "{\"status\":\"offline\",\"deviceId\":\"%s\",\"reason\":\"connection_lost\",\"timestamp\":%llu}",
+             wifi_get_device_id(), get_timestamp_ms());
+
+    ESP_LOGI(TAG, "LWT configured - topic: %s", lwt_topic);
+
+    // Configure MQTT client with Last Will and Testament (LWT)
     esp_mqtt_client_config_t mqtt_cfg = {
         .broker.address.uri = mqtt_uri,
         .buffer.size = MQTT_BUFFER_SIZE,
         .buffer.out_size = MQTT_BUFFER_SIZE,
+        .session.last_will = {
+            .topic = lwt_topic,
+            .msg = lwt_message,
+            .msg_len = strlen(lwt_message),
+            .qos = 1,
+            .retain = 1,  // Retain LWT message so subscribers see device is offline
+        },
     };
 
     s_mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
@@ -940,6 +1009,83 @@ esp_err_t mqtt_publish_tasmota_toggle(void)
         ESP_LOGE(TAG, "Failed to publish T3 command");
         return ESP_FAIL;
     }
+}
+
+void mqtt_get_led_config(uint8_t *r, uint8_t *g, uint8_t *b, uint8_t *brightness)
+{
+    if (r != NULL) {
+        *r = s_device_config.led_red;
+    }
+    if (g != NULL) {
+        *g = s_device_config.led_green;
+    }
+    if (b != NULL) {
+        *b = s_device_config.led_blue;
+    }
+    if (brightness != NULL) {
+        *brightness = s_device_config.led_brightness;
+    }
+}
+
+uint32_t mqtt_get_long_press_threshold(void)
+{
+    return s_device_config.long_press_threshold_ms;
+}
+
+esp_err_t mqtt_send_offline_status(const char *reason)
+{
+    if (s_mqtt_client == NULL || !s_is_connected) {
+        ESP_LOGW(TAG, "MQTT not connected, cannot send offline status");
+        return ESP_FAIL;
+    }
+
+    if (reason == NULL) {
+        reason = "unknown";
+    }
+
+    ESP_LOGI(TAG, "Sending offline status (reason: %s)", reason);
+
+    // Create JSON object
+    cJSON *root = cJSON_CreateObject();
+    if (root == NULL) {
+        ESP_LOGE(TAG, "Failed to create JSON object");
+        return ESP_FAIL;
+    }
+
+    // Add fields
+    cJSON_AddStringToObject(root, "status", "offline");
+    cJSON_AddStringToObject(root, "deviceId", wifi_get_device_id());
+    cJSON_AddStringToObject(root, "reason", reason);
+    cJSON_AddNumberToObject(root, "timestamp", get_timestamp_ms());
+    cJSON_AddNumberToObject(root, "uptime", get_uptime_ms());
+    cJSON_AddStringToObject(root, "firmwareVersion", FIRMWARE_VERSION);
+    cJSON_AddStringToObject(root, "buildHash", FIRMWARE_BUILD_HASH);
+
+    // Convert to string
+    char *json_str = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+
+    if (json_str == NULL) {
+        ESP_LOGE(TAG, "Failed to serialize JSON");
+        return ESP_FAIL;
+    }
+
+    // Build topic
+    char topic[128];
+    snprintf(topic, sizeof(topic), "obedio/button/%s/status", wifi_get_device_id());
+
+    // Publish with QoS 1 and retain
+    int msg_id = esp_mqtt_client_publish(s_mqtt_client, topic, json_str, 0, 1, 1);
+
+    ESP_LOGI(TAG, "Published offline status (msg_id=%d)", msg_id);
+    ESP_LOGD(TAG, "Payload: %s", json_str);
+
+    free(json_str);
+
+    // Give MQTT time to send the message before disconnect/reboot
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    return (msg_id >= 0) ? ESP_OK : ESP_FAIL;
 }
 
 bool mqtt_is_connected(void)

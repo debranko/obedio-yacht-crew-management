@@ -282,6 +282,7 @@ static const char* BUTTON_MQTT[BUTTON_COUNT] = {
 #define NVS_KEY_SLEEP_TIMEOUT   "sleep_timeout"
 #define NVS_KEY_T3_TOPIC        "t3_topic"
 #define NVS_KEY_T3_PAYLOAD      "t3_payload"
+#define NVS_KEY_LONG_PRESS_MS   "long_press_ms"
 
 // ==================== FACTORY RESET ====================
 // Hold T6 (DND button) for 10 seconds on boot to factory reset
@@ -363,6 +364,7 @@ typedef struct {
     uint8_t touch_threshold;
     uint32_t heartbeat_interval_sec;  // Heartbeat interval in seconds (5-300s, default 30s)
     uint32_t sleep_timeout_sec;       // Sleep timeout in seconds (10-300s, default 30s)
+    uint32_t long_press_threshold_ms; // Long press threshold in milliseconds (200-2000ms, default 700ms)
     char t3_topic[128];               // T3 button MQTT topic (default: "tasmota_obedio/cmnd/POWER")
     char t3_payload[64];              // T3 button MQTT payload (default: "TOGGLE")
     bool factory_reset_pending;

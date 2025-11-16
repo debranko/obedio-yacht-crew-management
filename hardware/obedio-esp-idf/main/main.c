@@ -32,6 +32,7 @@
 #include "mcp23017.h"
 #include "lis3dhtr.h"
 #include "esp_ota_ops.h"
+#include "power_manager.h"
 
 static const char *TAG = "MAIN";
 
@@ -100,80 +101,85 @@ static void startup_led_animation(void)
 /**
  * Button press event callback
  * Handles single, double, and long press events
- * Special handling for voice recording on long press
+ * Interactive LED feedback: Blue flash on MQTT publish, rotating blue LED during T1 long press
  */
 static void button_press_callback(const char *button, press_type_t type)
 {
     ESP_LOGI(TAG, "Button callback: %s, type: %d", button, type);
 
-    // Handle T1 (main) button PRESS - track start time
-    if (strcmp(button, "T1") == 0 && type == PRESS_TYPE_PRESS) {
-        ESP_LOGI(TAG, "T1 (main) button pressed - tracking for duration");
-        is_recording = true;  // Use this flag to track button is held
-        recording_start_time = esp_timer_get_time();  // Store start time (microseconds)
-        return;
+    // Record user activity to reset sleep timer
+    power_manager_activity();
+
+    // Get current LED configuration for restore after feedback
+    uint8_t led_r, led_g, led_b, led_brightness;
+    mqtt_get_led_config(&led_r, &led_g, &led_b, &led_brightness);
+
+    // === T1 (CENTER BUTTON) SPECIAL HANDLING ===
+
+    // T1 LONG PRESS (700ms threshold reached while button still held)
+    // Start rotating blue LED animation to indicate "recording is active"
+    if (strcmp(button, "T1") == 0 && type == PRESS_TYPE_LONG) {
+        ESP_LOGI(TAG, "T1 long press detected - starting recording LED animation");
+        is_recording = true;
+        led_start_recording_animation(PRIORITY_LED_TASK, STACK_SIZE_LED);
+        return;  // Don't publish MQTT yet - wait for release
     }
 
-    // Handle T1 (main) button RELEASE - check duration to decide short vs long press
+    // T1 RELEASE after long press
+    // Stop animation, flash blue, restore config color, publish MQTT
     if (is_recording && strcmp(button, "T1") == 0 && type == PRESS_TYPE_SINGLE) {
-        // Calculate press duration in milliseconds
-        int64_t current_time = esp_timer_get_time();
-        int64_t duration_ms = (current_time - recording_start_time) / 1000;
+        ESP_LOGI(TAG, "T1 released after long press - stopping animation and publishing voice event");
         is_recording = false;
 
-        ESP_LOGI(TAG, "T1 (main) button released after %lld ms", duration_ms);
+        // Stop animation, flash blue confirmation, restore config color
+        led_stop_recording_animation(led_r, led_g, led_b, led_brightness);
 
-        if (duration_ms < 500) {
-            // Short press (< 0.5s) - Send normal button notification
-            ESP_LOGI(TAG, "Short press - sending button notification");
-            led_flash(LED_COLOR_WHITE, 100);
-            mqtt_publish_button_press("main", "single");
-            ESP_LOGI(TAG, "Button notification sent: main - single");
-        } else {
-            // Long press (>= 0.5s) - Send voice event (without actual audio for now)
-            ESP_LOGI(TAG, "Long press - sending voice event");
-            led_flash(LED_COLOR_BLUE, 200);  // Blue = voice event
-            mqtt_publish_button_press("main", "voice");
-            ESP_LOGI(TAG, "Voice event sent: main - voice");
-        }
+        // Publish voice event
+        mqtt_publish_button_press("main", "voice");
+        ESP_LOGI(TAG, "Voice event published: main - voice");
         return;
     }
 
-    // IMPORTANT: Filter out ALL T1 (main button) events that aren't handled above
-    // This prevents LONG press events from being published while button is held
-    if (strcmp(button, "T1") == 0) {
-        return;  // Don't publish any other T1 events
+    // T1 SHORT PRESS (released before 700ms threshold)
+    // Flash blue, restore config color, publish MQTT
+    if (strcmp(button, "T1") == 0 && type == PRESS_TYPE_SINGLE && !is_recording) {
+        ESP_LOGI(TAG, "T1 short press - publishing button event");
+
+        // Publish button event first
+        mqtt_publish_button_press("main", "single");
+
+        // Flash blue confirmation and restore config color
+        led_flash_blue_confirm(led_r, led_g, led_b, led_brightness);
+
+        ESP_LOGI(TAG, "Button event published: main - single");
+        return;
     }
 
-    // SPECIAL CASE: T3 (Light button) - Direct Tasmota control
-    // Publishes directly to "tasmota_obedio/cmnd/POWER" with "TOGGLE"
-    // Does NOT publish to backend/frontend - local device-to-device control only
+    // Filter out PRESS_TYPE_PRESS events for T1 (we don't do anything on initial press)
+    if (strcmp(button, "T1") == 0 && type == PRESS_TYPE_PRESS) {
+        return;
+    }
+
+    // === T3 (LIGHT BUTTON) SPECIAL CASE ===
+    // Direct Tasmota control - does NOT publish to backend
     if (strcmp(button, "T3") == 0 && (type == PRESS_TYPE_SINGLE || type == PRESS_TYPE_LONG)) {
         ESP_LOGI(TAG, "T3 (Light) button pressed - sending Tasmota TOGGLE");
-        led_flash(LED_COLOR_YELLOW, 100);  // Yellow flash to indicate light command
-        mqtt_publish_tasmota_toggle();
-        ESP_LOGI(TAG, "Tasmota toggle command sent - no backend event");
-        return;  // Skip normal button press publication
-    }
 
-    // Ignore PRESS_TYPE_PRESS for all other buttons (T2-T6)
-    if (type == PRESS_TYPE_PRESS) {
+        // Publish Tasmota command
+        mqtt_publish_tasmota_toggle();
+
+        // Flash blue confirmation and restore config color
+        led_flash_blue_confirm(led_r, led_g, led_b, led_brightness);
+
+        ESP_LOGI(TAG, "Tasmota toggle command sent");
         return;
     }
 
-    // Flash different colors based on press type
-    switch (type) {
-        case PRESS_TYPE_SINGLE:
-            led_flash(LED_COLOR_WHITE, 100);
-            break;
-        case PRESS_TYPE_DOUBLE:
-            led_flash(LED_COLOR_YELLOW, 100);
-            break;
-        case PRESS_TYPE_LONG:
-            led_flash(LED_COLOR_CYAN, 100);
-            break;
-        default:
-            break;
+    // === ALL OTHER BUTTONS (T2, T4, T5, T6) ===
+
+    // Ignore PRESS_TYPE_PRESS events (no action on button down)
+    if (type == PRESS_TYPE_PRESS) {
+        return;
     }
 
     // Convert press type to string
@@ -195,6 +201,10 @@ static void button_press_callback(const char *button, press_type_t type)
 
     // Publish button event via MQTT
     mqtt_publish_button_press(button, press_type_str);
+
+    // Flash blue confirmation and restore config color
+    led_flash_blue_confirm(led_r, led_g, led_b, led_brightness);
+
     ESP_LOGI(TAG, "Button event published: %s - %s", button, press_type_str);
 }
 
@@ -204,6 +214,9 @@ static void button_press_callback(const char *button, press_type_t type)
 static void touch_press_callback(press_type_t type)
 {
     ESP_LOGI(TAG, "Touch callback: type %d", type);
+
+    // Record user activity to reset sleep timer
+    power_manager_activity();
 
     // Flash LED based on touch type
     switch (type) {
@@ -243,6 +256,9 @@ static void touch_press_callback(press_type_t type)
 static void shake_detected_callback(void)
 {
     ESP_LOGI(TAG, "Shake detected!");
+
+    // Record user activity to reset sleep timer
+    power_manager_activity();
 
     // Flash red LEDs to indicate shake
     led_flash(LED_COLOR_RED, 200);
@@ -583,6 +599,26 @@ void app_main(void)
     } else {
         ESP_LOGW(TAG, "Failed to create heartbeat timer");
     }
+
+    // Step 21: Initialize and start power manager
+    // TEMPORARILY DISABLED FOR DEBUGGING OTA ROLLBACK ISSUE
+    ESP_LOGW(TAG, "Power manager DISABLED for debugging");
+    /*
+    ESP_LOGI(TAG, "Initializing power manager...");
+    ret = power_manager_init(config.sleep_timeout_sec);
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Power manager initialized (sleep timeout: %lu sec)", config.sleep_timeout_sec);
+
+        ret = power_manager_start_task(3, 3072);  // Priority 3, stack 3072
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "Power manager task started - automatic sleep enabled");
+        } else {
+            ESP_LOGW(TAG, "Failed to start power manager task");
+        }
+    } else {
+        ESP_LOGW(TAG, "Failed to initialize power manager");
+    }
+    */
 
     // Setup complete!
     ESP_LOGI(TAG, "===========================================");

@@ -231,3 +231,111 @@ esp_err_t led_update_static(uint8_t r, uint8_t g, uint8_t b, uint8_t brightness)
     // Set all LEDs to the scaled color
     return led_set_all(scaled_r, scaled_g, scaled_b);
 }
+
+esp_err_t led_flash_blue_confirm(uint8_t r, uint8_t g, uint8_t b, uint8_t brightness)
+{
+    if (led_strip == NULL) {
+        ESP_LOGE(TAG, "LED strip not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    ESP_LOGI(TAG, "Blue flash confirmation - will restore RGB(%d,%d,%d) brightness=%d", r, g, b, brightness);
+
+    // Flash blue at max brightness (255, 255 for full brightness)
+    esp_err_t ret = led_set_all(0, 0, 255);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    // Hold blue for 150ms
+    vTaskDelay(pdMS_TO_TICKS(150));
+
+    // Restore configured color
+    return led_update_static(r, g, b, brightness);
+}
+
+// Static task handle for recording animation
+static TaskHandle_t recording_task_handle = NULL;
+
+// Recording animation task
+static void led_recording_animation_task(void *pvParameters)
+{
+    ESP_LOGI(TAG, "Starting rotating blue LED recording animation");
+
+    uint8_t position = 0;
+
+    // Blue LED at max brightness
+    const uint8_t blue_r = 0;
+    const uint8_t blue_g = 0;
+    const uint8_t blue_b = 255;
+
+    while (1) {
+        if (led_strip != NULL) {
+            // Clear all LEDs
+            for (int i = 0; i < NUM_LEDS; i++) {
+                led_strip_set_pixel(led_strip, i, 0, 0, 0);
+            }
+
+            // Set single blue LED at current position
+            led_strip_set_pixel(led_strip, position, blue_r, blue_g, blue_b);
+
+            // Refresh strip
+            led_strip_refresh(led_strip);
+
+            // Move to next position clockwise
+            position = (position + 1) % NUM_LEDS;
+        }
+
+        // Update every 80ms for smooth rotation
+        vTaskDelay(pdMS_TO_TICKS(80));
+    }
+}
+
+esp_err_t led_start_recording_animation(uint32_t priority, uint32_t stack_size)
+{
+    if (recording_task_handle != NULL) {
+        ESP_LOGW(TAG, "Recording animation task already running");
+        return ESP_OK;
+    }
+
+    BaseType_t task_created = xTaskCreate(
+        led_recording_animation_task,
+        "led_recording",
+        stack_size,
+        NULL,
+        priority,
+        &recording_task_handle
+    );
+
+    if (task_created != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create recording animation task");
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "Recording animation task started");
+    return ESP_OK;
+}
+
+esp_err_t led_stop_recording_animation(uint8_t r, uint8_t g, uint8_t b, uint8_t brightness)
+{
+    if (recording_task_handle == NULL) {
+        ESP_LOGW(TAG, "Recording animation task not running");
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Stopping recording animation");
+    vTaskDelete(recording_task_handle);
+    recording_task_handle = NULL;
+
+    // Flash blue to confirm recording completed
+    if (led_strip != NULL) {
+        led_set_all(0, 0, 255);
+        vTaskDelay(pdMS_TO_TICKS(150));
+    }
+
+    // Restore configured static color
+    esp_err_t ret = led_update_static(r, g, b, brightness);
+
+    ESP_LOGI(TAG, "Recording animation stopped, restored RGB(%d,%d,%d) brightness=%d", r, g, b, brightness);
+    return ret;
+}

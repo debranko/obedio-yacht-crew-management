@@ -5,6 +5,7 @@
 
 #include "ota_handler.h"
 #include "config.h"
+#include "mqtt_handler.h"
 #include "esp_log.h"
 #include "esp_ota_ops.h"
 #include "esp_https_ota.h"
@@ -12,6 +13,7 @@
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "power_manager.h"
 #include <string.h>
 
 static const char *TAG = "OTA";
@@ -68,12 +70,17 @@ esp_err_t ota_begin_update(void)
         return ESP_ERR_INVALID_STATE;
     }
 
+    // Prevent sleep during OTA update
+    power_manager_prevent_sleep();
+    ESP_LOGI(TAG, "Sleep prevented during OTA update");
+
     ESP_LOGI(TAG, "Starting OTA update");
 
     // Get next update partition
     update_partition = esp_ota_get_next_update_partition(NULL);
     if (update_partition == NULL) {
         ESP_LOGE(TAG, "Failed to find update partition");
+        power_manager_allow_sleep();  // Release sleep lock on error
         return ESP_FAIL;
     }
 
@@ -84,6 +91,7 @@ esp_err_t ota_begin_update(void)
     esp_err_t err = esp_ota_begin(update_partition, OTA_SIZE_UNKNOWN, &ota_handle);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "esp_ota_begin failed: %s", esp_err_to_name(err));
+        power_manager_allow_sleep();  // Release sleep lock on error
         return err;
     }
 
@@ -112,6 +120,7 @@ esp_err_t ota_update_from_buffer(const uint8_t *data, size_t len)
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "esp_ota_write failed: %s", esp_err_to_name(err));
         ota_in_progress = false;
+        power_manager_allow_sleep();  // Release sleep lock on error
         return err;
     }
 
@@ -143,6 +152,7 @@ esp_err_t ota_finalize(void)
             ESP_LOGE(TAG, "esp_ota_end failed: %s", esp_err_to_name(err));
         }
         ota_in_progress = false;
+        power_manager_allow_sleep();  // Release sleep lock on error
         return err;
     }
 
@@ -153,10 +163,16 @@ esp_err_t ota_finalize(void)
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "esp_ota_set_boot_partition failed: %s", esp_err_to_name(err));
         ota_in_progress = false;
+        power_manager_allow_sleep();  // Release sleep lock on error
         return err;
     }
 
     ota_in_progress = false;
+
+    // Allow sleep now that OTA is complete (device will reboot soon anyway)
+    power_manager_allow_sleep();
+    ESP_LOGI(TAG, "Sleep allowed - OTA update complete");
+
     ESP_LOGI(TAG, "OTA update completed successfully");
     ESP_LOGI(TAG, "New boot partition: %s", update_partition->label);
     ESP_LOGI(TAG, "Reboot required to apply update");
@@ -259,10 +275,15 @@ esp_err_t ota_update_from_url(const char *url)
 
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "OTA update completed successfully!");
-        ESP_LOGI(TAG, "Rebooting in 3 seconds...");
+        ESP_LOGI(TAG, "Sending offline status before reboot...");
 
-        // Give time for log output
-        vTaskDelay(pdMS_TO_TICKS(3000));
+        // Send offline status message to MQTT
+        mqtt_send_offline_status("ota");
+
+        ESP_LOGI(TAG, "Rebooting in 2 seconds...");
+
+        // Give time for MQTT message to be sent and log output
+        vTaskDelay(pdMS_TO_TICKS(2000));
 
         // Reboot to new firmware
         esp_restart();
