@@ -178,7 +178,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       // Re-throw with better message if it's a network error
       if (error instanceof TypeError && error.message.includes('fetch')) {
-        throw new Error('Cannot connect to server. Please check if backend is running on http://localhost:8080');
+        throw new Error('Cannot connect to server. Please check if backend is running on http://localhost:3001');
       }
 
       throw error;

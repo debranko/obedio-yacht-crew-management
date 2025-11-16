@@ -1,0 +1,103 @@
+version: "3.9"
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: obedio-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: obedio_user
+      POSTGRES_PASSWORD: obedio_secure_pass_2025
+      POSTGRES_DB: obedio_yacht_crew
+    ports:
+      - "5432:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U obedio_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - obedio-network
+
+  # Backend API Server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: obedio-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://obedio_user:obedio_secure_pass_2025@db:5432/obedio_yacht_crew?schema=public
+      JWT_SECRET: obedio-jwt-secret-exhibition-2025-ultra-secure
+      JWT_EXPIRES_IN: 7d
+      REFRESH_TOKEN_SECRET: obedio-refresh-secret-exhibition-2025
+      REFRESH_TOKEN_EXPIRES_IN: 30d
+      FRONTEND_URL: http://10.10.0.10:3000
+      CORS_ORIGIN: http://10.10.0.10:3000,http://localhost:3000
+      SOCKET_IO_CORS_ORIGIN: http://10.10.0.10:3000,http://localhost:3000,http://*:3000
+      MQTT_BROKER: mqtt://mosquitto:1883
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+      MQTT_CLIENT_ID: obedio-backend
+      MQTT_ENABLED: "true"
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
+    networks:
+      - obedio-network
+
+  # Frontend Web Application
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        VITE_API_URL: http://10.10.0.10:3001/api
+        VITE_WS_URL: http://10.10.0.10:3001
+        VITE_MQTT_BROKER: ws://10.10.0.10:9001
+    container_name: obedio-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    networks:
+      - obedio-network
+
+  # Mosquitto MQTT Broker
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: obedio-mqtt
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    networks:
+      - obedio-network
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 | grep -v Error || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  dbdata:
+    driver: local
+
+networks:
+  obedio-network:
+    driver: bridge

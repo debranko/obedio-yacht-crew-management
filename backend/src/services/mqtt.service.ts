@@ -14,7 +14,7 @@ class MQTTService {
   private isConnected: boolean = false;
 
   // MQTT Configuration
-  private readonly MQTT_BROKER = process.env.MQTT_BROKER || 'mqtt://localhost:1883';
+  private readonly MQTT_BROKER = process.env.MQTT_BROKER || 'mqtt://mosquitto:1883';
   private readonly CLIENT_ID = `obedio-backend-${Date.now()}`;
   
   // Topic structure

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OBEDIO - Status</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        .nav {
+            display: flex;
+            background: #f7f7f7;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .nav a {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            text-decoration: none;
+            color: #666;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .nav a:hover {
+            background: #e0e0e0;
+        }
+        .nav a.active {
+            background: white;
+            color: #667eea;
+            font-weight: 600;
+        }
+        .content {
+            padding: 30px;
+        }
+        .status-section {
+            margin-bottom: 30px;
+        }
+        .status-section h2 {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .info-table tr {
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .info-table tr:last-child {
+            border-bottom: none;
+        }
+        .info-table td {
+            padding: 15px 10px;
+        }
+        .info-table td:first-child {
+            color: #666;
+            font-weight: 500;
+            width: 40%;
+        }
+        .info-table td:last-child {
+            color: #333;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            text-align: right;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        }
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .badge-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+        .refresh-btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin-top: 20px;
+        }
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        .refresh-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        .loading {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .stat-card h3 {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .stat-card .value {
+            font-size: 36px;
+            font-weight: 700;
+        }
+        .signal-strength {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .signal-bar {
+            width: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+        }
+        .signal-bar.active {
+            background: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>OBEDIO Smart Button</h1>
+            <p>Device Status</p>
+        </div>
+
+        <div class="nav">
+            <a href="/">Config</a>
+            <a href="/debug">Debug</a>
+            <a href="/status" class="active">Status</a>
+            <a href="/ota">OTA</a>
+        </div>
+
+        <div class="content">
+            <div class="stat-card">
+                <h3>Uptime</h3>
+                <div class="value" id="uptime">0d 0h 0m</div>
+            </div>
+
+            <div class="status-section">
+                <h2>Firmware Information</h2>
+                <table class="info-table">
+                    <tr>
+                        <td>Firmware Version</td>
+                        <td id="firmware_version">-</td>
+                    </tr>
+                    <tr>
+                        <td>Hardware Version</td>
+                        <td id="hardware_version">-</td>
+                    </tr>
+                    <tr>
+                        <td>Device ID</td>
+                        <td id="device_id">-</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="status-section">
+                <h2>Network Information</h2>
+                <table class="info-table">
+                    <tr>
+                        <td>IP Address</td>
+                        <td id="ip_address">-</td>
+                    </tr>
+                    <tr>
+                        <td>MAC Address</td>
+                        <td id="mac_address">-</td>
+                    </tr>
+                    <tr>
+                        <td>Signal Strength (RSSI)</td>
+                        <td>
+                            <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px;">
+                                <span id="rssi">- dBm</span>
+                                <span id="rssi_badge" class="badge">-</span>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="status-section">
+                <h2>System Resources</h2>
+                <table class="info-table">
+                    <tr>
+                        <td>Free Heap</td>
+                        <td id="heap_free">- KB</td>
+                    </tr>
+                    <tr>
+                        <td>Minimum Free Heap</td>
+                        <td id="heap_total">- KB</td>
+                    </tr>
+                    <tr>
+                        <td>Heap Usage</td>
+                        <td>
+                            <div style="width: 100%;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                    <span id="heap_percent">0%</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="heap_progress" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <button class="refresh-btn" id="refreshBtn" onclick="loadStatus()">
+                Refresh Status
+            </button>
+        </div>
+    </div>
+
+    <script>
+        function formatUptime(seconds) {
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            return `${days}d ${hours}h ${minutes}m`;
+        }
+
+        function formatBytes(bytes) {
+            return (bytes / 1024).toFixed(1);
+        }
+
+        function getRSSIBadge(rssi) {
+            if (rssi >= -50) {
+                return { text: 'Excellent', class: 'badge-success' };
+            } else if (rssi >= -60) {
+                return { text: 'Good', class: 'badge-success' };
+            } else if (rssi >= -70) {
+                return { text: 'Fair', class: 'badge-warning' };
+            } else {
+                return { text: 'Poor', class: 'badge-danger' };
+            }
+        }
+
+        async function loadStatus() {
+            const refreshBtn = document.getElementById('refreshBtn');
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML = '<span class="loading"></span>Loading...';
+
+            try {
+                const response = await fetch('/api/status');
+                const status = await response.json();
+
+                // Firmware info
+                document.getElementById('firmware_version').textContent = status.firmware_version || '-';
+                document.getElementById('hardware_version').textContent = status.hardware_version || '-';
+                document.getElementById('device_id').textContent = status.device_id || '-';
+
+                // Uptime
+                document.getElementById('uptime').textContent = formatUptime(status.uptime || 0);
+
+                // Network info
+                document.getElementById('ip_address').textContent = status.ip_address || '-';
+                document.getElementById('mac_address').textContent = status.mac_address || '-';
+
+                const rssi = status.rssi || -100;
+                document.getElementById('rssi').textContent = rssi + ' dBm';
+
+                const rssiBadge = getRSSIBadge(rssi);
+                const badgeElement = document.getElementById('rssi_badge');
+                badgeElement.textContent = rssiBadge.text;
+                badgeElement.className = 'badge ' + rssiBadge.class;
+
+                // Heap info
+                const heapFree = status.heap_free || 0;
+                const heapTotal = status.heap_total || 1;
+
+                document.getElementById('heap_free').textContent = formatBytes(heapFree) + ' KB';
+                document.getElementById('heap_total').textContent = formatBytes(heapTotal) + ' KB';
+
+                // Calculate heap usage percentage (inverted logic - free vs used)
+                const heapUsagePercent = Math.max(0, 100 - ((heapFree / (heapFree + heapTotal)) * 100));
+                document.getElementById('heap_percent').textContent = heapUsagePercent.toFixed(1) + '%';
+                document.getElementById('heap_progress').style.width = heapUsagePercent + '%';
+
+            } catch (error) {
+                console.error('Failed to load status:', error);
+                alert('Failed to load device status. Please try again.');
+            } finally {
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = 'Refresh Status';
+            }
+        }
+
+        // Load status on page load
+        loadStatus();
+
+        // Auto-refresh every 5 seconds
+        setInterval(loadStatus, 5000);
+    </script>
+</body>
+</html>

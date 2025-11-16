@@ -113,7 +113,7 @@ export class WebSocketService {
       console.log('WebSocket connection initiated');
 
       // Connect to Socket.IO server
-      const serverUrl = import.meta.env.VITE_WS_URL || 'http://localhost:8080';
+      const serverUrl = import.meta.env.VITE_WS_URL || 'http://localhost:3001';
 
       this.socket = io(serverUrl, {
         auth: { userId },
