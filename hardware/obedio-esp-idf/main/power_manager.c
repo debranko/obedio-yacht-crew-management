@@ -85,18 +85,17 @@ static void enter_light_sleep(void)
 
     s_pm_state.is_sleeping = false;
 
-    // Check wake cause
-    esp_sleep_wakeup_cause_t wake_cause = esp_sleep_get_wakeup_cause();
+    // Check wake causes (new API returns bitmap of multiple causes)
+    uint32_t wake_causes = esp_sleep_get_wakeup_causes();
 
-    switch (wake_cause) {
-        case ESP_SLEEP_WAKEUP_EXT0:
-            ESP_LOGI(TAG, "Woke from touch/GPIO after %lld ms", sleep_duration_ms);
-            power_manager_activity();  // Touch detected = activity
-            break;
-
-        default:
-            ESP_LOGD(TAG, "Woke from %d after %lld ms", wake_cause, sleep_duration_ms);
-            break;
+    // Check for specific wake sources (wake_causes is now a bitmap)
+    if (wake_causes & (1 << ESP_SLEEP_WAKEUP_EXT0)) {
+        ESP_LOGI(TAG, "Woke from touch/GPIO after %lld ms", sleep_duration_ms);
+        power_manager_activity();  // Touch detected = activity
+    } else if (wake_causes != 0) {
+        ESP_LOGD(TAG, "Woke from causes 0x%lx after %lld ms", wake_causes, sleep_duration_ms);
+    } else {
+        ESP_LOGD(TAG, "Woke after %lld ms", sleep_duration_ms);
     }
 }
 

@@ -11,7 +11,7 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "driver/touch_pad.h"
+#include "driver/touch_sens.h"
 #include "soc/touch_sensor_channel.h"
 
 static const char *TAG = "touch_handler";
@@ -31,6 +31,10 @@ static touch_callback_t event_callback = NULL;
 static TaskHandle_t touch_task_handle = NULL;
 static bool is_initialized = false;
 
+// New touch sensor handles
+static touch_sensor_handle_t touch_sens_handle = NULL;
+static touch_channel_handle_t touch_chan_handle = NULL;
+
 /**
  * @brief Calibrate touch sensor
  *
@@ -48,13 +52,13 @@ static esp_err_t calibrate_touch_sensor(void) {
     const int samples = 10;
 
     for (int i = 0; i < samples; i++) {
-        uint32_t value;
-        esp_err_t ret = touch_pad_read_raw_data(TOUCH_PAD_NO, &value);
+        uint32_t chan_data = 0;
+        esp_err_t ret = touch_channel_read_data(touch_chan_handle, TOUCH_CHAN_DATA_TYPE_SMOOTH, &chan_data);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "Failed to read touch sensor: %s", esp_err_to_name(ret));
             return ret;
         }
-        sum += value;
+        sum += chan_data;
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 
@@ -65,8 +69,11 @@ static esp_err_t calibrate_touch_sensor(void) {
     ESP_LOGI(TAG, "  Baseline: %lu", touch_state.baseline);
     ESP_LOGI(TAG, "  Threshold: %lu (%d%%)", touch_state.threshold, TOUCH_THRESHOLD_PERCENT);
 
-    // Set the threshold
-    esp_err_t ret = touch_pad_set_thresh(TOUCH_PAD_NO, touch_state.threshold);
+    // Configure threshold for the channel
+    touch_channel_config_t chan_cfg = {
+        .active_thresh = {touch_state.threshold},
+    };
+    esp_err_t ret = touch_sensor_reconfig_channel(touch_chan_handle, &chan_cfg);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to set threshold: %s", esp_err_to_name(ret));
         return ret;
@@ -82,21 +89,20 @@ static esp_err_t calibrate_touch_sensor(void) {
  * @return true if touched, false otherwise
  */
 static bool is_touch_detected(uint32_t *value) {
-    uint32_t raw_value;
-    // ESP32-S3 uses touch_pad_read_raw_data instead of touch_pad_read_filtered
-    esp_err_t ret = touch_pad_read_raw_data(TOUCH_PAD_NO, &raw_value);
+    uint32_t chan_data = 0;
+    esp_err_t ret = touch_channel_read_data(touch_chan_handle, TOUCH_CHAN_DATA_TYPE_SMOOTH, &chan_data);
 
     if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to read raw value: %s", esp_err_to_name(ret));
+        ESP_LOGW(TAG, "Failed to read touch data: %s", esp_err_to_name(ret));
         return false;
     }
 
     if (value != NULL) {
-        *value = raw_value;
+        *value = chan_data;
     }
 
     // Touch detected if value falls below threshold
-    return (raw_value < touch_state.threshold);
+    return (chan_data < touch_state.threshold);
 }
 
 /**
@@ -192,35 +198,55 @@ esp_err_t touch_handler_init(touch_callback_t callback) {
 
     event_callback = callback;
 
-    // Initialize touch sensor
-    esp_err_t ret = touch_pad_init();
+    // Configure touch sensor controller
+    touch_sensor_sample_config_t sample_cfg = {};
+    touch_sensor_config_t sens_cfg = {
+        .sample_cfg = &sample_cfg,
+    };
+    esp_err_t ret = touch_sensor_new_controller(&sens_cfg, &touch_sens_handle);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize touch pad: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to create touch sensor controller: %s", esp_err_to_name(ret));
         return ret;
     }
 
-    // Configure touch sensor
-    ret = touch_pad_config(TOUCH_PAD_NO);
+    // Configure the touch channel (channel 1 for GPIO1)
+    touch_channel_config_t chan_cfg = {
+        .active_thresh = {0},  // Will be set during calibration
+    };
+    ret = touch_sensor_new_channel(touch_sens_handle, 1, &chan_cfg, &touch_chan_handle);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to configure touch pad: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to create touch channel: %s", esp_err_to_name(ret));
+        touch_sensor_del_controller(touch_sens_handle);
         return ret;
     }
 
-    // Set voltage for charging/discharging
-    // ESP32-S3 uses different voltage ranges than ESP32
-    ret = touch_pad_set_voltage(TOUCH_HVOLT_2V7, TOUCH_LVOLT_0V5, TOUCH_HVOLT_ATTEN_1V);
+    // Enable the touch sensor
+    ret = touch_sensor_enable(touch_sens_handle);
     if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to set touch voltage: %s", esp_err_to_name(ret));
-        // Non-critical, continue
+        ESP_LOGE(TAG, "Failed to enable touch sensor: %s", esp_err_to_name(ret));
+        touch_sensor_del_channel(touch_chan_handle);
+        touch_sensor_del_controller(touch_sens_handle);
+        return ret;
     }
 
-    // Note: ESP32-S3 touch API might differ from ESP32
-    // Filter might not be needed or available on ESP32-S3
+    // Start continuous scanning
+    ret = touch_sensor_start_continuous_scanning(touch_sens_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start scanning: %s", esp_err_to_name(ret));
+        touch_sensor_disable(touch_sens_handle);
+        touch_sensor_del_channel(touch_chan_handle);
+        touch_sensor_del_controller(touch_sens_handle);
+        return ret;
+    }
 
     // Calibrate the touch sensor
     ret = calibrate_touch_sensor();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to calibrate touch sensor");
+        touch_sensor_stop_continuous_scanning(touch_sens_handle);
+        touch_sensor_disable(touch_sens_handle);
+        touch_sensor_del_channel(touch_chan_handle);
+        touch_sensor_del_controller(touch_sens_handle);
         return ret;
     }
 

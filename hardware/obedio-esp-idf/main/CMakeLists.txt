@@ -16,6 +16,10 @@ idf_component_register(
         "."
     REQUIRES
         driver
+        esp_driver_i2c
+        esp_driver_i2s
+        esp_driver_gpio
+        esp_driver_touch_sens
         esp_wifi
         esp_netif
         esp_http_server
@@ -27,7 +31,7 @@ idf_component_register(
         esp_https_ota
         app_update
         spiffs
-        json
+        cjson
         mcp23017
         lis3dhtr
         led_effects
@@ -38,3 +42,6 @@ idf_component_register(
         "../web/status.html"
         "../web/ota.html"
 )
+
+# Allow deprecated API warnings (don't treat them as errors)
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error=cpp)

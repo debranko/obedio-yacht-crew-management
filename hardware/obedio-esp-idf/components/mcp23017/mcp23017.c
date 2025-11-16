@@ -33,11 +33,14 @@ static const char *TAG = "mcp23017";
 #define MCP23017_OLATA      0x14  // Output Latch Register A
 #define MCP23017_OLATB      0x15  // Output Latch Register B
 
-static i2c_port_t mcp_i2c_port = I2C_NUM_0;
+static i2c_master_dev_handle_t mcp_dev_handle = NULL;
 static SemaphoreHandle_t i2c_mutex = NULL;
 
-esp_err_t mcp23017_init(i2c_port_t port, uint8_t addr) {
-    mcp_i2c_port = port;
+esp_err_t mcp23017_init(i2c_master_bus_handle_t bus_handle, uint8_t addr) {
+    if (bus_handle == NULL) {
+        ESP_LOGE(TAG, "Invalid bus handle");
+        return ESP_ERR_INVALID_ARG;
+    }
 
     // Create I2C mutex if it doesn't exist
     if (i2c_mutex == NULL) {
@@ -48,7 +51,18 @@ esp_err_t mcp23017_init(i2c_port_t port, uint8_t addr) {
         }
     }
 
-    esp_err_t ret;
+    // Configure device on the I2C bus
+    i2c_device_config_t dev_cfg = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = addr,
+        .scl_speed_hz = 400000,  // 400kHz
+    };
+
+    esp_err_t ret = i2c_master_bus_add_device(bus_handle, &dev_cfg, &mcp_dev_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to add device to I2C bus: %s", esp_err_to_name(ret));
+        return ret;
+    }
 
     // Set all GPIOA pins as inputs (0xFF = all inputs)
     ret = mcp23017_write_reg(addr, MCP23017_IODIRA, 0xFF);
@@ -76,6 +90,13 @@ esp_err_t mcp23017_init(i2c_port_t port, uint8_t addr) {
 }
 
 esp_err_t mcp23017_write_reg(uint8_t addr, uint8_t reg, uint8_t data) {
+    (void)addr;  // Address is now part of device handle
+
+    if (mcp_dev_handle == NULL) {
+        ESP_LOGE(TAG, "MCP23017 not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+
     if (i2c_mutex == NULL) {
         ESP_LOGE(TAG, "I2C mutex not initialized");
         return ESP_ERR_INVALID_STATE;
@@ -83,15 +104,8 @@ esp_err_t mcp23017_write_reg(uint8_t addr, uint8_t reg, uint8_t data) {
 
     xSemaphoreTake(i2c_mutex, portMAX_DELAY);
 
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (addr << 1) | I2C_MASTER_WRITE, true);
-    i2c_master_write_byte(cmd, reg, true);
-    i2c_master_write_byte(cmd, data, true);
-    i2c_master_stop(cmd);
-
-    esp_err_t ret = i2c_master_cmd_begin(mcp_i2c_port, cmd, pdMS_TO_TICKS(1000));
-    i2c_cmd_link_delete(cmd);
+    uint8_t write_buf[2] = {reg, data};
+    esp_err_t ret = i2c_master_transmit(mcp_dev_handle, write_buf, sizeof(write_buf), 1000);
 
     xSemaphoreGive(i2c_mutex);
 
@@ -103,6 +117,13 @@ esp_err_t mcp23017_write_reg(uint8_t addr, uint8_t reg, uint8_t data) {
 }
 
 esp_err_t mcp23017_read_reg(uint8_t addr, uint8_t reg, uint8_t *data) {
+    (void)addr;  // Address is now part of device handle
+
+    if (mcp_dev_handle == NULL) {
+        ESP_LOGE(TAG, "MCP23017 not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+
     if (i2c_mutex == NULL) {
         ESP_LOGE(TAG, "I2C mutex not initialized");
         return ESP_ERR_INVALID_STATE;
@@ -114,17 +135,8 @@ esp_err_t mcp23017_read_reg(uint8_t addr, uint8_t reg, uint8_t *data) {
 
     xSemaphoreTake(i2c_mutex, portMAX_DELAY);
 
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (addr << 1) | I2C_MASTER_WRITE, true);
-    i2c_master_write_byte(cmd, reg, true);
-    i2c_master_start(cmd);  // Repeated start
-    i2c_master_write_byte(cmd, (addr << 1) | I2C_MASTER_READ, true);
-    i2c_master_read_byte(cmd, data, I2C_MASTER_NACK);
-    i2c_master_stop(cmd);
-
-    esp_err_t ret = i2c_master_cmd_begin(mcp_i2c_port, cmd, pdMS_TO_TICKS(1000));
-    i2c_cmd_link_delete(cmd);
+    // Use transmit_receive for write-then-read operation
+    esp_err_t ret = i2c_master_transmit_receive(mcp_dev_handle, &reg, 1, data, 1, 1000);
 
     xSemaphoreGive(i2c_mutex);
 

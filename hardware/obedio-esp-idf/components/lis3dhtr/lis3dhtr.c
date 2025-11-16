@@ -28,8 +28,7 @@ static const char *TAG = "lis3dhtr";
 // Scale factor for ±2G range
 #define LIS3DHTR_SCALE_FACTOR   0.001f  // LSB to g conversion
 
-static i2c_port_t lis_i2c_port = I2C_NUM_0;
-static uint8_t lis_i2c_addr = 0x19;
+static i2c_master_dev_handle_t lis_dev_handle = NULL;
 static SemaphoreHandle_t i2c_mutex = NULL;
 static bool is_initialized = false;
 
@@ -41,6 +40,11 @@ static bool is_initialized = false;
  * @return ESP_OK on success
  */
 static esp_err_t lis3dhtr_write_reg(uint8_t reg, uint8_t data) {
+    if (lis_dev_handle == NULL) {
+        ESP_LOGE(TAG, "LIS3DHTR not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+
     if (i2c_mutex == NULL) {
         ESP_LOGE(TAG, "I2C mutex not initialized");
         return ESP_ERR_INVALID_STATE;
@@ -48,15 +52,8 @@ static esp_err_t lis3dhtr_write_reg(uint8_t reg, uint8_t data) {
 
     xSemaphoreTake(i2c_mutex, portMAX_DELAY);
 
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (lis_i2c_addr << 1) | I2C_MASTER_WRITE, true);
-    i2c_master_write_byte(cmd, reg, true);
-    i2c_master_write_byte(cmd, data, true);
-    i2c_master_stop(cmd);
-
-    esp_err_t ret = i2c_master_cmd_begin(lis_i2c_port, cmd, pdMS_TO_TICKS(1000));
-    i2c_cmd_link_delete(cmd);
+    uint8_t write_buf[2] = {reg, data};
+    esp_err_t ret = i2c_master_transmit(lis_dev_handle, write_buf, sizeof(write_buf), 1000);
 
     xSemaphoreGive(i2c_mutex);
 
@@ -75,6 +72,11 @@ static esp_err_t lis3dhtr_write_reg(uint8_t reg, uint8_t data) {
  * @return ESP_OK on success
  */
 static esp_err_t lis3dhtr_read_reg(uint8_t reg, uint8_t *data) {
+    if (lis_dev_handle == NULL) {
+        ESP_LOGE(TAG, "LIS3DHTR not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+
     if (i2c_mutex == NULL) {
         ESP_LOGE(TAG, "I2C mutex not initialized");
         return ESP_ERR_INVALID_STATE;
@@ -86,17 +88,8 @@ static esp_err_t lis3dhtr_read_reg(uint8_t reg, uint8_t *data) {
 
     xSemaphoreTake(i2c_mutex, portMAX_DELAY);
 
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (lis_i2c_addr << 1) | I2C_MASTER_WRITE, true);
-    i2c_master_write_byte(cmd, reg, true);
-    i2c_master_start(cmd);  // Repeated start
-    i2c_master_write_byte(cmd, (lis_i2c_addr << 1) | I2C_MASTER_READ, true);
-    i2c_master_read_byte(cmd, data, I2C_MASTER_NACK);
-    i2c_master_stop(cmd);
-
-    esp_err_t ret = i2c_master_cmd_begin(lis_i2c_port, cmd, pdMS_TO_TICKS(1000));
-    i2c_cmd_link_delete(cmd);
+    // Use transmit_receive for write-then-read operation
+    esp_err_t ret = i2c_master_transmit_receive(lis_dev_handle, &reg, 1, data, 1, 1000);
 
     xSemaphoreGive(i2c_mutex);
 
@@ -107,9 +100,11 @@ static esp_err_t lis3dhtr_read_reg(uint8_t reg, uint8_t *data) {
     return ret;
 }
 
-esp_err_t lis3dhtr_init(i2c_port_t port, uint8_t addr) {
-    lis_i2c_port = port;
-    lis_i2c_addr = addr;
+esp_err_t lis3dhtr_init(i2c_master_bus_handle_t bus_handle, uint8_t addr) {
+    if (bus_handle == NULL) {
+        ESP_LOGE(TAG, "Invalid bus handle");
+        return ESP_ERR_INVALID_ARG;
+    }
 
     // Create I2C mutex if it doesn't exist
     if (i2c_mutex == NULL) {
@@ -120,7 +115,18 @@ esp_err_t lis3dhtr_init(i2c_port_t port, uint8_t addr) {
         }
     }
 
-    esp_err_t ret;
+    // Configure device on the I2C bus
+    i2c_device_config_t dev_cfg = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = addr,
+        .scl_speed_hz = 400000,  // 400kHz
+    };
+
+    esp_err_t ret = i2c_master_bus_add_device(bus_handle, &dev_cfg, &lis_dev_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to add device to I2C bus: %s", esp_err_to_name(ret));
+        return ret;
+    }
 
     // Configure CTRL_REG1: 50Hz data rate, normal mode, XYZ enabled
     ret = lis3dhtr_write_reg(LIS3DHTR_CTRL_REG1, LIS3DHTR_CTRL_REG1_VAL);

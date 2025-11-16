@@ -30,12 +30,8 @@ esp_err_t accel_handler_init(shake_callback_t callback)
     // Store callback function
     shake_callback = callback;
 
-    // Initialize LIS3DHTR accelerometer
-    esp_err_t ret = lis3dhtr_init(I2C_MASTER_NUM, LIS3DHTR_I2C_ADDR);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize LIS3DHTR: %s", esp_err_to_name(ret));
-        return ret;
-    }
+    // NOTE: LIS3DHTR is initialized in main.c before calling this function
+    // No need to re-initialize here
 
     is_initialized = true;
 

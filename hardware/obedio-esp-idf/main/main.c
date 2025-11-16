@@ -14,7 +14,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "nvs_flash.h"
-#include "driver/i2c.h"
+#include "driver/i2c_master.h"
 #include "lwip/sockets.h"
 #include "lwip/netdb.h"
 
@@ -40,6 +40,9 @@ static const char *TAG = "MAIN";
 static bool is_recording = false;
 static int64_t recording_start_time = 0;  // Timestamp when recording started (microseconds)
 
+// I2C bus handle
+static i2c_master_bus_handle_t i2c_bus_handle = NULL;
+
 // UDP logging
 static int udp_log_socket = -1;
 static struct sockaddr_in udp_log_addr;
@@ -60,24 +63,18 @@ static int udp_vprintf(const char *fmt, va_list args);
  */
 static esp_err_t i2c_bus_init(void)
 {
-    i2c_config_t i2c_config = {
-        .mode = I2C_MODE_MASTER,
-        .sda_io_num = I2C_MASTER_SDA_IO,
+    i2c_master_bus_config_t bus_config = {
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .i2c_port = I2C_NUM_0,
         .scl_io_num = I2C_MASTER_SCL_IO,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = I2C_MASTER_FREQ_HZ,
+        .sda_io_num = I2C_MASTER_SDA_IO,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_internal_pullup = true,
     };
 
-    esp_err_t ret = i2c_param_config(I2C_NUM_0, &i2c_config);
+    esp_err_t ret = i2c_new_master_bus(&bus_config, &i2c_bus_handle);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to configure I2C parameters: %s", esp_err_to_name(ret));
-        return ret;
-    }
-
-    ret = i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to install I2C driver: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to create I2C master bus: %s", esp_err_to_name(ret));
         return ret;
     }
 
@@ -429,7 +426,7 @@ void app_main(void)
 
     // Step 6: Initialize MCP23017 (button GPIO expander)
     ESP_LOGI(TAG, "Initializing MCP23017...");
-    ret = mcp23017_init(I2C_NUM_0, MCP23017_I2C_ADDR);
+    ret = mcp23017_init(i2c_bus_handle, MCP23017_I2C_ADDR);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "FATAL: MCP23017 initialization failed!");
         // Flash red LEDs indefinitely to indicate critical failure
@@ -444,7 +441,7 @@ void app_main(void)
 
     // Step 7: Initialize LIS3DHTR (accelerometer)
     ESP_LOGI(TAG, "Initializing LIS3DHTR accelerometer...");
-    ret = lis3dhtr_init(I2C_NUM_0, LIS3DHTR_I2C_ADDR);
+    ret = lis3dhtr_init(i2c_bus_handle, LIS3DHTR_I2C_ADDR);
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "LIS3DHTR initialization failed, continuing without accelerometer");
     } else {

@@ -162,12 +162,8 @@ esp_err_t button_handler_init(button_callback_t callback) {
 
     event_callback = callback;
 
-    // Initialize MCP23017
-    esp_err_t ret = mcp23017_init(I2C_MASTER_NUM, MCP23017_I2C_ADDR);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize MCP23017: %s", esp_err_to_name(ret));
-        return ret;
-    }
+    // NOTE: MCP23017 is initialized in main.c before calling this function
+    // No need to re-initialize here
 
     // Initialize button states
     for (uint8_t i = 0; i < BUTTON_COUNT; i++) {

@@ -10,7 +10,7 @@
 #define MCP23017_H
 
 #include "esp_err.h"
-#include "driver/i2c.h"
+#include "driver/i2c_master.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -21,11 +21,11 @@ extern "C" {
 /**
  * @brief Initialize MCP23017
  *
- * @param port I2C port number
+ * @param bus_handle I2C master bus handle
  * @param addr I2C device address (typically 0x20-0x27)
  * @return ESP_OK on success
  */
-esp_err_t mcp23017_init(i2c_port_t port, uint8_t addr);
+esp_err_t mcp23017_init(i2c_master_bus_handle_t bus_handle, uint8_t addr);
 
 /**
  * @brief Write to MCP23017 register

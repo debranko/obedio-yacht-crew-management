@@ -68,18 +68,20 @@ static uint8_t adpcm_encode_sample(int16_t sample, adpcm_state_t *state)
     }
 
     // Update previous value
+    int32_t new_val = state->valprev;
     if (code & 8) {
-        state->valprev -= vpdiff;
+        new_val -= vpdiff;
     } else {
-        state->valprev += vpdiff;
+        new_val += vpdiff;
     }
 
     // Clamp to 16-bit range
-    if (state->valprev > 32767) {
-        state->valprev = 32767;
-    } else if (state->valprev < -32768) {
-        state->valprev = -32768;
+    if (new_val > 32767) {
+        new_val = 32767;
+    } else if (new_val < -32768) {
+        new_val = -32768;
     }
+    state->valprev = (int16_t)new_val;
 
     // Update step index
     state->index += index_table[code];
@@ -116,18 +118,20 @@ static int16_t adpcm_decode_sample(uint8_t code, adpcm_state_t *state)
     }
 
     // Apply sign
+    int32_t new_val = state->valprev;
     if (code & 8) {
-        state->valprev -= vpdiff;
+        new_val -= vpdiff;
     } else {
-        state->valprev += vpdiff;
+        new_val += vpdiff;
     }
 
     // Clamp to 16-bit range
-    if (state->valprev > 32767) {
-        state->valprev = 32767;
-    } else if (state->valprev < -32768) {
-        state->valprev = -32768;
+    if (new_val > 32767) {
+        new_val = 32767;
+    } else if (new_val < -32768) {
+        new_val = -32768;
     }
+    state->valprev = (int16_t)new_val;
 
     // Update step index
     state->index += index_table[code];

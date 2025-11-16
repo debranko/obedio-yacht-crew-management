@@ -10,7 +10,7 @@
 #define LIS3DHTR_H
 
 #include "esp_err.h"
-#include "driver/i2c.h"
+#include "driver/i2c_master.h"
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -28,11 +28,11 @@ extern "C" {
  * - High resolution mode
  * - X, Y, Z axes enabled
  *
- * @param port I2C port number
+ * @param bus_handle I2C master bus handle
  * @param addr I2C device address (typically 0x18 or 0x19)
  * @return ESP_OK on success
  */
-esp_err_t lis3dhtr_init(i2c_port_t port, uint8_t addr);
+esp_err_t lis3dhtr_init(i2c_master_bus_handle_t bus_handle, uint8_t addr);
 
 /**
  * @brief Read acceleration values from all three axes

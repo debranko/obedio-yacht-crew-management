@@ -89,6 +89,9 @@ CONFIG_NVS_ENCRYPTION=n
 CONFIG_SOC_TOUCH_SENSOR_NUM=14
 CONFIG_SOC_TOUCH_PROXIMITY_CHANNEL_NUM=3
 
+# ==================== I2C ====================
+# I2C deprecation warnings removed - using new i2c_master API
+
 # ==================== I2S (Audio) ====================
 CONFIG_I2S_ISR_IRAM_SAFE=y
 CONFIG_I2S_SUPPRESS_DEPRECATE_WARN=y

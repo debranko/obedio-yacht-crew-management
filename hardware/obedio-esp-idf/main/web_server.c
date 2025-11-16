@@ -113,7 +113,7 @@ static esp_err_t load_config_from_nvs(device_config_t *config)
     // Shake Threshold
     uint32_t shake_thresh_int;
     if (nvs_get_u32(nvs_handle, NVS_KEY_SHAKE_THRESH, &shake_thresh_int) == ESP_OK) {
-        config->shake_threshold = *(float*)&shake_thresh_int;
+        memcpy(&config->shake_threshold, &shake_thresh_int, sizeof(float));
     }
 
     // Touch Threshold
@@ -147,7 +147,8 @@ static esp_err_t save_config_to_nvs(const device_config_t *config)
     nvs_set_u8(nvs_handle, NVS_KEY_LED_BRIGHTNESS, config->led_brightness);
 
     // Save float as u32
-    uint32_t shake_thresh_int = *(uint32_t*)&config->shake_threshold;
+    uint32_t shake_thresh_int;
+    memcpy(&shake_thresh_int, &config->shake_threshold, sizeof(float));
     nvs_set_u32(nvs_handle, NVS_KEY_SHAKE_THRESH, shake_thresh_int);
 
     nvs_set_u8(nvs_handle, NVS_KEY_TOUCH_THRESH, config->touch_threshold);

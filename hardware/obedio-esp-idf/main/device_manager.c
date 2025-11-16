@@ -27,10 +27,13 @@ extern esp_err_t led_set_all(uint8_t r, uint8_t g, uint8_t b);
 extern esp_err_t led_clear(void);
 
 // MCP23017 I2C helper functions (minimal implementation for factory reset check)
-#include "driver/i2c.h"
+#include "driver/i2c_master.h"
 
 #define MCP23017_GPIOA      0x12  // GPIO register A
 #define MCP23017_IODIRA     0x00  // I/O direction register A
+
+static i2c_master_bus_handle_t temp_bus_handle = NULL;
+static i2c_master_dev_handle_t temp_dev_handle = NULL;
 
 static esp_err_t mcp23017_read_gpio(uint8_t *gpio_state);
 static esp_err_t mcp23017_set_direction(uint8_t direction);
@@ -268,25 +271,34 @@ esp_err_t device_manager_check_factory_reset_button(void)
 {
     ESP_LOGI(TAG, "Checking for factory reset button press");
 
-    // Initialize I2C for MCP23017 communication
-    i2c_config_t conf = {
-        .mode = I2C_MODE_MASTER,
-        .sda_io_num = I2C_MASTER_SDA_IO,
+    // Initialize I2C master bus for MCP23017 communication
+    i2c_master_bus_config_t bus_config = {
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .i2c_port = I2C_MASTER_NUM,
         .scl_io_num = I2C_MASTER_SCL_IO,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = I2C_MASTER_FREQ_HZ,
+        .sda_io_num = I2C_MASTER_SDA_IO,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_internal_pullup = true,
     };
 
-    esp_err_t err = i2c_param_config(I2C_MASTER_NUM, &conf);
+    esp_err_t err = i2c_new_master_bus(&bus_config, &temp_bus_handle);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "I2C config failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "I2C new master bus failed: %s", esp_err_to_name(err));
         return err;
     }
 
-    err = i2c_driver_install(I2C_MASTER_NUM, conf.mode, 0, 0, 0);
+    // Add MCP23017 device to the bus
+    i2c_device_config_t dev_cfg = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = MCP23017_I2C_ADDR,
+        .scl_speed_hz = I2C_MASTER_FREQ_HZ,
+    };
+
+    err = i2c_master_bus_add_device(temp_bus_handle, &dev_cfg, &temp_dev_handle);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "I2C driver install failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "I2C add device failed: %s", esp_err_to_name(err));
+        i2c_del_master_bus(temp_bus_handle);
+        temp_bus_handle = NULL;
         return err;
     }
 
@@ -294,7 +306,10 @@ esp_err_t device_manager_check_factory_reset_button(void)
     err = mcp23017_set_direction(0xFF);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Failed to configure MCP23017");
-        i2c_driver_delete(I2C_MASTER_NUM);
+        i2c_master_bus_rm_device(temp_dev_handle);
+        i2c_del_master_bus(temp_bus_handle);
+        temp_dev_handle = NULL;
+        temp_bus_handle = NULL;
         return ESP_OK;  // Continue boot even if MCP23017 not responding
     }
 
@@ -303,7 +318,10 @@ esp_err_t device_manager_check_factory_reset_button(void)
     err = mcp23017_read_gpio(&gpio_state);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Failed to read MCP23017 GPIO");
-        i2c_driver_delete(I2C_MASTER_NUM);
+        i2c_master_bus_rm_device(temp_dev_handle);
+        i2c_del_master_bus(temp_bus_handle);
+        temp_dev_handle = NULL;
+        temp_bus_handle = NULL;
         return ESP_OK;
     }
 
@@ -312,7 +330,10 @@ esp_err_t device_manager_check_factory_reset_button(void)
 
     if (!button_pressed) {
         ESP_LOGI(TAG, "Factory reset button not pressed");
-        i2c_driver_delete(I2C_MASTER_NUM);
+        i2c_master_bus_rm_device(temp_dev_handle);
+        i2c_del_master_bus(temp_bus_handle);
+        temp_dev_handle = NULL;
+        temp_bus_handle = NULL;
         return ESP_OK;
     }
 
@@ -332,7 +353,10 @@ esp_err_t device_manager_check_factory_reset_button(void)
         if (err != ESP_OK || !(gpio_state & 0x01)) {
             ESP_LOGI(TAG, "Factory reset cancelled (button released)");
             led_clear();
-            i2c_driver_delete(I2C_MASTER_NUM);
+            i2c_master_bus_rm_device(temp_dev_handle);
+            i2c_del_master_bus(temp_bus_handle);
+            temp_dev_handle = NULL;
+            temp_bus_handle = NULL;
             return ESP_OK;
         }
 
@@ -370,7 +394,10 @@ esp_err_t device_manager_check_factory_reset_button(void)
     vTaskDelay(pdMS_TO_TICKS(500));
     led_clear();
 
-    i2c_driver_delete(I2C_MASTER_NUM);
+    i2c_master_bus_rm_device(temp_dev_handle);
+    i2c_del_master_bus(temp_bus_handle);
+    temp_dev_handle = NULL;
+    temp_bus_handle = NULL;
 
     // Perform factory reset
     device_manager_factory_reset();
@@ -422,10 +449,7 @@ bool device_manager_validate_config(const device_config_t *config)
     }
 
     // Validate numeric ranges
-    if (config->led_brightness > 255) {
-        ESP_LOGW(TAG, "LED brightness out of range");
-        return false;
-    }
+    // Note: led_brightness is uint8_t (0-255), so no upper bound check needed
 
     if (config->shake_threshold <= 0 || config->shake_threshold > 10.0f) {
         ESP_LOGW(TAG, "Shake threshold out of range");
@@ -471,34 +495,21 @@ esp_err_t device_manager_get_default_config(device_config_t *config)
 // MCP23017 I2C helper functions
 static esp_err_t mcp23017_write_register(uint8_t reg, uint8_t value)
 {
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (MCP23017_I2C_ADDR << 1) | I2C_MASTER_WRITE, true);
-    i2c_master_write_byte(cmd, reg, true);
-    i2c_master_write_byte(cmd, value, true);
-    i2c_master_stop(cmd);
+    if (temp_dev_handle == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
 
-    esp_err_t err = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, pdMS_TO_TICKS(100));
-    i2c_cmd_link_delete(cmd);
-
-    return err;
+    uint8_t write_buf[2] = {reg, value};
+    return i2c_master_transmit(temp_dev_handle, write_buf, sizeof(write_buf), 100);
 }
 
 static esp_err_t mcp23017_read_register(uint8_t reg, uint8_t *value)
 {
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (MCP23017_I2C_ADDR << 1) | I2C_MASTER_WRITE, true);
-    i2c_master_write_byte(cmd, reg, true);
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (MCP23017_I2C_ADDR << 1) | I2C_MASTER_READ, true);
-    i2c_master_read_byte(cmd, value, I2C_MASTER_NACK);
-    i2c_master_stop(cmd);
+    if (temp_dev_handle == NULL || value == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
 
-    esp_err_t err = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, pdMS_TO_TICKS(100));
-    i2c_cmd_link_delete(cmd);
-
-    return err;
+    return i2c_master_transmit_receive(temp_dev_handle, &reg, 1, value, 1, 100);
 }
 
 static esp_err_t mcp23017_set_direction(uint8_t direction)
