@@ -388,13 +388,17 @@ export function ButtonSimulatorWidget() {
     }
   };
 
-  // Stop recording and transcribe
+  // Stop recording and upload to server (like ESP32 does)
   const stopRecording = async () => {
-    return new Promise<{ transcript: string | null; audioUrl: string | null }>((resolve) => {
+    return new Promise<{
+      transcript: string | null;
+      audioUrl: string | null;
+      serviceRequestId: string | null;
+    }>((resolve) => {
       const mediaRecorder = mediaRecorderRef.current;
       
       if (!mediaRecorder || mediaRecorder.state === 'inactive') {
-        resolve({ transcript: null, audioUrl: null });
+        resolve({ transcript: null, audioUrl: null, serviceRequestId: null });
         return;
       }
 
@@ -404,23 +408,19 @@ export function ButtonSimulatorWidget() {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         console.log('Audio blob size:', audioBlob.size, 'bytes');
 
-        // Create audio URL for playback
-        const audioUrl = URL.createObjectURL(audioBlob);
-        console.log('🎵 Audio URL created:', audioUrl);
-
         // Stop all tracks
         mediaRecorder.stream.getTracks().forEach(track => track.stop());
 
-        // Transcribe audio
+        // Upload audio to server (permanent storage + auto-create service request)
         try {
           setIsTranscribing(true);
-          const transcript = await transcribeAudio(audioBlob, recordingDuration);
+          const result = await uploadAudioToServer(audioBlob, recordingDuration);
           setIsTranscribing(false);
-          resolve({ transcript, audioUrl });
+          resolve(result);
         } catch (error) {
           setIsTranscribing(false);
-          console.error('Transcription failed:', error);
-          resolve({ transcript: null, audioUrl });
+          console.error('Audio upload failed:', error);
+          resolve({ transcript: null, audioUrl: null, serviceRequestId: null });
         }
       };
 
@@ -428,50 +428,67 @@ export function ButtonSimulatorWidget() {
     });
   };
 
-  // Send audio to backend for transcription
-  const transcribeAudio = async (audioBlob: Blob, duration: number): Promise<string | null> => {
+  // Upload audio to server for permanent storage, transcription, and auto-service-request
+  const uploadAudioToServer = async (
+    audioBlob: Blob,
+    duration: number
+  ): Promise<{
+    transcript: string | null;
+    audioUrl: string | null;
+    serviceRequestId: string | null;
+  }> => {
     try {
       const formData = new FormData();
       formData.append('audio', audioBlob, 'recording.webm');
       formData.append('duration', duration.toFixed(2));
+      
+      // Add location info if available
+      if (selectedLocation) {
+        formData.append('locationId', selectedLocation);
+      }
 
-      console.log('📤 Sending audio to backend for transcription...');
+      console.log('📤 Uploading audio to server (like ESP32)...');
 
-      // Use relative path to leverage Vite proxy (same-origin for cookie support)
-      const response = await fetch('/api/transcribe', {
+      const response = await fetch('/api/upload/upload-audio', {
         method: 'POST',
         body: formData
       });
 
       if (!response.ok) {
-        throw new Error('Transcription failed');
+        throw new Error('Audio upload failed');
       }
 
       const data = await response.json();
 
-      // Backend returns { success, transcript, translation, language, duration }
-      // We use TRANSLATION (English) for crew to read, but keep original AUDIO
-      const englishText = data.translation || data.transcript; // Fallback to transcript if already English
+      if (data.success) {
+        const englishText = data.data.translation || data.data.transcript;
+        const audioUrl = data.data.audioUrl;
 
-      if (data.success && englishText) {
-        console.log('✅ Transcription successful:', {
-          original: data.transcript,
-          english: englishText,
-          language: data.language
+        console.log('✅ Audio uploaded successfully:', {
+          audioUrl,
+          transcript: data.data.transcript,
+          translation: englishText,
+          language: data.data.language
         });
+
         toast.success('Voice message transcribed!', {
-          description: englishText.substring(0, 100)
+          description: englishText ? englishText.substring(0, 100) : 'Audio saved'
         });
-        return englishText; // Return ENGLISH translation for crew
+
+        return {
+          transcript: englishText,
+          audioUrl,
+          serviceRequestId: null  // Backend no longer creates request
+        };
       }
 
-      return null;
+      return { transcript: null, audioUrl: null, serviceRequestId: null };
     } catch (error) {
-      console.error('Transcription error:', error);
-      toast.error('Failed to transcribe audio', {
-        description: 'Using fallback mode'
+      console.error('Audio upload error:', error);
+      toast.error('Failed to upload audio', {
+        description: 'Please try again'
       });
-      return null;
+      return { transcript: null, audioUrl: null, serviceRequestId: null };
     }
   };
 
@@ -508,13 +525,14 @@ export function ButtonSimulatorWidget() {
       setIsRecording(false);
       
       if (recordingDuration > 0.3) {
-        // Stop recording and get transcript + audio URL
+        // Upload audio to server to get permanent URL and transcript
         const { transcript, audioUrl } = await stopRecording();
         
-        // Use real transcript or fallback (plain text only, no formatting)
+        // ALWAYS publish MQTT after getting audio URL (let backend MQTT handler create service request)
         const voiceMessage = transcript || "Voice Message";
-        
         generateServiceRequest("main", voiceMessage, true, recordingDuration, 'normal', audioUrl || undefined);
+      } else {
+        toast.error("Recording too short");
       }
       setRecordingDuration(0);
     } else {

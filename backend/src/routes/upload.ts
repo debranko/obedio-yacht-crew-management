@@ -148,8 +148,8 @@ router.post('/upload-audio', audioUpload.single('audio'), async (req, res) => {
     const locationId = req.body.locationId || null;
     const priority = req.body.priority || 'normal';
 
-    // Generate audio URL for access
-    const audioUrl = `/uploads/audio/${req.file.filename}`;
+    // Generate audio URL for access (full backend URL so frontend can load it)
+    const audioUrl = `http://localhost:8080/uploads/audio/${req.file.filename}`;
 
     let transcript = null;
     let translation = null;
@@ -203,110 +203,8 @@ router.post('/upload-audio', audioUpload.single('audio'), async (req, res) => {
       translation = transcript;
     }
 
-    // STEP 2: Create service request with voice transcript
-    let serviceRequest = null;
-    let device = null;
-    let guest = null;
-
-    try {
-      // Find device if deviceId provided
-      if (deviceId) {
-        device = await prisma.device.findUnique({
-          where: { deviceId },
-          include: { location: true }
-        });
-
-        if (!device) {
-          console.warn(`⚠️ Device ${deviceId} not found - creating anonymous request`);
-        }
-      }
-
-      // Find guest for the location
-      const effectiveLocationId = locationId || device?.locationId;
-      if (effectiveLocationId) {
-        guest = await prisma.guest.findFirst({
-          where: { locationId: effectiveLocationId },
-          orderBy: { createdAt: 'desc' }
-        });
-      }
-
-      // Build voice notes with transcript and translation
-      let voiceNotes = `Voice Message (${detectedLanguage || 'unknown'} language):\n`;
-      voiceNotes += `Original: "${transcript}"\n`;
-      if (translation && translation !== transcript) {
-        voiceNotes += `English: "${translation}"\n`;
-      }
-      voiceNotes += `\nAudio: ${audioUrl}`;
-      if (device) {
-        voiceNotes += `\n\nDevice: ${device.name || deviceId}`;
-        voiceNotes += `\nLocation: ${device.location?.name || 'Unknown'}`;
-      }
-
-      // Create service request
-      serviceRequest = await prisma.serviceRequest.create({
-        data: {
-          requestType: ServiceRequestType.voice,
-          priority: priority as any,
-          status: 'pending',
-          voiceTranscript: transcript,
-          notes: voiceNotes,
-          guestName: guest ? `${guest.firstName} ${guest.lastName}` : 'Guest',
-          guestCabin: device?.location?.name || 'Unknown',
-          ...(guest?.id && {
-            guest: { connect: { id: guest.id } }
-          }),
-          ...(effectiveLocationId && {
-            location: { connect: { id: effectiveLocationId } }
-          })
-        },
-        include: {
-          guest: true,
-          location: true,
-        }
-      });
-
-      console.log('✅ Service request created with voice transcript:', serviceRequest.id);
-
-      // Log to activity log
-      await prisma.activityLog.create({
-        data: {
-          type: 'device',
-          action: 'Voice Message',
-          details: `Voice message received from ${guest ? guest.firstName + ' ' + guest.lastName : 'Guest'} at ${device?.location?.name || 'Unknown'}. Transcript: "${transcript?.substring(0, 100)}${transcript && transcript.length > 100 ? '...' : ''}"`,
-          locationId: effectiveLocationId,
-          guestId: guest?.id,
-          deviceId: device?.id,
-          metadata: JSON.stringify({
-            audioUrl,
-            transcript,
-            translation,
-            language: detectedLanguage,
-            requestId: serviceRequest.id,
-            fileSize: req.file.size
-          })
-        }
-      });
-
-      // Emit WebSocket event for real-time frontend update
-      const io = websocketService.getIO();
-      if (io) {
-        console.log('📡 Emitting service-request:created via WebSocket');
-        io.emit('service-request:created', serviceRequest);
-      }
-
-      // Notify crew watches via MQTT
-      await mqttService.notifyAssignedCrewWatch(
-        serviceRequest,
-        device?.location?.name || 'Unknown',
-        guest
-      );
-
-    } catch (serviceRequestError: any) {
-      console.error('⚠️ Failed to create service request:', serviceRequestError.message);
-      // Continue - audio and transcription still successful
-    }
-
-    // STEP 3: Return response to ESP32
+    // STEP 2: Return response (audio saved + transcribed)
+    // Service request will be created by MQTT handler when widget publishes MQTT message
     res.json(apiSuccess({
       audioUrl,
       filename: req.file.filename,
@@ -315,11 +213,6 @@ router.post('/upload-audio', audioUpload.single('audio'), async (req, res) => {
       translation: translation,
       language: detectedLanguage,
       duration: req.body.duration ? parseFloat(req.body.duration) : null,
-      serviceRequest: serviceRequest ? {
-        id: serviceRequest.id,
-        status: serviceRequest.status,
-        requestType: serviceRequest.requestType
-      } : null,
       message: 'Audio uploaded and transcribed successfully'
     }));
 
