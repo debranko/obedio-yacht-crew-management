@@ -316,6 +316,21 @@ void app_main(void)
     ESP_LOGI(TAG, "  Hardware Version: %s", HARDWARE_VERSION);
     ESP_LOGI(TAG, "===========================================");
 
+    // CRITICAL: Validate OTA update IMMEDIATELY on boot (before WiFi, within watchdog timeout)
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    esp_ota_img_states_t ota_state;
+    if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK) {
+        if (ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
+            ESP_LOGI(TAG, "⚠️  PENDING_VERIFY state - validating OTA update NOW (before WiFi)");
+            esp_err_t mark_ret = esp_ota_mark_app_valid_cancel_rollback();
+            if (mark_ret == ESP_OK) {
+                ESP_LOGI(TAG, "✅ OTA validated successfully - rollback canceled!");
+            } else {
+                ESP_LOGE(TAG, "❌ OTA validation failed: %s", esp_err_to_name(mark_ret));
+            }
+        }
+    }
+
     // Step 1: Initialize NVS flash
     ESP_LOGI(TAG, "Initializing NVS flash...");
     ret = nvs_flash_init();
@@ -422,23 +437,6 @@ void app_main(void)
             ESP_LOGI(TAG, "Connect to WiFi network and visit http://192.168.4.1 to configure");
         } else {
             ESP_LOGI(TAG, "WiFi initialized in STA mode");
-
-            // Validate OTA update immediately after WiFi connects
-            // ESP-IDF docs: "new firmware connecting to Wi-Fi network is a good checkpoint"
-            // CRITICAL: Must happen as early as possible to prevent rollback
-            const esp_partition_t *running = esp_ota_get_running_partition();
-            esp_ota_img_states_t ota_state;
-            if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK) {
-                if (ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
-                    ESP_LOGI(TAG, "⚠️  PENDING_VERIFY state detected - validating OTA update NOW");
-                    esp_err_t mark_ret = esp_ota_mark_app_valid_cancel_rollback();
-                    if (mark_ret == ESP_OK) {
-                        ESP_LOGI(TAG, "✅ OTA update validated - rollback canceled!");
-                    } else {
-                        ESP_LOGE(TAG, "❌ Failed to validate OTA: %s", esp_err_to_name(mark_ret));
-                    }
-                }
-            }
 
             // Initialize UDP logging for wireless debugging
             ESP_LOGI(TAG, "Enabling wireless UDP logging...");
