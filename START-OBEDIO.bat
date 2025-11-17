@@ -99,17 +99,17 @@ echo ========================================
 echo    STARTUP COMPLETE!
 echo ========================================
 echo.
-echo MQTT Broker:  mqtt://10.10.0.207:1883 (WebSocket: ws://10.10.0.207:9001)
-echo Backend API:  http://10.10.0.207:8080/api
-echo MQTT Monitor: http://10.10.0.207:8888
-echo Frontend App: http://10.10.0.207:5173
+echo MQTT Broker:  mqtt://100.105.189.77:1883 (WebSocket: ws://100.105.189.77:9001)
+echo Backend API:  http://100.105.189.77:8080/api
+echo MQTT Monitor: http://100.105.189.77:8888
+echo Frontend App: http://100.105.189.77:5173
 echo Database:     PostgreSQL (active)
 echo.
 echo Opening web app in 3 seconds...
 timeout /t 3 /nobreak >nul
 
 REM Open browser
-start http://10.10.0.207:5173
+start http://100.105.189.77:5173
 
 echo.
 echo ========================================

@@ -357,6 +357,7 @@ class MQTTService {
           guestName: guest ? `${guest.firstName} ${guest.lastName}` : 'Guest',
           guestCabin: device.location?.name || 'Unknown',
           voiceTranscript: message.voiceTranscript || null,
+          voiceAudioUrl: message.audioUrl || null, // CRITICAL FIX: Save audio URL from ESP32/simulator
         },
         include: {
           guest: true,
@@ -856,7 +857,8 @@ class MQTTService {
           guest: guest ? `${guest.firstName} ${guest.lastName}` : 'Guest',
           priority: serviceRequest.priority,
           timestamp: new Date().toISOString(),
-          voiceTranscript: serviceRequest.voiceTranscript || null
+          voiceTranscript: serviceRequest.voiceTranscript || null,
+          voiceAudioUrl: serviceRequest.voiceAudioUrl || null
         };
 
         this.publish(notificationTopic, notification);
@@ -949,11 +951,11 @@ class MQTTService {
         data: {
           type: 'service_request',
           action: 'Request Accepted',
-          details: `${watch.crewmember.name} accepted service request from ${serviceRequest.guest ? serviceRequest.guest.firstName + ' ' + serviceRequest.guest.lastName : serviceRequest.guestName || 'Guest'} at ${serviceRequest.location?.name || serviceRequest.guestCabin || 'Unknown'}`,
-          userId: watch.crewmember.userId,
+          details: `${crewMember.name} accepted service request from ${serviceRequest.guest ? serviceRequest.guest.firstName + ' ' + serviceRequest.guest.lastName : serviceRequest.guestName || 'Guest'} at ${serviceRequest.location?.name || serviceRequest.guestCabin || 'Unknown'}`,
+          userId: crewMember.userId,
           locationId: serviceRequest.locationId,
           guestId: serviceRequest.guestId,
-          deviceId: watch.id,
+          deviceId: watch?.id,
           metadata: JSON.stringify({
             requestId: serviceRequest.id,
             responseTimeMs: responseTime,
@@ -972,7 +974,7 @@ class MQTTService {
       this.publish(this.TOPICS.SERVICE_UPDATE, {
         requestId,
         status: 'serving',
-        assignedTo: watch.crewmember.name,
+        assignedTo: crewMember.name,
         acknowledgedAt: new Date().toISOString()
       });
 

@@ -180,9 +180,9 @@ cd backend
 start "Prisma Studio" cmd /k "npx prisma studio"
 cd..
 timeout /t 3 /nobreak >nul
-start http://10.10.0.207:5555
+start http://100.105.189.77:5555
 echo.
-echo Prisma Studio opened at http://10.10.0.207:5555
+echo Prisma Studio opened at http://100.105.189.77:5555
 echo.
 pause
 goto menu
@@ -208,7 +208,7 @@ goto menu
 :open_browser
 cls
 echo Opening Web App...
-start http://10.10.0.207:5173
+start http://100.105.189.77:5173
 echo.
 if "%FRONTEND_STATUS%"=="OFFLINE" (
     echo WARNING: Frontend server is not running!
@@ -221,7 +221,7 @@ goto menu
 :mqtt_monitor
 cls
 echo Opening MQTT Monitor Dashboard...
-start http://10.10.0.207:8888
+start http://100.105.189.77:8888
 echo.
 if "%MQTT_STATUS%"=="OFFLINE" (
     echo WARNING: MQTT Broker is not running!
@@ -398,7 +398,7 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4 Address"') do (
 echo.
 echo ========================================
 echo.
-set /p NEW_IP="Enter new IP address (e.g., 10.10.0.207): "
+set /p NEW_IP="Enter new IP address (e.g., 100.105.189.77): "
 
 REM Validate IP format (basic check)
 echo %NEW_IP% | findstr /r "^[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*$" >nul

@@ -194,7 +194,7 @@ async function startServer() {
 📍 Server Details:
    • Host: 0.0.0.0:${PORT} (accessible from network)
    • Local: localhost:${PORT}
-   • Network: 10.10.0.207:${PORT}
+   • Network: 100.105.189.77:${PORT}
    • Environment: ${process.env.NODE_ENV || 'development'}
 
 🌐 Access URLs:

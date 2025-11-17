@@ -19,7 +19,8 @@ import {
   UtensilsCrossed,
   Wine,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Cog
 } from "lucide-react";
 import { motion } from "motion/react";
 import { ServiceRequest } from "../contexts/AppDataContext";

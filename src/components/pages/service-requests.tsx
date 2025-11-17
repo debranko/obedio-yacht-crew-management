@@ -395,15 +395,34 @@ export function ServiceRequestsPage({
       return;
     }
 
-    // In production, this would play the actual audio file
-    // For now, just simulate play state
-    setPlayingAudio(requestId);
-    toast.info('Playing voice message...');
-    
-    // Simulate audio playback
-    setTimeout(() => {
+    // Stop currently playing audio if any
+    if (playingAudio) {
       setPlayingAudio(null);
-    }, 3000);
+    }
+
+    // Create audio element and play
+    const audio = new Audio(audioUrl);
+    setPlayingAudio(requestId);
+    
+    audio.onended = () => {
+      setPlayingAudio(null);
+    };
+    
+    audio.onerror = (e) => {
+      console.error('Audio playback error:', e);
+      toast.error('Failed to play audio recording');
+      setPlayingAudio(null);
+    };
+    
+    audio.onloadeddata = () => {
+      toast.success('Playing voice message...');
+    };
+    
+    audio.play().catch(err => {
+      console.error('Audio play error:', err);
+      toast.error('Failed to play audio. Please check the audio file.');
+      setPlayingAudio(null);
+    });
   };
 
   const getPriorityColor = (priority: string) => {
@@ -640,11 +659,24 @@ export function ServiceRequestsPage({
                         {/* Voice Transcript - LARGE & PROMINENT */}
                         {request.voiceTranscript && (
                           <div className="mb-6 p-6 bg-gradient-to-br from-primary/10 via-primary/5 to-background rounded-xl border-2 border-primary/30 shadow-lg">
-                            <div className="flex items-start gap-3 mb-3">
-                              <MessageSquare className={`${isFullscreen ? 'h-7 w-7' : 'h-6 w-6'} text-primary mt-1`} />
-                              <p className={`${isFullscreen ? 'text-lg' : 'text-base'} font-semibold text-primary`}>
-                                Voice Transcript
-                              </p>
+                            <div className="flex items-start justify-between gap-3 mb-3">
+                              <div className="flex items-start gap-3">
+                                <MessageSquare className={`${isFullscreen ? 'h-7 w-7' : 'h-6 w-6'} text-primary mt-1`} />
+                                <p className={`${isFullscreen ? 'text-lg' : 'text-base'} font-semibold text-primary`}>
+                                  Voice Transcript
+                                </p>
+                              </div>
+                              {request.voiceAudioUrl && (
+                                <Button
+                                  size={isFullscreen ? 'default' : 'sm'}
+                                  variant="outline"
+                                  onClick={() => handlePlayAudio(request.id, request.voiceAudioUrl)}
+                                  className={`gap-2 ${playingAudio === request.id ? 'animate-pulse' : ''}`}
+                                >
+                                  <Volume2 className={`${isFullscreen ? 'h-5 w-5' : 'h-4 w-4'}`} />
+                                  {playingAudio === request.id ? 'Playing...' : 'Play Audio'}
+                                </Button>
+                              )}
                             </div>
                             <p className={`${isFullscreen ? 'text-3xl' : 'text-2xl'} font-medium leading-relaxed pl-10 text-foreground`}>
                               "{request.voiceTranscript}"

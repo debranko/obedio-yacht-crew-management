@@ -131,13 +131,17 @@ export function ButtonSimulatorPage() {
     }
   };
 
-  // Stop recording and transcribe
+  // Stop recording and upload to server (like ESP32 does)
   const stopRecording = async () => {
-    return new Promise<{ transcript: string | null; audioUrl: string | null }>((resolve) => {
+    return new Promise<{
+      transcript: string | null;
+      audioUrl: string | null;
+      serviceRequestId: string | null;
+    }>((resolve) => {
       const mediaRecorder = mediaRecorderRef.current;
       
       if (!mediaRecorder || mediaRecorder.state === 'inactive') {
-        resolve({ transcript: null, audioUrl: null });
+        resolve({ transcript: null, audioUrl: null, serviceRequestId: null });
         return;
       }
 
@@ -147,23 +151,19 @@ export function ButtonSimulatorPage() {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         console.log('Audio blob size:', audioBlob.size, 'bytes');
 
-        // Create audio URL for playback
-        const audioUrl = URL.createObjectURL(audioBlob);
-        console.log('🎵 Audio URL created:', audioUrl);
-
         // Stop all tracks
         mediaRecorder.stream.getTracks().forEach(track => track.stop());
 
-        // Transcribe audio
+        // Upload audio to server (permanent storage + auto-create service request)
         try {
           setIsTranscribing(true);
-          const transcript = await transcribeAudio(audioBlob, recordingDuration);
+          const result = await uploadAudioToServer(audioBlob, recordingDuration);
           setIsTranscribing(false);
-          resolve({ transcript, audioUrl });
+          resolve(result);
         } catch (error) {
           setIsTranscribing(false);
-          console.error('Transcription failed:', error);
-          resolve({ transcript: null, audioUrl });
+          console.error('Audio upload failed:', error);
+          resolve({ transcript: null, audioUrl: null, serviceRequestId: null });
         }
       };
 
@@ -171,48 +171,69 @@ export function ButtonSimulatorPage() {
     });
   };
 
-  // Send audio to backend for transcription
-  const transcribeAudio = async (audioBlob: Blob, duration: number): Promise<string | null> => {
+  // Upload audio to server for permanent storage, transcription, and auto-service-request
+  const uploadAudioToServer = async (
+    audioBlob: Blob,
+    duration: number
+  ): Promise<{
+    transcript: string | null;
+    audioUrl: string | null;
+    serviceRequestId: string | null;
+  }> => {
     try {
       const formData = new FormData();
       formData.append('audio', audioBlob, 'recording.webm');
       formData.append('duration', duration.toFixed(2));
+      
+      // Add location info if available
+      if (selectedLocation) {
+        formData.append('locationId', selectedLocation);
+      }
 
-      console.log('📤 Sending audio to backend for transcription...');
+      console.log('📤 Uploading audio to server (like ESP32)...');
 
-      const response = await fetch('/api/transcribe', {
+      const response = await fetch('/api/upload/upload-audio', {
         method: 'POST',
         body: formData
       });
 
       if (!response.ok) {
-        throw new Error('Transcription failed');
+        throw new Error('Audio upload failed');
       }
 
       const data = await response.json();
 
-      // Backend returns { success, transcript, translation, language, duration }
-      const englishText = data.translation || data.transcript;
+      if (data.success) {
+        const englishText = data.data.translation || data.data.transcript;
+        const audioUrl = data.data.audioUrl;
+        const requestId = data.data.serviceRequest?.id || null;
 
-      if (data.success && englishText) {
-        console.log('✅ Transcription successful:', {
-          original: data.transcript,
-          english: englishText,
-          language: data.language
+        console.log('✅ Audio uploaded successfully:', {
+          audioUrl,
+          transcript: data.data.transcript,
+          translation: englishText,
+          language: data.data.language,
+          serviceRequestId: requestId
         });
-        toast.success('Voice message transcribed!', {
-          description: englishText.substring(0, 100)
+
+        toast.success('Voice message uploaded!', {
+          description: englishText ? englishText.substring(0, 100) : 'Audio saved'
         });
-        return englishText;
+
+        return {
+          transcript: englishText,
+          audioUrl,
+          serviceRequestId: requestId
+        };
       }
 
-      return null;
+      return { transcript: null, audioUrl: null, serviceRequestId: null };
     } catch (error) {
-      console.error('Transcription error:', error);
-      toast.error('Failed to transcribe audio', {
-        description: 'Using fallback mode'
+      console.error('Audio upload error:', error);
+      toast.error('Failed to upload audio', {
+        description: 'Please try again'
       });
-      return null;
+      return { transcript: null, audioUrl: null, serviceRequestId: null };
     }
   };
 
@@ -353,13 +374,20 @@ export function ButtonSimulatorPage() {
       setIsRecording(false);
       
       if (recordingDuration > 0.3) {
-        // Stop recording and get transcript + audio URL
-        const { transcript, audioUrl } = await stopRecording();
+        // Upload audio to server - backend auto-creates service request
+        const { transcript, audioUrl, serviceRequestId } = await stopRecording();
         
-        // Use real transcript or fallback
-        const voiceMessage = transcript || "Voice Message";
-        
-        generateServiceRequest("main", voiceMessage, true, recordingDuration);
+        if (serviceRequestId) {
+          // Backend successfully created service request
+          console.log('✅ Voice service request created by backend:', serviceRequestId);
+          toast.success('Voice request sent!', {
+            description: transcript || 'Audio uploaded successfully'
+          });
+        } else {
+          // Fallback: create request manually if backend didn't
+          const voiceMessage = transcript || "Voice Message";
+          generateServiceRequest("main", voiceMessage, true, recordingDuration);
+        }
       } else {
         toast.error("Recording too short");
       }

@@ -64,7 +64,7 @@ export default defineConfig({
     // Proxy API requests to backend (fixes auth cookie persistence on refresh)
     proxy: {
       '/api': {
-        target: 'http://10.10.0.207:8080',
+        target: 'http://100.105.189.77:8080',
         changeOrigin: true,
         secure: false,
       }
