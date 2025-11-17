@@ -7,6 +7,9 @@ import mqtt, { MqttClient } from 'mqtt';
 import { prisma } from './db';
 import { Server as SocketIOServer } from 'socket.io';
 import { mqttMonitor } from './mqtt-monitor';
+import { transcribeAudioFile } from './transcription.service';
+import fs from 'fs';
+import path from 'path';
 
 class MQTTService {
   private client: MqttClient | null = null;
@@ -450,10 +453,18 @@ class MQTTService {
    *   timestamp: 1732012345678
    * }
    *
+   * Processing Flow:
+   * 1. Download audio from audioUrl to temp file
+   * 2. Transcribe using OpenAI Whisper (via shared service)
+   * 3. Store English translation in voiceTranscript field
+   * 4. Store original audioUrl in voiceAudioUrl field
+   * 5. Clean up temp file
+   *
    * Creates service request with:
    * - requestType: 'voice'
    * - priority: 'high'
-   * - audioUrl stored in notes or voiceTranscript field
+   * - voiceTranscript: English translation (for crew to read)
+   * - voiceAudioUrl: Original audio file URL
    */
   private async handleButtonVoice(deviceId: string, message: any): Promise<void> {
     console.log(`🎤 Voice message from ${deviceId}:`, message);
@@ -509,11 +520,67 @@ class MQTTService {
       const audioUrl = message.audioUrl || null;
       const duration = message.duration || 0;
 
+      // STEP 1: Download and transcribe audio
+      let transcript = null;
+      let language = 'unknown';
+      let tempFilePath: string | null = null;
+
+      if (audioUrl) {
+        try {
+          console.log('📥 Downloading audio from:', audioUrl);
+
+          // Download audio to temp file
+          const response = await fetch(audioUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to download audio: ${response.statusText}`);
+          }
+
+          const arrayBuffer = await response.arrayBuffer();
+          const audioBuffer = Buffer.from(arrayBuffer);
+          const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+          if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+          }
+
+          tempFilePath = path.join(tempDir, `voice-${Date.now()}.wav`);
+          fs.writeFileSync(tempFilePath, audioBuffer);
+
+          console.log('✅ Audio downloaded to:', tempFilePath);
+
+          // STEP 2: Transcribe using shared service
+          console.log('🎙️ Transcribing audio...');
+          const result = await transcribeAudioFile(tempFilePath);
+
+          transcript = result.translation; // Use ENGLISH translation for crew
+          language = result.language;
+
+          console.log('✅ Transcription complete:', {
+            original: result.transcript,
+            english: result.translation,
+            language: result.language
+          });
+
+        } catch (error) {
+          console.error('❌ Error transcribing voice message:', error);
+          transcript = null; // Continue without transcript
+        } finally {
+          // Clean up temp file
+          if (tempFilePath && fs.existsSync(tempFilePath)) {
+            fs.unlinkSync(tempFilePath);
+            console.log('🗑️ Cleaned up temp file:', tempFilePath);
+          }
+        }
+      }
+
       // Build service notes with voice details
       let notes = `🎤 Voice request from ${device.location?.name || deviceId}`;
       notes += `\n\nVoice Details:`;
       notes += `\n- Audio URL: ${audioUrl || 'Not available'}`;
       notes += `\n- Duration: ${duration}s`;
+      if (transcript) {
+        notes += `\n- Transcript: "${transcript}"`;
+        notes += `\n- Language: ${language}`;
+      }
       notes += `\n- Timestamp: ${new Date(message.timestamp || Date.now()).toISOString()}`;
       notes += `\n\nDevice Details:`;
       notes += `\n- Device ID: ${deviceId}`;
@@ -538,7 +605,8 @@ class MQTTService {
           notes,
           guestName: guest ? `${guest.firstName} ${guest.lastName}` : 'Guest',
           guestCabin: device.location?.name || 'Unknown',
-          voiceTranscript: audioUrl,  // Store audio URL in voiceTranscript field temporarily
+          voiceTranscript: transcript,  // English transcript
+          voiceAudioUrl: audioUrl,      // Original audio URL
         },
         include: {
           guest: true,
@@ -556,6 +624,8 @@ class MQTTService {
             pressType: 'voice',
             audioUrl,
             duration,
+            transcript,
+            language,
             timestamp: message.timestamp,
             locationId: device.locationId,
             guestId: guest?.id,
@@ -572,13 +642,15 @@ class MQTTService {
         data: {
           type: 'device',
           action: 'Voice Message',
-          details: `${guest ? guest.firstName + ' ' + guest.lastName : 'Guest'} sent voice message from ${device.location?.name || 'Unknown'}`,
+          details: `${guest ? guest.firstName + ' ' + guest.lastName : 'Guest'} sent voice message from ${device.location?.name || 'Unknown'}${transcript ? `: "${transcript.substring(0, 100)}${transcript.length > 100 ? '...' : ''}"` : ''}`,
           locationId: device.locationId,
           guestId: guest?.id,
           deviceId: device.id,
           metadata: JSON.stringify({
             audioUrl,
             duration,
+            transcript,
+            language,
             requestId: serviceRequest.id,
             priority: 'high'
           })
@@ -602,6 +674,8 @@ class MQTTService {
         type: 'voice',
         audioUrl,
         duration,
+        transcript,  // Include transcript for watch display
+        language,
         timestamp: new Date().toISOString(),
       });
 

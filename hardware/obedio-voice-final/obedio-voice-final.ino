@@ -33,6 +33,8 @@
 #include <Adafruit_NeoPixel.h>
 #include <ArduinoJson.h>
 #include "driver/i2s.h"
+#include "esp_heap_caps.h"  // For PSRAM allocation
+#include "esp_task_wdt.h"   // For watchdog timer management
 
 // ==================== CONFIGURATION ====================
 
@@ -41,12 +43,12 @@ const char* WIFI_SSID     = "Obedio";
 const char* WIFI_PASSWORD = "BrankomeinBruder:)";
 
 // Backend Server
-const char* BACKEND_HOST = "10.10.0.207";
-const uint16_t BACKEND_PORT = 8080;
-const char* UPLOAD_ENDPOINT = "/api/transcribe";  // FIXED: Use correct endpoint
+const char* BACKEND_HOST = "10.10.0.10";
+const uint16_t BACKEND_PORT = 3001;
+const char* UPLOAD_ENDPOINT = "/api/voice/upload";  // FIXED: Use correct endpoint
 
 // MQTT Broker
-const char* MQTT_HOST = "10.10.0.207";
+const char* MQTT_HOST = "10.10.0.10";
 const uint16_t MQTT_PORT = 1883;
 
 // Device Location (IMPORTANT: Set this for each button!)
@@ -160,34 +162,80 @@ void setup() {
   Serial.begin(115200);
   delay(500);
 
+  // Disable watchdog during setup to prevent resets
+  esp_task_wdt_deinit();
+
   Serial.println("\n\n========================================");
   Serial.println("OBEDIO ESP32-S3 Smart Button - Voice");
   Serial.println("========================================\n");
 
+  // Check PSRAM availability
+  if (psramFound()) {
+    Serial.printf("✅ PSRAM detected: %d bytes (%.1fMB)\n",
+                  ESP.getPsramSize(), ESP.getPsramSize() / 1024.0 / 1024.0);
+    Serial.printf("   Free PSRAM: %d bytes (%.1fMB)\n",
+                  ESP.getFreePsram(), ESP.getFreePsram() / 1024.0 / 1024.0);
+  } else {
+    Serial.println("⚠️  WARNING: PSRAM NOT DETECTED!");
+    Serial.println("   Enable PSRAM in Arduino IDE: Tools → PSRAM → OPI PSRAM");
+  }
+  Serial.println();
+
   // Initialize hardware
   initI2C();
-  initMCP23017();
-  initLEDRing();
-  initI2SSpeaker();
-  initI2SMicrophone();
+  delay(100);
 
-  // Allocate audio buffer
-  audioBuffer = (int16_t*)malloc(MAX_SAMPLES * sizeof(int16_t));
+  initMCP23017();
+  delay(100);
+
+  initLEDRing();
+  delay(100);
+
+  initI2SSpeaker();
+  delay(200);  // Give I2S speaker time to stabilize
+
+  Serial.println("⏳ Initializing I2S Microphone...");
+  initI2SMicrophone();
+  delay(200);  // Give I2S microphone time to stabilize
+
+  // Allocate audio buffer from PSRAM (ESP32-S3R8 has 8MB PSRAM!)
+  Serial.println("⏳ Allocating audio buffer...");
+  audioBuffer = (int16_t*)heap_caps_malloc(MAX_SAMPLES * sizeof(int16_t), MALLOC_CAP_SPIRAM);
   if (audioBuffer == nullptr) {
-    Serial.println("❌ Failed to allocate audio buffer!");
-    ledError();
-    while (true) delay(1000);
+    Serial.println("⚠️  PSRAM allocation failed, trying regular heap...");
+    audioBuffer = (int16_t*)malloc(MAX_SAMPLES * sizeof(int16_t));
+    if (audioBuffer == nullptr) {
+      Serial.println("❌ Failed to allocate audio buffer!");
+      ledError();
+      while (true) delay(1000);
+    }
+    Serial.printf("⚠️  Audio buffer in HEAP: %d bytes\n", MAX_SAMPLES * sizeof(int16_t));
+  } else {
+    Serial.printf("✅ Audio buffer in PSRAM: %d bytes (%.1fKB)\n",
+                  MAX_SAMPLES * sizeof(int16_t),
+                  (MAX_SAMPLES * sizeof(int16_t)) / 1024.0);
   }
-  Serial.printf("✅ Audio buffer allocated: %d bytes\n", MAX_SAMPLES * sizeof(int16_t));
+  delay(100);
 
   // Connect to WiFi and MQTT
+  Serial.println("⏳ Connecting to WiFi...");
   setupWiFi();
+  Serial.println("⏳ Connecting to MQTT...");
   setupMQTT();
 
   // Ready!
   ledFill(0, 255, 0);  // Green
   delay(500);
   ledFill(0, 0, 0);    // Off
+
+  // Re-enable watchdog for loop() monitoring
+  esp_task_wdt_config_t wdt_config = {
+    .timeout_ms = 30000,  // 30 second timeout
+    .idle_core_mask = 0,
+    .trigger_panic = true
+  };
+  esp_task_wdt_init(&wdt_config);
+  esp_task_wdt_add(NULL);  // Add current task to watchdog
 
   Serial.println("\n✅ Firmware ready!");
   Serial.println("📌 Hold T1 to record voice message\n");
@@ -214,6 +262,9 @@ void loop() {
     lastHeartbeat = now;
     publishButtonPress("heartbeat", "status");
   }
+
+  // Reset watchdog timer
+  esp_task_wdt_reset();
 
   delay(10);
 }
@@ -357,6 +408,8 @@ void initLEDRing() {
 }
 
 void initI2SMicrophone() {
+  Serial.println("  → Creating I2S MIC config...");
+
   i2s_config_t mic_config = {
     .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX),
     .sample_rate = SAMPLE_RATE,
@@ -371,6 +424,15 @@ void initI2SMicrophone() {
     .fixed_mclk = 0
   };
 
+  Serial.println("  → Installing I2S MIC driver...");
+  esp_err_t err = i2s_driver_install(I2S_MIC_PORT, &mic_config, 0, NULL);
+  if (err != ESP_OK) {
+    Serial.printf("❌ I2S MIC install error: %d (0x%X)\n", err, err);
+    Serial.println("⚠️  Continuing without microphone...");
+    return;
+  }
+
+  Serial.println("  → Setting I2S MIC pins...");
   i2s_pin_config_t mic_pins = {
     .bck_io_num = MIC_BCLK_PIN,
     .ws_io_num = MIC_WS_PIN,
@@ -378,20 +440,18 @@ void initI2SMicrophone() {
     .data_in_num = MIC_SD_PIN
   };
 
-  esp_err_t err = i2s_driver_install(I2S_MIC_PORT, &mic_config, 0, NULL);
-  if (err != ESP_OK) {
-    Serial.printf("❌ I2S MIC install error: %d\n", err);
-    return;
-  }
-
   err = i2s_set_pin(I2S_MIC_PORT, &mic_pins);
   if (err != ESP_OK) {
-    Serial.printf("❌ I2S MIC pin error: %d\n", err);
+    Serial.printf("❌ I2S MIC pin error: %d (0x%X)\n", err, err);
+    Serial.println("⚠️  Continuing without microphone...");
     return;
   }
 
+  Serial.println("  → Clearing DMA buffer...");
   i2s_zero_dma_buffer(I2S_MIC_PORT);
-  Serial.println("✅ I2S Microphone initialized (16kHz)");
+
+  Serial.printf("✅ I2S Microphone initialized (16kHz, BCK=%d, WS=%d, SD=%d)\n",
+                MIC_BCLK_PIN, MIC_WS_PIN, MIC_SD_PIN);
 }
 
 void initI2SSpeaker() {
@@ -661,71 +721,82 @@ bool uploadAudio(String& audioUrl, String& transcript) {
 
   // Create multipart form data
   String boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
-  String contentType = "multipart/form-data; boundary=" + boundary;
 
-  http.addHeader("Content-Type", contentType);
-
-  // Build multipart body
+  // Build multipart body header
   String header = "--" + boundary + "\r\n";
   header += "Content-Disposition: form-data; name=\"audio\"; filename=\"recording.wav\"\r\n";
   header += "Content-Type: audio/wav\r\n\r\n";
 
   String footer = "\r\n--" + boundary + "--\r\n";
 
-  // Calculate total size
+  // Calculate total payload size
   size_t totalSize = header.length() + 44 + dataSize + footer.length();
 
-  // Send POST request
-  WiFiClient* stream = http.getStreamPtr();
-  http.addHeader("Content-Length", String(totalSize));
+  Serial.printf("📦 Payload size: %d bytes (%.1fKB)\n", totalSize, totalSize / 1024.0);
 
-  http.POST((uint8_t*)nullptr, 0);  // Start POST
-
-  // Send header
-  stream->print(header);
-
-  // Send WAV header
-  stream->write(wavHeader, 44);
-
-  // Send audio data in chunks
-  const size_t chunkSize = 2048;
-  uint8_t* audioData = (uint8_t*)audioBuffer;
-  for (size_t i = 0; i < dataSize; i += chunkSize) {
-    size_t remaining = dataSize - i;
-    size_t toSend = (remaining < chunkSize) ? remaining : chunkSize;
-    stream->write(audioData + i, toSend);
+  // Allocate buffer for complete payload (use PSRAM since we have 8MB!)
+  uint8_t* payload = (uint8_t*)heap_caps_malloc(totalSize, MALLOC_CAP_SPIRAM);
+  if (payload == nullptr) {
+    Serial.println("❌ Failed to allocate payload buffer from PSRAM!");
+    // Try regular heap as fallback
+    payload = (uint8_t*)malloc(totalSize);
+    if (payload == nullptr) {
+      Serial.println("❌ Failed to allocate payload buffer!");
+      http.end();
+      return false;
+    }
   }
 
-  // Send footer
-  stream->print(footer);
+  // Build complete payload in memory
+  size_t offset = 0;
 
-  // Get response
-  int httpCode = http.GET();  // Actually reads response from POST
+  // Copy header
+  memcpy(payload + offset, header.c_str(), header.length());
+  offset += header.length();
+
+  // Copy WAV header
+  memcpy(payload + offset, wavHeader, 44);
+  offset += 44;
+
+  // Copy audio data
+  memcpy(payload + offset, (uint8_t*)audioBuffer, dataSize);
+  offset += dataSize;
+
+  // Copy footer
+  memcpy(payload + offset, footer.c_str(), footer.length());
+
+  // Send POST request with complete payload
+  http.addHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
+  http.addHeader("Content-Length", String(totalSize));
+
+  Serial.println("📤 Sending POST request...");
+  int httpCode = http.POST(payload, totalSize);
+
+  // Free payload buffer immediately
+  free(payload);
 
   bool success = false;
   if (httpCode == 200 || httpCode == 201) {
     String response = http.getString();
     Serial.printf("✅ Upload OK (HTTP %d)\n", httpCode);
-    Serial.println("Response: " + response);
+    Serial.println("📄 Response: " + response);
 
-    // Parse JSON response
-    // Backend returns: {"success": true, "transcript": "...", "translation": "...", "language": "sr"}
+    // Parse JSON response from /api/voice/upload
+    // Backend returns: {"success": true, "url": "http://...", "filename": "...", "size": 123456}
     StaticJsonDocument<1024> doc;
     DeserializationError error = deserializeJson(doc, response);
 
     if (!error) {
       if (doc["success"] == true) {
-        // No audioUrl from backend (audio is not saved)
-        audioUrl = "";  // Empty for now
-
-        // Get English translation (or original transcript if already English)
-        if (doc.containsKey("translation")) {
-          transcript = doc["translation"].as<String>();
-        } else if (doc.containsKey("transcript")) {
-          transcript = doc["transcript"].as<String>();
+        // Get audio URL from backend
+        if (doc.containsKey("url")) {
+          audioUrl = doc["url"].as<String>();
+          Serial.println("🔗 Audio URL: " + audioUrl);
         }
 
-        Serial.println("📝 Transcript: " + transcript);
+        // For now, transcript is empty (will be filled by backend via MQTT later)
+        transcript = "";
+
         success = true;
       }
     } else {
@@ -733,7 +804,10 @@ bool uploadAudio(String& audioUrl, String& transcript) {
     }
   } else {
     Serial.printf("❌ Upload failed: HTTP %d\n", httpCode);
-    Serial.println(http.getString());
+    String errorResponse = http.getString();
+    if (errorResponse.length() > 0) {
+      Serial.println("Error response: " + errorResponse);
+    }
   }
 
   http.end();

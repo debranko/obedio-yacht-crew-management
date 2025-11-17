@@ -148,7 +148,7 @@ static void button_press_callback(const char *button, press_type_t type)
         // Record and upload audio
         char audio_url[256] = {0};
         esp_err_t ret = audio_record_and_upload(
-            "http://10.10.0.10:3001/api/voice/upload",
+            "http://10.10.0.10:8080/api/voice/upload",
             audio_url,
             sizeof(audio_url),
             duration_ms
