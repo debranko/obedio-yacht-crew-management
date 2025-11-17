@@ -1,0 +1,47 @@
+idf_component_register(
+    SRCS
+        "main.c"
+        "wifi_manager.c"
+        "mqtt_handler.c"
+        "button_handler.c"
+        "touch_handler.c"
+        "accel_handler.c"
+        "led_controller.c"
+        "audio_recorder.c"
+        "web_server.c"
+        "ota_handler.c"
+        "device_manager.c"
+        "power_manager.c"
+    INCLUDE_DIRS
+        "."
+    REQUIRES
+        driver
+        esp_driver_i2c
+        esp_driver_i2s
+        esp_driver_gpio
+        esp_driver_touch_sens
+        esp_wifi
+        esp_netif
+        esp_http_server
+        mqtt
+        nvs_flash
+        esp_timer
+        esp_adc
+        mdns
+        esp_https_ota
+        app_update
+        spiffs
+        cjson
+        mcp23017
+        lis3dhtr
+        led_effects
+        adpcm_codec
+    EMBED_FILES
+        "../web/index.html"
+        "../web/debug.html"
+        "../web/status.html"
+        "../web/ota.html"
+)
+
+# Allow deprecated API warnings (don't treat them as errors)
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error=cpp)
