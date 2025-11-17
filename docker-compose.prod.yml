@@ -94,8 +94,35 @@ services:
       timeout: 5s
       retries: 5
 
+  # Caddy Reverse Proxy (HTTPS with self-signed certificate)
+  caddy:
+    image: caddy:2-alpine
+    container_name: obedio-caddy
+    restart: unless-stopped
+    depends_on:
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+      - "2019:2019"  # Caddy admin API & health check
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - obedio-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:2019/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
 volumes:
   dbdata:
+    driver: local
+  caddy-data:
+    driver: local
+  caddy-config:
     driver: local
 
 networks:
