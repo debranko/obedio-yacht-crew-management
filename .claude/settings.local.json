@@ -15,7 +15,9 @@
       "Bash(\"C:\\Users\\debra\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" -s adb-C101X3B220410-Q2LfOc._adb-tls-connect._tcp install \"c:\\Users\\debra\\OneDrive\\Desktop\\Luxury Minimal Web App Design\\ObedioWear\\app\\build\\outputs\\apk\\debug\\app-debug.apk\")",
       "Bash(git add:*)",
       "Bash(\"C:\\Users\\debra\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" -s adb-C101X3B220410-Q2LfOc._adb-tls-connect._tcp shell \"appops set com.example.obediowear SYSTEM_ALERT_WINDOW allow\")",
-      "Bash(powershell -Command \"cd ''c:\\Users\\debra\\OneDrive\\Desktop\\Luxury Minimal Web App Design\\ObedioWear''; .\\gradlew.bat assembleDebug\")"
+      "Bash(powershell -Command \"cd ''c:\\Users\\debra\\OneDrive\\Desktop\\Luxury Minimal Web App Design\\ObedioWear''; .\\gradlew.bat assembleDebug\")",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -Command \"& { . ''C:\\Espressif\\frameworks\\esp-idf-v5.3.1\\export.ps1''; Set-Location ''c:\\Users\\debra\\OneDrive\\Desktop\\OBEDIO Final\\hardware\\obedio-esp-idf''; Write-Host ''Cleaning build directory...'' -ForegroundColor Yellow; Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue; Write-Host ''Building firmware...'' -ForegroundColor Green; idf.py build; if ($LASTEXITCODE -eq 0) { Write-Host ''Build successful! Flashing to COM23...'' -ForegroundColor Green; idf.py -p COM23 flash monitor } else { Write-Host ''Build failed!'' -ForegroundColor Red } }\")",
+      "Bash(if exist build rmdir /s /q build)"
     ],
     "deny": [],
     "ask": []

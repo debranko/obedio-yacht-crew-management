@@ -153,6 +153,18 @@ esp_err_t mqtt_app_stop(void);
 esp_err_t mqtt_publish_tasmota_toggle(void);
 
 /**
+ * @brief Publish raw JSON payload to custom topic
+ *
+ * Publishes a raw JSON string to a specified MQTT topic.
+ * Used for custom messages that don't fit standard formats.
+ *
+ * @param topic MQTT topic (e.g., "obedio/button/BTN-XXX/voice")
+ * @param json_payload JSON string payload
+ * @return ESP_OK on success, error code otherwise
+ */
+esp_err_t mqtt_publish_raw(const char *topic, const char *json_payload);
+
+/**
  * @brief Get current LED configuration (RGB and brightness)
  *
  * Retrieves the current LED color and brightness settings from device config.

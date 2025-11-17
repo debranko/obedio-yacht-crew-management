@@ -22,6 +22,7 @@ class MQTTService {
     // Button events
     BUTTON_PRESS: 'obedio/button/+/press',        // obedio/button/{deviceId}/press
     BUTTON_STATUS: 'obedio/button/+/status',      // obedio/button/{deviceId}/status
+    BUTTON_VOICE: 'obedio/button/+/voice',        // obedio/button/{deviceId}/voice (audio upload)
 
     // Service requests
     SERVICE_REQUEST: 'obedio/service/request',     // Publish new requests here
@@ -113,6 +114,7 @@ class MQTTService {
     const topics = [
       this.TOPICS.BUTTON_PRESS,
       this.TOPICS.BUTTON_STATUS,
+      this.TOPICS.BUTTON_VOICE,
       this.TOPICS.DEVICE_REGISTER,
       this.TOPICS.DEVICE_HEARTBEAT,
       this.TOPICS.DEVICE_TELEMETRY,
@@ -153,6 +155,11 @@ class MQTTService {
     // Handle button press
     if (topic.includes('/button/') && topic.endsWith('/press')) {
       await this.handleButtonPress(deviceId, message);
+    }
+
+    // Handle button voice (audio upload from ESP32)
+    else if (topic.includes('/button/') && topic.endsWith('/voice')) {
+      await this.handleButtonVoice(deviceId, message);
     }
 
     // Handle device status
@@ -427,6 +434,190 @@ class MQTTService {
 
     } catch (error) {
       console.error('❌ Error handling button press:', error);
+    }
+  }
+
+  /**
+   * Handle button voice event from ESP32 (audio upload)
+   *
+   * ESP32 Voice Message Format:
+   * {
+   *   deviceId: "BTN-XXXXXX",
+   *   button: "main",
+   *   pressType: "voice",
+   *   audioUrl: "http://10.10.0.10:3001/uploads/voice/voice-1732012345678.wav",
+   *   duration: 3.5,
+   *   timestamp: 1732012345678
+   * }
+   *
+   * Creates service request with:
+   * - requestType: 'voice'
+   * - priority: 'high'
+   * - audioUrl stored in notes or voiceTranscript field
+   */
+  private async handleButtonVoice(deviceId: string, message: any): Promise<void> {
+    console.log(`🎤 Voice message from ${deviceId}:`, message);
+
+    try {
+      // Get device from database
+      let device = await prisma.device.findUnique({
+        where: { deviceId },
+        include: { location: true }
+      });
+
+      if (!device) {
+        console.error(`❌ Voice event from unknown device: ${deviceId} - creating device first`);
+
+        // Auto-create device
+        device = await prisma.device.create({
+          data: {
+            deviceId,
+            name: `Button ${deviceId.slice(-4)}`,
+            type: 'smart_button',
+            status: 'online',
+            batteryLevel: 100,
+            signalStrength: -50,
+            config: {
+              ledEnabled: true,
+              soundEnabled: true,
+              vibrationEnabled: true
+            },
+            firmwareVersion: 'v1.0.0',
+            hardwareVersion: 'ESP32-WROOM-32',
+            lastSeen: new Date()
+          },
+          include: { location: true }
+        });
+
+        console.log(`✅ Device created for voice event: ${device.name}`);
+      }
+
+      // Get guest for the location
+      let guest = null;
+      if (device.locationId) {
+        guest = await prisma.guest.findFirst({
+          where: { locationId: device.locationId },
+          orderBy: { createdAt: 'desc' }
+        });
+      }
+
+      if (!guest && device.locationId) {
+        console.warn(`⚠️ No guest found for location: ${device.location?.name} - creating anonymous voice request`);
+      }
+
+      // Extract audio URL and duration from message
+      const audioUrl = message.audioUrl || null;
+      const duration = message.duration || 0;
+
+      // Build service notes with voice details
+      let notes = `🎤 Voice request from ${device.location?.name || deviceId}`;
+      notes += `\n\nVoice Details:`;
+      notes += `\n- Audio URL: ${audioUrl || 'Not available'}`;
+      notes += `\n- Duration: ${duration}s`;
+      notes += `\n- Timestamp: ${new Date(message.timestamp || Date.now()).toISOString()}`;
+      notes += `\n\nDevice Details:`;
+      notes += `\n- Device ID: ${deviceId}`;
+      notes += `\n- Button: ${message.button || 'main'}`;
+
+      // Create service request with VOICE type and HIGH priority
+      const serviceRequest = await prisma.serviceRequest.create({
+        data: {
+          ...(guest?.id && {
+            guest: {
+              connect: { id: guest.id }
+            }
+          }),
+          ...((device.locationId) && {
+            location: {
+              connect: { id: device.locationId }
+            }
+          }),
+          status: 'pending',
+          priority: 'high',  // Voice requests are HIGH priority
+          requestType: 'voice',
+          notes,
+          guestName: guest ? `${guest.firstName} ${guest.lastName}` : 'Guest',
+          guestCabin: device.location?.name || 'Unknown',
+          voiceTranscript: audioUrl,  // Store audio URL in voiceTranscript field temporarily
+        },
+        include: {
+          guest: true,
+          location: true,
+        }
+      });
+
+      // Log voice event to device logs
+      await prisma.deviceLog.create({
+        data: {
+          deviceId: device.id,
+          eventType: 'voice_message',
+          eventData: {
+            button: message.button || 'main',
+            pressType: 'voice',
+            audioUrl,
+            duration,
+            timestamp: message.timestamp,
+            locationId: device.locationId,
+            guestId: guest?.id,
+            serviceRequestId: serviceRequest.id
+          },
+          severity: 'info'
+        }
+      });
+
+      console.log('✅ Voice service request created:', serviceRequest.id);
+
+      // Log activity: Voice message received
+      await prisma.activityLog.create({
+        data: {
+          type: 'device',
+          action: 'Voice Message',
+          details: `${guest ? guest.firstName + ' ' + guest.lastName : 'Guest'} sent voice message from ${device.location?.name || 'Unknown'}`,
+          locationId: device.locationId,
+          guestId: guest?.id,
+          deviceId: device.id,
+          metadata: JSON.stringify({
+            audioUrl,
+            duration,
+            requestId: serviceRequest.id,
+            priority: 'high'
+          })
+        }
+      });
+
+      // Emit to WebSocket clients
+      if (this.io) {
+        console.log('📡 Emitting WebSocket event: service-request:created (voice) to', this.io.engine.clientsCount, 'clients');
+        this.io.emit('service-request:created', serviceRequest);
+      } else {
+        console.error('❌ WebSocket (io) not available!');
+      }
+
+      // Publish to MQTT for other devices (watches)
+      this.publish(this.TOPICS.SERVICE_REQUEST, {
+        id: serviceRequest.id,
+        location: device.location?.name || 'Unknown',
+        guest: guest ? `${guest.firstName} ${guest.lastName}` : 'Guest',
+        priority: 'high',
+        type: 'voice',
+        audioUrl,
+        duration,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Send notification to assigned crew member's watch
+      await this.notifyAssignedCrewWatch(serviceRequest, device.location?.name || 'Unknown', guest);
+
+      // Send acknowledgment to button
+      this.sendDeviceCommand(deviceId, {
+        command: 'ack',
+        requestId: serviceRequest.id,
+        status: 'received',
+        type: 'voice'
+      });
+
+    } catch (error) {
+      console.error('❌ Error handling voice message:', error);
     }
   }
 

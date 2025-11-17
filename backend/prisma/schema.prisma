@@ -212,6 +212,7 @@ model ServiceRequest {
   priority        ServiceRequestPriority @default(normal)
   notes           String?
   voiceTranscript String?
+  voiceAudioUrl   String?
   assignedTo      String?
   assignedToId    String?
   guestName       String?

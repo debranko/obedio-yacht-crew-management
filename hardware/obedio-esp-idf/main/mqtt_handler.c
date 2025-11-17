@@ -1011,6 +1011,31 @@ esp_err_t mqtt_publish_tasmota_toggle(void)
     }
 }
 
+esp_err_t mqtt_publish_raw(const char *topic, const char *json_payload)
+{
+    if (s_mqtt_client == NULL || !s_is_connected) {
+        ESP_LOGW(TAG, "MQTT not connected, cannot publish");
+        return ESP_FAIL;
+    }
+
+    if (topic == NULL || json_payload == NULL) {
+        ESP_LOGE(TAG, "Invalid parameters for mqtt_publish_raw");
+        return ESP_FAIL;
+    }
+
+    // Publish with QoS 1 (at least once delivery)
+    int msg_id = esp_mqtt_client_publish(s_mqtt_client, topic, json_payload, 0, 1, 0);
+
+    if (msg_id >= 0) {
+        ESP_LOGI(TAG, "Published raw message to %s (msg_id=%d)", topic, msg_id);
+        ESP_LOGD(TAG, "Payload: %s", json_payload);
+        return ESP_OK;
+    } else {
+        ESP_LOGE(TAG, "Failed to publish raw message");
+        return ESP_FAIL;
+    }
+}
+
 void mqtt_get_led_config(uint8_t *r, uint8_t *g, uint8_t *b, uint8_t *brightness)
 {
     if (r != NULL) {

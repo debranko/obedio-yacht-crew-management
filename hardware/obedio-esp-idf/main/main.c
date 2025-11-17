@@ -17,22 +17,24 @@
 #include "driver/i2c_master.h"
 #include "lwip/sockets.h"
 #include "lwip/netdb.h"
+#include "cJSON.h"
 
 #include "config.h"
 #include "device_manager.h"
 #include "wifi_manager.h"
 #include "mqtt_handler.h"
 #include "button_handler.h"
-#include "touch_handler.h"
+// #include "touch_handler.h"  // Disabled for ESP-IDF v5.3 compatibility
 #include "accel_handler.h"
 #include "led_controller.h"
 #include "audio_recorder.h"
+#include "audio_http_upload.h"
 #include "web_server.h"
 #include "ota_handler.h"
 #include "mcp23017.h"
 #include "lis3dhtr.h"
 #include "esp_ota_ops.h"
-#include "power_manager.h"
+// #include "power_manager.h"  // Disabled for ESP-IDF v5.3 compatibility
 
 static const char *TAG = "MAIN";
 
@@ -105,7 +107,7 @@ static void button_press_callback(const char *button, press_type_t type)
     ESP_LOGI(TAG, "Button callback: %s, type: %d", button, type);
 
     // Record user activity to reset sleep timer
-    power_manager_activity();
+    // power_manager_activity();  // Disabled for ESP-IDF v5.3 compatibility
 
     // Get current LED configuration for restore after feedback
     uint8_t led_r, led_g, led_b, led_brightness;
@@ -118,22 +120,71 @@ static void button_press_callback(const char *button, press_type_t type)
     if (strcmp(button, "T1") == 0 && type == PRESS_TYPE_LONG) {
         ESP_LOGI(TAG, "T1 long press detected - starting recording LED animation");
         is_recording = true;
+        recording_start_time = esp_timer_get_time();
         led_start_recording_animation(PRIORITY_LED_TASK, STACK_SIZE_LED);
         return;  // Don't publish MQTT yet - wait for release
     }
 
     // T1 RELEASE after long press
-    // Stop animation, flash blue, restore config color, publish MQTT
+    // Record audio, upload via HTTP, publish MQTT with URL
     if (is_recording && strcmp(button, "T1") == 0 && type == PRESS_TYPE_SINGLE) {
-        ESP_LOGI(TAG, "T1 released after long press - stopping animation and publishing voice event");
+        ESP_LOGI(TAG, "T1 released after long press - recording and uploading audio");
         is_recording = false;
+
+        // Calculate recording duration
+        int64_t duration_us = esp_timer_get_time() - recording_start_time;
+        uint32_t duration_ms = (uint32_t)(duration_us / 1000);
+
+        // Limit to 10 seconds
+        if (duration_ms > 10000) {
+            duration_ms = 10000;
+        }
+
+        ESP_LOGI(TAG, "Recording duration: %lu ms", duration_ms);
 
         // Stop animation, flash blue confirmation, restore config color
         led_stop_recording_animation(led_r, led_g, led_b, led_brightness);
 
-        // Publish voice event
-        mqtt_publish_button_press("main", "voice");
-        ESP_LOGI(TAG, "Voice event published: main - voice");
+        // Record and upload audio
+        char audio_url[256] = {0};
+        esp_err_t ret = audio_record_and_upload(
+            "http://10.10.0.10:3001/api/voice/upload",
+            audio_url,
+            sizeof(audio_url),
+            duration_ms
+        );
+
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "Audio uploaded successfully: %s", audio_url);
+
+            // Get device ID
+            char device_id[32];
+            device_manager_get_device_id(device_id);
+
+            // Publish MQTT with audio URL
+            cJSON *json = cJSON_CreateObject();
+            cJSON_AddStringToObject(json, "deviceId", device_id);
+            cJSON_AddStringToObject(json, "button", "main");
+            cJSON_AddStringToObject(json, "pressType", "voice");
+            cJSON_AddStringToObject(json, "audioUrl", audio_url);
+            cJSON_AddNumberToObject(json, "duration", (float)duration_ms / 1000.0f);
+            cJSON_AddNumberToObject(json, "timestamp", esp_timer_get_time() / 1000);
+
+            char *json_str = cJSON_PrintUnformatted(json);
+            char topic[128];
+            snprintf(topic, sizeof(topic), "obedio/button/%s/voice", device_id);
+            mqtt_publish_raw(topic, json_str);
+
+            cJSON_Delete(json);
+            free(json_str);
+
+            ESP_LOGI(TAG, "Voice event published with audio URL");
+        } else {
+            ESP_LOGE(TAG, "Audio upload failed: %s", esp_err_to_name(ret));
+            // Still publish button event without audio URL
+            mqtt_publish_button_press("main", "voice");
+        }
+
         return;
     }
 
@@ -213,7 +264,7 @@ static void touch_press_callback(press_type_t type)
     ESP_LOGI(TAG, "Touch callback: type %d", type);
 
     // Record user activity to reset sleep timer
-    power_manager_activity();
+    // power_manager_activity();  // Disabled for ESP-IDF v5.3 compatibility
 
     // Flash LED based on touch type
     switch (type) {
@@ -255,7 +306,7 @@ static void shake_detected_callback(void)
     ESP_LOGI(TAG, "Shake detected!");
 
     // Record user activity to reset sleep timer
-    power_manager_activity();
+    // power_manager_activity();  // Disabled for ESP-IDF v5.3 compatibility
 
     // Flash red LEDs to indicate shake
     led_flash(LED_COLOR_RED, 200);
@@ -399,8 +450,10 @@ void app_main(void)
     ESP_LOGI(TAG, "Device manager initialized");
 
     // Step 3: Check for factory reset (T6 touch pad held during boot)
-    ESP_LOGI(TAG, "Checking for factory reset request...");
-    if (touch_check_factory_reset()) {
+    // Touch handler disabled for ESP-IDF v5.3 compatibility
+    ESP_LOGI(TAG, "Factory reset check disabled (touch handler disabled)");
+    // if (touch_check_factory_reset()) {
+    if (false) {  // Factory reset disabled temporarily
         ESP_LOGW(TAG, "Factory reset requested!");
         device_manager_factory_reset();
         ESP_LOGI(TAG, "Factory reset complete, rebooting...");
@@ -458,6 +511,8 @@ void app_main(void)
     startup_led_animation();
 
     // Step 10: Initialize touch sensor
+    // Disabled for ESP-IDF v5.3 compatibility
+    /*
     ESP_LOGI(TAG, "Initializing touch sensor...");
     ret = touch_handler_init(touch_press_callback);
     if (ret != ESP_OK) {
@@ -465,14 +520,16 @@ void app_main(void)
     } else {
         ESP_LOGI(TAG, "Touch sensor initialized");
     }
+    */
+    ESP_LOGI(TAG, "Touch sensor disabled (ESP-IDF v5.3 compatibility)");
 
-    // Step 11: Initialize audio recorder
-    ESP_LOGI(TAG, "Initializing audio recorder...");
-    ret = audio_recorder_init();
+    // Step 11: Initialize audio HTTP upload (replaces old audio_recorder)
+    ESP_LOGI(TAG, "Initializing audio HTTP upload...");
+    ret = audio_http_upload_init();
     if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Audio recorder initialization failed, voice features disabled");
+        ESP_LOGW(TAG, "Audio HTTP upload initialization failed, voice features disabled");
     } else {
-        ESP_LOGI(TAG, "Audio recorder initialized");
+        ESP_LOGI(TAG, "Audio HTTP upload initialized - voice recording via HTTP POST");
     }
 
     // Step 12: Initialize WiFi (with AP fallback if STA fails)
@@ -538,6 +595,8 @@ void app_main(void)
     ESP_LOGI(TAG, "Button handler task started (priority 5, stack 4096)");
 
     // Step 17: Create touch handler task
+    // Disabled for ESP-IDF v5.3 compatibility
+    /*
     if (touch_handler_is_initialized()) {
         ESP_LOGI(TAG, "Starting touch handler task...");
         ret = touch_handler_start_task(5, 3072);
@@ -547,6 +606,8 @@ void app_main(void)
             ESP_LOGW(TAG, "Failed to start touch handler task");
         }
     }
+    */
+    ESP_LOGI(TAG, "Touch handler task disabled (ESP-IDF v5.3 compatibility)");
 
     // Step 18: Initialize accelerometer handler and create task
     // TEMPORARILY DISABLED - causing false shake detections
