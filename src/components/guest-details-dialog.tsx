@@ -56,20 +56,16 @@ export function GuestDetailsDialog({ open, onOpenChange, guest, onEdit }: GuestD
 
   const getGuestTypeLabel = (type: Guest['type']) => {
     switch (type) {
-      case 'primary':
-        return 'Primary Guest';
+      case 'guest':
+        return 'Guest';
       case 'partner':
         return 'Partner';
       case 'family':
         return 'Family';
-      case 'child':
-        return 'Child';
       case 'vip':
         return 'VIP';
       case 'owner':
         return 'Owner';
-      case 'charter':
-        return 'Charter';
     }
   };
 
@@ -135,7 +131,7 @@ export function GuestDetailsDialog({ open, onOpenChange, guest, onEdit }: GuestD
               </div>
             )}
 
-            {guest.languages.length > 0 && (
+            {guest.languages?.length > 0 && (
               <div className="space-y-1">
                 <div className="text-sm text-muted-foreground">Languages</div>
                 <div className="font-medium">{guest.languages.join(', ')}</div>
@@ -209,7 +205,7 @@ export function GuestDetailsDialog({ open, onOpenChange, guest, onEdit }: GuestD
           </h3>
 
           {/* Allergies - Critical Alert */}
-          {guest.allergies.length > 0 && (
+          {guest.allergies?.length > 0 && (
             <div className="p-4 bg-destructive/10 border-2 border-destructive/30 rounded-lg">
               <div className="flex items-center gap-2 mb-3">
                 <AlertTriangle className="h-5 w-5 text-destructive" />
@@ -227,7 +223,7 @@ export function GuestDetailsDialog({ open, onOpenChange, guest, onEdit }: GuestD
 
           {/* Dietary Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {guest.dietaryRestrictions.length > 0 && (
+            {guest.dietaryRestrictions?.length > 0 && (
               <div className="bg-muted/30 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Utensils className="h-4 w-4 text-muted-foreground" />
@@ -243,7 +239,7 @@ export function GuestDetailsDialog({ open, onOpenChange, guest, onEdit }: GuestD
               </div>
             )}
 
-            {guest.foodDislikes.length > 0 && (
+            {guest.foodDislikes?.length > 0 && (
               <div className="bg-muted/30 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <ThumbsDown className="h-4 w-4 text-muted-foreground" />
@@ -259,7 +255,7 @@ export function GuestDetailsDialog({ open, onOpenChange, guest, onEdit }: GuestD
               </div>
             )}
 
-            {guest.favoriteFoods.length > 0 && (
+            {guest.favoriteFoods?.length > 0 && (
               <div className="bg-muted/30 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Heart className="h-4 w-4 text-muted-foreground" />
@@ -275,7 +271,7 @@ export function GuestDetailsDialog({ open, onOpenChange, guest, onEdit }: GuestD
               </div>
             )}
 
-            {guest.favoriteDrinks.length > 0 && (
+            {guest.favoriteDrinks?.length > 0 && (
               <div className="bg-muted/30 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Wine className="h-4 w-4 text-muted-foreground" />

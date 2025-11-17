@@ -26,8 +26,18 @@ export function useYachtSettingsApi() {
   const fetchSettings = async () => {
     try {
       setIsLoading(true);
-      const response = await api.get<YachtSettingsResponse>('/yacht-settings');
-      setSettings(response.data);
+      // Response is now unwrapped by api client: { name, type, timezone, floors }
+      const data = await api.get<any>('/yacht-settings');
+
+      // Map backend response fields to frontend format
+      const mappedSettings: YachtSettingsData = {
+        vesselName: data.name || '',
+        vesselType: data.type || 'motor-yacht',
+        timezone: data.timezone || 'Europe/Monaco',
+        floors: data.floors || [],
+      };
+
+      setSettings(mappedSettings);
       setError(null);
     } catch (err) {
       console.error('Failed to fetch yacht settings:', err);
@@ -40,9 +50,27 @@ export function useYachtSettingsApi() {
   // Update yacht settings
   const updateSettings = async (data: YachtSettingsData) => {
     try {
-      const response = await api.put<YachtSettingsResponse>('/yacht-settings', data);
-      setSettings(response.data);
-      return response.data;
+      // Map frontend format to backend format
+      const backendData = {
+        name: data.vesselName,
+        type: data.vesselType,
+        timezone: data.timezone,
+        floors: data.floors,
+      };
+
+      // Response is now unwrapped by api client: { name, type, timezone, floors }
+      const responseData = await api.put<any>('/yacht-settings', backendData);
+
+      // Map response back to frontend format
+      const mappedSettings: YachtSettingsData = {
+        vesselName: responseData.name || data.vesselName,
+        vesselType: responseData.type || data.vesselType,
+        timezone: responseData.timezone || data.timezone,
+        floors: responseData.floors || data.floors,
+      };
+
+      setSettings(mappedSettings);
+      return mappedSettings;
     } catch (err) {
       console.error('Failed to update yacht settings:', err);
       throw err;

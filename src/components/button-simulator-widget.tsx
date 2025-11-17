@@ -3,11 +3,12 @@
  * Always visible for quick ESP32 firmware testing
  */
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAppData } from "../contexts/AppDataContext";
 import { useLocations } from "../hooks/useLocations";
 import { useGuests } from "../hooks/useGuests";
 import { DNDService } from "../services/dnd";
+import { mqttClient } from "../services/mqtt-client";
 import { 
   Mic, 
   Phone, 
@@ -56,6 +57,49 @@ const auxButtons: AuxButton[] = [
 ];
 
 export function ButtonSimulatorWidget() {
+  // Connect to MQTT broker on mount - REAL MQTT CONNECTION
+  useEffect(() => {
+    // Check if already connected BEFORE attempting connection
+    const wasConnected = mqttClient.getConnectionStatus();
+
+    console.log('🔌 Button Simulator: Checking MQTT connection...');
+    console.log('📍 MQTT Broker URL from env:', import.meta.env.VITE_MQTT_BROKER || 'NOT SET - using default ws://localhost:9001');
+    console.log('🔍 Current MQTT connection status:', wasConnected);
+
+    // Only show toast if we're establishing a NEW connection
+    mqttClient.connect()
+      .then(() => {
+        const isConnected = mqttClient.getConnectionStatus();
+        console.log('✅ Button Simulator: MQTT connection verified');
+        console.log('🔍 MQTT connection status after connect:', isConnected);
+
+        // Only show notification if we just connected (was disconnected before)
+        if (!wasConnected && isConnected) {
+          toast.success('MQTT Connected', {
+            description: 'Button simulator ready to send real MQTT messages'
+          });
+        } else if (wasConnected) {
+          console.log('📌 MQTT already connected, no notification shown');
+        }
+      })
+      .catch((error) => {
+        console.error('❌ Button Simulator: MQTT connection failed:', error);
+        console.error('🔍 Error details:', error.message, error.stack);
+
+        // Only show error if we weren't connected before (avoid spam on reconnect attempts)
+        if (!wasConnected) {
+          toast.error('MQTT Connection Failed', {
+            description: 'Make sure Mosquitto is running on port 9001 (WebSocket)'
+          });
+        }
+      });
+
+    return () => {
+      // Keep connection alive (don't disconnect on unmount)
+      // This prevents reconnection spam when sidebar collapses/expands
+    };
+  }, []);
+
   // Use same source of truth as Dashboard and DNDWidget
   const { locations: locationsFromService = [], updateLocation } = useLocations();
   
@@ -70,7 +114,7 @@ export function ButtonSimulatorWidget() {
     updateGuest,
     getGuestByLocationId
   } = useAppData();
-  
+
   const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [isMainPressed, setIsMainPressed] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -128,13 +172,13 @@ export function ButtonSimulatorWidget() {
     
     // Find guest by proper foreign key relationship
     // If multiple guests in same cabin, prefer owner > vip > partner > guest
-    const guestsAtLocation = guests.filter(g => g.locationId === location.id);
+    const guestsAtLocation = guests.filter((g: any) => g.locationId === location.id);
     let guestAtLocation = null;
     
     if (guestsAtLocation.length > 0) {
       // Sort by priority: owner > vip > partner > family > guest
       const priorityOrder = { owner: 1, vip: 2, partner: 3, family: 4, guest: 5 };
-      guestsAtLocation.sort((a, b) => {
+      guestsAtLocation.sort((a: any, b: any) => {
         const aPriority = priorityOrder[a.type as keyof typeof priorityOrder] || 10;
         const bPriority = priorityOrder[b.type as keyof typeof priorityOrder] || 10;
         return aPriority - bPriority;
@@ -196,21 +240,58 @@ export function ButtonSimulatorWidget() {
       }
     }
 
-    // Create actual service request and add to context
-    const serviceRequest = addServiceRequest({
-      guestName: guestName,
-      guestCabin: location.name,
-      cabinId: location.id,
-      requestType: 'call' as const,
-      priority: requestPriority,
-      voiceTranscript: isVoice 
-        ? `Voice message (${voiceDuration?.toFixed(1)}s): ${requestLabel}`
-        : undefined, // Only set transcript for voice messages
-      voiceAudioUrl: isVoice ? (audioUrl || undefined) : undefined,
-      cabinImage: location.image || 'https://images.unsplash.com/photo-1597126729864-51740ac05236?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080',
-      status: 'pending' as const,
-      notes: requestNotes
+    // ============================================
+    // REAL MQTT PUBLISH - Simulates actual OBEDIO ESP32 Smart Button
+    // ============================================
+    const deviceId = location.smartButtonId || `BTN-${location.id.slice(-8)}`;
+
+    // Determine button type
+    let button: 'main' | 'aux1' | 'aux2' | 'aux3' | 'aux4' = 'main';
+    let pressType: 'single' | 'double' | 'long' | 'shake' = 'single';
+    
+    if (isVoice) {
+      pressType = 'long';
+    } else if (requestType === 'shake') {
+      pressType = 'shake';
+    } else if (requestType === 'dnd') {
+      button = 'aux1';
+    } else if (requestType === 'lights') {
+      button = 'aux2';
+    } else if (requestType === 'prepare_food') {
+      button = 'aux3';
+    } else if (requestType === 'bring_drinks') {
+      button = 'aux4';
+    }
+
+    // ============================================
+    // EXACT ESP32 SPECIFICATION - DO NOT MODIFY
+    // See: ESP32-FIRMWARE-DETAILED-SPECIFICATION.md lines 70-88
+    // ============================================
+    console.log('📤 MQTT: Publishing ESP32 button press (EXACT SPEC)', {
+      deviceId,
+      locationId: location.id,
+      guestId: guestAtLocation?.id || null,
+      pressType,
+      button
     });
+
+    // Send MQTT message to broker - matches real OBEDIO ESP32 Smart Button exactly
+    mqttClient.publishButtonPress(deviceId, {
+      locationId: location.id,
+      guestId: guestAtLocation?.id || null,
+      pressType,
+      button,
+      voiceTranscript: isVoice ? requestLabel : undefined,
+      audioUrl: isVoice ? audioUrl : undefined
+    });
+
+    // Backend MQTT handler will:
+    // 1. Receive this MQTT message
+    // 2. Create service request in database
+    // 3. Emit WebSocket event back to frontend
+    // 4. Frontend will receive and display via WebSocket subscription
+    //
+    // DO NOT create service request via API here - it would create duplicates!
 
     // Log activity for tracking
     addActivityLog({
@@ -251,33 +332,32 @@ export function ButtonSimulatorWidget() {
       { duration: 5000 }
     );
 
-    console.log("🔘 BUTTON PRESS GENERATED SERVICE REQUEST:", {
+    console.log("🔘 BUTTON PRESS - MQTT MESSAGE SENT:", {
       timestamp: new Date().toISOString(),
       buttonType: isVoice ? "MAIN_HOLD" : requestType === "main" ? "MAIN_TAP" : "AUX_" + requestType.toUpperCase(),
-      location: { 
-        id: location.id, 
-        name: location.name, 
+      location: {
+        id: location.id,
+        name: location.name,
         floor: location.floor,
-        smartButtonId: location.smartButtonId 
+        smartButtonId: location.smartButtonId
       },
-      request: { 
-        id: serviceRequest.id,
-        type: requestType, 
-        label: requestLabel, 
-        isVoice, 
+      requestDetails: {
+        type: requestType,
+        label: requestLabel,
+        isVoice,
         voiceDuration,
         priority: requestPriority,
-        status: 'pending'
       },
-      guest: guestAtLocation ? { 
-        id: guestAtLocation.id, 
+      guest: guestAtLocation ? {
+        id: guestAtLocation.id,
         name: guestName
       } : null,
-      assignedTo: assignedCrew ? { 
-        id: assignedCrew.id, 
-        name: assignedCrew.name, 
-        role: assignedCrew.role 
-      } : null
+      assignedTo: assignedCrew ? {
+        id: assignedCrew.id,
+        name: assignedCrew.name,
+        role: assignedCrew.role
+      } : null,
+      note: "Service request will be created by backend MQTT handler"
     });
   };
 
@@ -357,7 +437,8 @@ export function ButtonSimulatorWidget() {
 
       console.log('📤 Sending audio to backend for transcription...');
 
-      const response = await fetch('http://localhost:3001/api/transcribe', {
+      const apiUrl = import.meta.env.VITE_API_URL || '/api';
+      const response = await fetch(`${apiUrl}/transcribe`, {
         method: 'POST',
         body: formData
       });
@@ -367,13 +448,21 @@ export function ButtonSimulatorWidget() {
       }
 
       const data = await response.json();
-      
-      if (data.success && data.transcript) {
-        console.log('✅ Transcription successful:', data.transcript);
-        toast.success('Voice message transcribed!', {
-          description: data.transcript.substring(0, 100)
+
+      // Backend returns { success, transcript, translation, language, duration }
+      // We use TRANSLATION (English) for crew to read, but keep original AUDIO
+      const englishText = data.translation || data.transcript; // Fallback to transcript if already English
+
+      if (data.success && englishText) {
+        console.log('✅ Transcription successful:', {
+          original: data.transcript,
+          english: englishText,
+          language: data.language
         });
-        return data.transcript;
+        toast.success('Voice message transcribed!', {
+          description: englishText.substring(0, 100)
+        });
+        return englishText; // Return ENGLISH translation for crew
       }
 
       return null;
@@ -615,6 +704,19 @@ export function ButtonSimulatorWidget() {
             )}
           </SelectContent>
         </Select>
+
+        {/* Button ID Display */}
+        {selectedLocation && currentLocation && (
+          <div className="flex items-center gap-2 px-1 py-1 text-[11px] bg-neutral-900/40 rounded border border-accent/10">
+            <span className="font-mono font-semibold text-accent">
+              {currentLocation.smartButtonId || 'NO-BTN'}
+            </span>
+            <span className="text-muted-foreground opacity-40">→</span>
+            <span className="text-muted-foreground">
+              {currentLocation.smartButtonId ? currentLocation.name : 'Unassigned'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Button Simulator */}
@@ -676,7 +778,7 @@ export function ButtonSimulatorWidget() {
               }
             }}
             onTouchStart={selectedLocation ? handleMainButtonDown : undefined}
-            onTouchEnd={selectedLocation ? handleMainButtonUp : undefined}
+            onTouchEnd={selectedLocation ? (e: any) => handleMainButtonUp(e) : undefined}
           >
             <div className="absolute inset-0 rounded-full bg-gradient-to-br from-accent via-accent to-accent/80 border border-accent/50" />
             <div className="absolute inset-1 rounded-full bg-gradient-to-br from-neutral-900 to-black flex items-center justify-center">

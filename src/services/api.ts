@@ -18,13 +18,9 @@ async function fetchApi<T>(
   endpoint: string,
   options?: RequestInit
 ): Promise<T> {
-  const token = localStorage.getItem('obedio-auth-token');
-  
-  console.log('🔐 API Call:', endpoint, { hasToken: !!token, token: token?.substring(0, 20) + '...' });
-  
+  // Auth handled by HTTP-only cookies (server runs 24/7)
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` }),
     ...options?.headers,
   };
 
@@ -32,6 +28,7 @@ async function fetchApi<T>(
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers,
+      credentials: 'include', // Sends HTTP-only cookie automatically
     });
 
     if (!response.ok) {
@@ -40,14 +37,14 @@ async function fetchApi<T>(
     }
 
     const result: ApiResponse<T> = await response.json();
-    
+
     if (!result.success) {
       throw new Error(result.error || 'API request failed');
     }
 
     return result.data as T;
   } catch (error) {
-    console.error(`API Error [${endpoint}]:`, error);
+    console.error(`[API] ${endpoint}:`, error);
     throw error;
   }
 }
@@ -59,15 +56,33 @@ async function fetchApi<T>(
 export interface CrewMemberDTO {
   id: string;
   name: string;
+  nickname?: string | null;
   position: string;
   department: string;
   status: string;
   contact?: string | null;
   email?: string | null;
+  phone?: string | null;
+  onBoardContact?: string | null;
   joinDate?: string | null;
+  leaveStart?: string | null;
+  leaveEnd?: string | null;
+  languages?: string[];
+  skills?: string[];
   role?: string | null;
+  avatar?: string | null;
+  color?: string;
+  notes?: string | null;
+  shift?: string | null;
+  userId?: string | null;
   createdAt: string;
   updatedAt: string;
+  // Only present in POST /crew response (when creating new crew)
+  credentials?: {
+    username: string;
+    password: string;
+    message: string;
+  };
 }
 
 export const crewApi = {
@@ -116,7 +131,7 @@ export interface GuestDTO {
   preferredName?: string | null;
   photo?: string | null;
   type: 'owner' | 'vip' | 'guest' | 'partner' | 'family';
-  status: 'expected' | 'onboard' | 'ashore' | 'departed';
+  status: 'expected' | 'onboard' | 'departed';
   nationality?: string | null;
   languages?: string[];
   passportNumber?: string | null;
@@ -191,12 +206,18 @@ export interface ServiceRequestDTO {
   id: string;
   guestId: string;
   locationId?: string | null;
-  status: 'pending' | 'in-progress' | 'completed' | 'cancelled';
+  requestType: 'call' | 'service' | 'emergency' | 'voice' | 'dnd' | 'lights' | 'prepare_food' | 'bring_drinks';
+  // Changed to match actual backend values (IN_PROGRESS with underscore)
+  status: 'pending' | 'in_progress' | 'IN_PROGRESS' | 'completed' | 'cancelled' | 'serving' | 'accepted' | 'delegated';
   priority: 'low' | 'normal' | 'urgent' | 'emergency';
   message?: string | null;
+  notes?: string | null;
   voiceTranscript?: string | null;
   voiceAudioUrl?: string | null;
-  assignedCrewId?: string | null;
+  assignedToId?: string | null; // Backend uses assignedToId, not assignedCrewId
+  assignedTo?: string | null; // Crew member name
+  categoryId?: string | null;
+  acceptedAt?: string | null; // When request was accepted
   createdAt: string;
   updatedAt: string;
   completedAt?: string | null;
@@ -236,8 +257,8 @@ export const serviceRequestsApi = {
    */
   accept: (id: string, crewId: string) =>
     fetchApi<ServiceRequestDTO>(`/service-requests/${id}/accept`, {
-      method: 'POST',
-      body: JSON.stringify({ crewId }),
+      method: 'PUT',
+      body: JSON.stringify({ crewMemberId: crewId }),
     }),
 
   /**
@@ -245,7 +266,7 @@ export const serviceRequestsApi = {
    */
   complete: (id: string) =>
     fetchApi<ServiceRequestDTO>(`/service-requests/${id}/complete`, {
-      method: 'POST',
+      method: 'PUT',
     }),
 
   /**
@@ -254,6 +275,14 @@ export const serviceRequestsApi = {
   cancel: (id: string) =>
     fetchApi<ServiceRequestDTO>(`/service-requests/${id}/cancel`, {
       method: 'POST',
+    }),
+
+  /**
+   * Clear all service requests
+   */
+  clearAll: () =>
+    fetchApi<{ message: string }>('/service-requests/clear-all', {
+      method: 'DELETE',
     }),
 };
 
@@ -338,6 +367,491 @@ export const devicesApi = {
 };
 
 // =====================
+// SHIFTS API (Duty Roster)
+// =====================
+
+export interface ShiftDTO {
+  id: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  color: string;
+  description?: string | null;
+  isActive: boolean;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const shiftsApi = {
+  /**
+   * Get all shifts
+   */
+  getAll: () => fetchApi<ShiftDTO[]>('/shifts'),
+
+  /**
+   * Get active shifts only
+   */
+  getActive: () => fetchApi<ShiftDTO[]>('/shifts/active'),
+
+  /**
+   * Get shift by ID
+   */
+  getById: (id: string) => fetchApi<ShiftDTO>(`/shifts/${id}`),
+
+  /**
+   * Create new shift
+   */
+  create: (data: Omit<ShiftDTO, 'id' | 'createdAt' | 'updatedAt'>) =>
+    fetchApi<ShiftDTO>('/shifts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Update shift
+   */
+  update: (id: string, data: Partial<ShiftDTO>) =>
+    fetchApi<ShiftDTO>(`/shifts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Delete shift
+   */
+  delete: (id: string) =>
+    fetchApi<void>(`/shifts/${id}`, {
+      method: 'DELETE',
+    }),
+
+  /**
+   * Toggle shift active status
+   */
+  toggleActive: (id: string, isActive: boolean) =>
+    fetchApi<ShiftDTO>(`/shifts/${id}/toggle-active`, {
+      method: 'POST',
+      body: JSON.stringify({ isActive }),
+    }),
+
+  /**
+   * Reorder shifts
+   */
+  reorder: (shifts: { id: string; order: number }[]) =>
+    fetchApi<void>('/shifts/reorder', {
+      method: 'POST',
+      body: JSON.stringify({ shifts }),
+    }),
+};
+
+// =====================
+// ASSIGNMENTS API (Duty Roster)
+// =====================
+
+export interface AssignmentDTO {
+  id: string;
+  date: string; // ISO date string "2025-10-23"
+  shiftId: string;
+  crewMemberId: string;
+  type: 'primary' | 'backup';
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  shift?: ShiftDTO; // Populated when included
+}
+
+export const assignmentsApi = {
+  /**
+   * Get all assignments with optional filters
+   */
+  getAll: (params?: {
+    date?: string;
+    shiftId?: string;
+    crewMemberId?: string;
+    type?: 'primary' | 'backup';
+    startDate?: string;
+    endDate?: string;
+  }) => {
+    const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+    return fetchApi<AssignmentDTO[]>(`/assignments${query}`);
+  },
+
+  /**
+   * Get assignments for a specific date
+   */
+  getByDate: (date: string) => fetchApi<AssignmentDTO[]>(`/assignments/by-date/${date}`),
+
+  /**
+   * Get assignments for a week starting from date
+   */
+  getByWeek: (startDate: string) => fetchApi<AssignmentDTO[]>(`/assignments/by-week/${startDate}`),
+
+  /**
+   * Get assignments for a specific crew member
+   */
+  getByCrew: (crewMemberId: string, params?: { startDate?: string; endDate?: string }) => {
+    const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+    return fetchApi<AssignmentDTO[]>(`/assignments/crew/${crewMemberId}${query}`);
+  },
+
+  /**
+   * Get assignment by ID
+   */
+  getById: (id: string) => fetchApi<AssignmentDTO>(`/assignments/${id}`),
+
+  /**
+   * Create new assignment
+   */
+  create: (data: Omit<AssignmentDTO, 'id' | 'createdAt' | 'updatedAt' | 'shift'>) =>
+    fetchApi<AssignmentDTO>('/assignments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Create multiple assignments at once
+   */
+  createBulk: (assignments: Omit<AssignmentDTO, 'id' | 'createdAt' | 'updatedAt' | 'shift'>[]) =>
+    fetchApi<AssignmentDTO[]>('/assignments/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ assignments }),
+    }),
+
+  /**
+   * Update assignment
+   */
+  update: (id: string, data: Partial<AssignmentDTO>) =>
+    fetchApi<AssignmentDTO>(`/assignments/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Delete assignment
+   */
+  delete: (id: string) =>
+    fetchApi<void>(`/assignments/${id}`, {
+      method: 'DELETE',
+    }),
+
+  /**
+   * Delete all assignments for a specific date
+   */
+  deleteByDate: (date: string) =>
+    fetchApi<void>(`/assignments/by-date/${date}`, {
+      method: 'DELETE',
+    }),
+
+  /**
+   * Delete assignments for a crew member
+   */
+  deleteByCrew: (crewMemberId: string, params?: { startDate?: string; endDate?: string }) => {
+    const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+    return fetchApi<void>(`/assignments/crew/${crewMemberId}${query}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// =====================
+// MESSAGES API
+// =====================
+
+export interface MessageDTO {
+  id: string;
+  senderId: string;
+  receiverId?: string | null; // null for broadcast messages
+  content: string;
+  type: 'text' | 'system' | 'alert' | 'notification';
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  isRead: boolean;
+  readAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Populated sender/receiver info
+  sender?: {
+    id: string;
+    username: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    role?: string | null;
+  };
+  receiver?: {
+    id: string;
+    username: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    role?: string | null;
+  };
+}
+
+export interface MessagesResponse {
+  messages: MessageDTO[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+  };
+}
+
+export const messagesApi = {
+  /**
+   * Get all messages for authenticated user
+   */
+  getAll: (params?: {
+    type?: string;
+    unreadOnly?: boolean;
+    limit?: number;
+    offset?: number;
+  }) => {
+    const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+    return fetchApi<MessagesResponse>(`/messages${query}`);
+  },
+
+  /**
+   * Get conversation with specific user
+   */
+  getConversation: (otherUserId: string, params?: { limit?: number; offset?: number }) => {
+    const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+    return fetchApi<MessageDTO[]>(`/messages/conversation/${otherUserId}${query}`);
+  },
+
+  /**
+   * Send a message
+   */
+  send: (data: {
+    receiverId?: string | null;
+    content: string;
+    type?: 'text' | 'system' | 'alert' | 'notification';
+    priority?: 'low' | 'normal' | 'high' | 'urgent';
+  }) =>
+    fetchApi<MessageDTO>('/messages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Mark message as read
+   */
+  markAsRead: (messageId: string) =>
+    fetchApi<MessageDTO>(`/messages/${messageId}/read`, {
+      method: 'PUT',
+    }),
+
+  /**
+   * Mark all messages as read
+   */
+  markAllAsRead: () =>
+    fetchApi<{ count: number }>('/messages/mark-all-read', {
+      method: 'PUT',
+    }),
+
+  /**
+   * Delete message
+   */
+  delete: (messageId: string) =>
+    fetchApi<{ deleted: boolean; id: string }>(`/messages/${messageId}`, {
+      method: 'DELETE',
+    }),
+
+  /**
+   * Get unread message count
+   */
+  getUnreadCount: () => fetchApi<{ count: number }>('/messages/unread-count'),
+};
+
+// =====================
+// USER PREFERENCES API
+// =====================
+
+export interface UserPreferencesDTO {
+  dashboardLayout?: any | null;
+  activeWidgets?: string[] | null;
+  theme?: 'light' | 'dark' | 'auto';
+  language?: string;
+
+  // Notification preferences
+  emailNotifications?: boolean;
+  notificationEmail?: string | null;
+  emergencyContacts?: string[] | null;
+
+  // Service Requests preferences
+  serviceRequestDisplayMode?: string | null;
+  serviceRequestViewStyle?: string | null;
+  serviceRequestSortOrder?: string | null;
+  serviceRequestShowGuestPhotos?: boolean;
+  serviceRequestServingTimeout?: number;
+  serviceRequestSoundAlerts?: boolean;
+  serviceRequestVisualFlash?: boolean;
+  serviceRequestResponseWarning?: number;
+  serviceRequestAutoArchive?: number;
+  serviceRequestAutoPriorityVIP?: boolean;
+  serviceRequestAutoPriorityMaster?: boolean;
+  requestDialogRepeatInterval?: number;
+
+  updatedAt?: string;
+}
+
+export const userPreferencesApi = {
+  /**
+   * Get user preferences
+   */
+  get: () => fetchApi<UserPreferencesDTO>('/user-preferences'),
+
+  /**
+   * Update dashboard layout and widgets
+   */
+  updateDashboard: (data: {
+    dashboardLayout?: any;
+    activeWidgets?: string[];
+  }) =>
+    fetchApi<{
+      dashboardLayout: any;
+      activeWidgets: string[];
+      updatedAt: string;
+    }>('/user-preferences/dashboard', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Update theme preference
+   */
+  updateTheme: (theme: 'light' | 'dark' | 'auto') =>
+    fetchApi<{
+      theme: string;
+    }>('/user-preferences/theme', {
+      method: 'PUT',
+      body: JSON.stringify({ theme }),
+    }),
+
+  /**
+   * Update notification preferences
+   */
+  updateNotifications: (data: {
+    emailNotifications?: boolean;
+    notificationEmail?: string;
+    emergencyContacts?: string[];
+  }) =>
+    fetchApi<{
+      emailNotifications: boolean;
+      notificationEmail: string | null;
+      emergencyContacts: any;
+      updatedAt: string;
+    }>('/user-preferences/notifications', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Update Service Requests preferences
+   */
+  updateServiceRequests: (data: {
+    serviceRequestDisplayMode?: string;
+    serviceRequestViewStyle?: string;
+    serviceRequestSortOrder?: string;
+    serviceRequestShowGuestPhotos?: boolean;
+    serviceRequestServingTimeout?: number;
+    serviceRequestSoundAlerts?: boolean;
+    serviceRequestVisualFlash?: boolean;
+    serviceRequestResponseWarning?: number;
+    serviceRequestAutoArchive?: number;
+    serviceRequestAutoPriorityVIP?: boolean;
+    serviceRequestAutoPriorityMaster?: boolean;
+    requestDialogRepeatInterval?: number;
+  }) =>
+    fetchApi<UserPreferencesDTO>('/user-preferences/service-requests', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Reset dashboard to defaults
+   */
+  resetDashboard: () =>
+    fetchApi<{
+      message: string;
+    }>('/user-preferences/dashboard', {
+      method: 'DELETE',
+    }),
+};
+
+// =====================
+// ACTIVITY LOGS API
+// =====================
+
+export interface ActivityLogDTO {
+  id: string;
+  type: string;
+  action: string;
+  details?: string | null;
+  userId?: string | null;
+  locationId?: string | null;
+  guestId?: string | null;
+  deviceId?: string | null;
+  metadata?: any | null;
+  timestamp: string;
+  createdAt: string;
+  // Populated relationships
+  user?: {
+    id: string;
+    username: string;
+    name?: string;
+  };
+  location?: {
+    id: string;
+    name: string;
+    type: string;
+  };
+  guest?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  };
+  device?: {
+    id: string;
+    deviceId: string;
+    name: string;
+    type: string;
+  };
+}
+
+export interface ActivityLogsResponse {
+  items: ActivityLogDTO[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export const activityLogsApi = {
+  /**
+   * Get activity logs with filters and pagination
+   */
+  getAll: (params?: {
+    type?: string;
+    userId?: string;
+    locationId?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+    return fetchApi<ActivityLogsResponse>(`/activity-logs${query}`);
+  },
+
+  /**
+   * Create activity log
+   */
+  create: (data: Omit<ActivityLogDTO, 'id' | 'createdAt'>) =>
+    fetchApi<ActivityLogDTO>('/activity-logs', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
+// =====================
 // EXPORT ALL
 // =====================
 
@@ -346,10 +860,15 @@ export const api = {
   guests: guestsApi,
   serviceRequests: serviceRequestsApi,
   devices: devicesApi,
-  
+  shifts: shiftsApi,
+  assignments: assignmentsApi,
+  messages: messagesApi,
+  userPreferences: userPreferencesApi,
+  activityLogs: activityLogsApi,
+
   // Direct methods for convenience
   get: (endpoint: string) => fetchApi<any>(endpoint),
-  post: (endpoint: string, data?: any) => 
+  post: (endpoint: string, data?: any) =>
     fetchApi<any>(endpoint, {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,

@@ -60,6 +60,15 @@ export function WeatherWidget({ className }: WeatherWidgetProps) {
 
       // Get yacht's current coordinates from settings
       const coords = getCurrentCoordinates();
+
+      // Guard: Return early if no coordinates available
+      if (!coords || coords.latitude == null || coords.longitude == null) {
+        console.warn('⚠️ Weather widget: No coordinates available - using default location (Monaco)');
+        setError('No coordinates set');
+        setLoading(false);
+        return;
+      }
+
       const lat = coords.latitude;
       const lon = coords.longitude;
 
@@ -83,7 +92,7 @@ export function WeatherWidget({ className }: WeatherWidgetProps) {
         wind_speed: Math.round(data.current.wind_speed_10m),
         visibility: Math.round((data.current.visibility || 10000) / 1000), // Convert to km
         weather: weatherInfo,
-        location: settings.locationName || 'Current Location'
+        location: settings?.locationName || 'Current Location'
       });
       
       setLoading(false);

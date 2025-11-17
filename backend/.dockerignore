@@ -1,0 +1,62 @@
+# Dependencies
+node_modules
+npm-debug.log
+package-lock.json
+
+# Build outputs
+dist
+build
+*.log
+
+# Development files
+.env
+.env.local
+.env.*.local
+*.local
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage
+.nyc_output
+*.test.ts
+*.spec.ts
+__tests__
+__mocks__
+
+# Documentation
+*.md
+docs
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+
+# Temporary files
+tmp
+temp
+*.tmp
+
+# Uploads (will be mounted as volume)
+uploads/*
+!uploads/.gitkeep
+
+# Backups
+backups
+
+# Prisma
+prisma/migrations/*/.gitkeep

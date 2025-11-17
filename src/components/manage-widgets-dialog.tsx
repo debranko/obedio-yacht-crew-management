@@ -20,8 +20,10 @@ import {
   Cloud,
   Wind,
   UserCheck,
+  Radio,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "../contexts/AuthContext";
 
 export interface WidgetConfig {
   id: string;
@@ -30,6 +32,8 @@ export interface WidgetConfig {
   icon: any;
   defaultSize: { w: number; h: number; minW: number; minH: number };
   category: "status" | "kpi" | "chart";
+  requiredPermissions?: string[]; // Permissions needed to see this widget
+  recommendedForRoles?: string[]; // Which roles should have this in default layout
 }
 
 export const availableWidgets: WidgetConfig[] = [
@@ -40,6 +44,8 @@ export const availableWidgets: WidgetConfig[] = [
     icon: Clock,
     defaultSize: { w: 2, h: 2, minW: 2, minH: 2 },
     category: "status",
+    // No permissions required - everyone sees the clock
+    recommendedForRoles: ["admin", "chief-stewardess", "stewardess", "eto", "crew"],
   },
   {
     id: "clock2",
@@ -48,6 +54,8 @@ export const availableWidgets: WidgetConfig[] = [
     icon: Clock,
     defaultSize: { w: 2, h: 2, minW: 2, minH: 2 },
     category: "status",
+    // No permissions required - alternative clock style
+    recommendedForRoles: [],
   },
   {
     id: "guest-status",
@@ -56,6 +64,8 @@ export const availableWidgets: WidgetConfig[] = [
     icon: UserCheck,
     defaultSize: { w: 2, h: 2, minW: 2, minH: 2 },
     category: "status",
+    requiredPermissions: ["guests.view"],
+    recommendedForRoles: ["admin", "chief-stewardess", "stewardess", "crew"],
   },
   {
     id: "weather-windy",
@@ -64,6 +74,8 @@ export const availableWidgets: WidgetConfig[] = [
     icon: Cloud,
     defaultSize: { w: 4, h: 5, minW: 3, minH: 4 },
     category: "status",
+    // No permissions required - weather is public info
+    recommendedForRoles: ["admin"],
   },
   {
     id: "weather",
@@ -72,6 +84,8 @@ export const availableWidgets: WidgetConfig[] = [
     icon: Cloud,
     defaultSize: { w: 3, h: 3, minW: 2, minH: 3 },
     category: "status",
+    // No permissions required - weather is public info
+    recommendedForRoles: ["chief-stewardess", "stewardess", "eto", "crew"],
   },
   {
     id: "windy",
@@ -80,6 +94,8 @@ export const availableWidgets: WidgetConfig[] = [
     icon: Wind,
     defaultSize: { w: 4, h: 4, minW: 3, minH: 3 },
     category: "status",
+    // No permissions required - weather is public info
+    recommendedForRoles: [],
   },
   // DND widget removed from here - it's now auto-managed (always active, auto-show/hide)
   {
@@ -89,6 +105,8 @@ export const availableWidgets: WidgetConfig[] = [
     icon: Clock,
     defaultSize: { w: 4, h: 3, minW: 3, minH: 2 },
     category: "status",
+    requiredPermissions: ["service-requests.view"],
+    recommendedForRoles: ["admin", "chief-stewardess", "stewardess", "crew"],
   },
   {
     id: "duty-timer",
@@ -97,10 +115,102 @@ export const availableWidgets: WidgetConfig[] = [
     icon: Clock,
     defaultSize: { w: 6, h: 3, minW: 4, minH: 3 },
     category: "status",
+    requiredPermissions: ["crew.view"],
+    recommendedForRoles: ["admin", "chief-stewardess"],
+  },
+  {
+    id: "button-simulator",
+    name: "ESP32 Button Simulator",
+    description: "Virtual smart button for testing MQTT and service requests",
+    icon: Radio,
+    defaultSize: { w: 3, h: 4, minW: 3, minH: 4 },
+    category: "status",
+    // Not shown by default - can be added manually from Manage Widgets
+    recommendedForRoles: [],
   },
   // Mock/hardcoded widgets removed: Active Devices, Service Requests Chart, Response Time Chart
   // These had fake data and are not production-ready
 ];
+
+/**
+ * Get all permissions for a given role
+ * Matches backend role permissions from backend/src/middleware/auth.ts
+ */
+export function getRolePermissions(role: string): string[] {
+  const rolePermissions: Record<string, string[]> = {
+    'admin': ['*'], // Admin has all permissions
+    'chief-stewardess': [
+      'service-requests.view',
+      'service-requests.create',
+      'service-requests.accept',
+      'service-requests.complete',
+      'guests.view',
+      'crew.view',
+      'devices.view',
+      'system.view-logs'
+    ],
+    'stewardess': [
+      'service-requests.view',
+      'service-requests.accept',
+      'service-requests.complete',
+      'guests.view'
+    ],
+    'eto': [
+      'devices.view',
+      'devices.add',
+      'devices.edit',
+      'system.view-logs'
+    ],
+    'crew': [
+      'service-requests.view',
+      'guests.view'
+    ]
+  };
+
+  return rolePermissions[role] || [];
+}
+
+/**
+ * Check if user has required permissions for a widget
+ */
+export function hasRequiredPermissions(userRole: string, requiredPermissions?: string[]): boolean {
+  // If no permissions required, everyone can see it
+  if (!requiredPermissions || requiredPermissions.length === 0) {
+    return true;
+  }
+
+  const userPermissions = getRolePermissions(userRole);
+
+  // Admin has all permissions
+  if (userPermissions.includes('*')) {
+    return true;
+  }
+
+  // Check if user has at least one of the required permissions
+  return requiredPermissions.some(permission => userPermissions.includes(permission));
+}
+
+/**
+ * Filter widgets based on user role permissions
+ */
+export function getAvailableWidgetsForRole(role: string): WidgetConfig[] {
+  return availableWidgets.filter(widget =>
+    hasRequiredPermissions(role, widget.requiredPermissions)
+  );
+}
+
+/**
+ * Get default active widgets for a role
+ * Returns widget IDs that are recommended for this role
+ */
+export function getDefaultWidgetsForRole(role: string): string[] {
+  const availableForRole = getAvailableWidgetsForRole(role);
+
+  // Return widgets that are recommended for this role
+  return availableForRole
+    .filter(widget => widget.recommendedForRoles?.includes(role))
+    .map(widget => widget.id);
+}
 
 interface ManageWidgetsDialogProps {
   isOpen: boolean;
@@ -115,7 +225,12 @@ export function ManageWidgetsDialog({
   activeWidgets,
   onUpdateWidgets,
 }: ManageWidgetsDialogProps) {
+  const { user } = useAuth();
   const [selectedWidgets, setSelectedWidgets] = useState<string[]>(activeWidgets);
+
+  // Get widgets available to this user based on their role permissions
+  const userRole = user?.role || 'crew';
+  const availableForUser = getAvailableWidgetsForRole(userRole);
 
   const handleToggleWidget = (widgetId: string) => {
     setSelectedWidgets((prev) =>
@@ -136,10 +251,11 @@ export function ManageWidgetsDialog({
     onClose();
   };
 
+  // Group widgets by category, but only show widgets available to this user
   const groupedWidgets = {
-    status: availableWidgets.filter((w) => w.category === "status"),
-    kpi: availableWidgets.filter((w) => w.category === "kpi"),
-    chart: availableWidgets.filter((w) => w.category === "chart"),
+    status: availableForUser.filter((w) => w.category === "status"),
+    kpi: availableForUser.filter((w) => w.category === "kpi"),
+    chart: availableForUser.filter((w) => w.category === "chart"),
   };
 
   return (

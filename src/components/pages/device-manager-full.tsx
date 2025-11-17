@@ -6,7 +6,10 @@
 import { useState } from 'react';
 import { useDevices, useDeviceMutations, Device } from '../../hooks/useDevices';
 import { useLocations } from '../../hooks/useLocations';
+import { useAppData } from '../../contexts/AppDataContext';
 import { SmartButtonConfigDialog } from '../devices/SmartButtonConfigDialog';
+import { WatchConfigDialog } from '../devices/WatchConfigDialog';
+import { AddDeviceDialog } from '../devices/AddDeviceDialog';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -40,6 +43,22 @@ import {
 import { toast } from 'sonner';
 import { Progress } from '../ui/progress';
 
+// Helper function to format device subType for display
+const formatDeviceType = (subType: string | null | undefined): string => {
+  if (!subType) return 'Unknown';
+
+  const typeMap: Record<string, string> = {
+    'wear_os': 'Wear OS',
+    'esp32': 'ESP32',
+    'lora_wifi': 'LoRa-WiFi',
+    'lora_868': 'LoRa 868',
+    'lora_915': 'LoRa 915',
+    'lora_433': 'LoRa 433',
+  };
+
+  return typeMap[subType] || subType.toUpperCase();
+};
+
 export function DeviceManagerPage() {
   const [activeTab, setActiveTab] = useState('buttons');
   const [searchQuery] = useState('');
@@ -51,7 +70,8 @@ export function DeviceManagerPage() {
   // Fetch data
   const { data: allDevices = [], refetch } = useDevices();
   const { locations } = useLocations();
-  const { updateDevice, deleteDevice, testDevice } = useDeviceMutations();
+  const { crewMembers } = useAppData();
+  const { createDevice, updateDevice, deleteDevice, testDevice } = useDeviceMutations();
 
   // Filter devices by tab
   const filterByType = (type: string) => {
@@ -125,12 +145,39 @@ export function DeviceManagerPage() {
   // Handle delete
   const handleDelete = async (device: Device) => {
     if (!confirm(`Delete ${device.name}?`)) return;
-    
+
     try {
       await deleteDevice(device.id);
       toast.success('Device deleted');
     } catch (error) {
       toast.error('Failed to delete device');
+    }
+  };
+
+  // Handle add new device
+  const handleAdd = async (deviceData: {
+    deviceId: string;
+    name: string;
+    type: 'smart_button' | 'watch' | 'repeater' | 'mobile_app';
+    subType?: string;
+    locationId?: string;
+    crewMemberId?: string;
+    connectionType?: string;
+  }) => {
+    try {
+      await createDevice({
+        ...deviceData,
+        status: 'offline', // New devices start as offline until they connect
+      });
+      toast.success(`Device ${deviceData.name} added successfully!`);
+      refetch(); // Refresh device list
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('Failed to add device:', errorMessage);
+      toast.error('Failed to add device', {
+        description: errorMessage,
+      });
+      throw error; // Re-throw to let dialog handle it
     }
   };
 
@@ -307,7 +354,7 @@ export function DeviceManagerPage() {
                 <TableCell>{device.name}</TableCell>
                 <TableCell>
                   <Badge variant="outline">
-                    {device.subType?.toUpperCase()}
+                    {formatDeviceType(device.subType)}
                   </Badge>
                 </TableCell>
                 <TableCell>
@@ -505,7 +552,7 @@ export function DeviceManagerPage() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline">
-                      {device.subType?.toUpperCase()}
+                      {formatDeviceType(device.subType)}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -617,8 +664,21 @@ export function DeviceManagerPage() {
         />
       )}
 
-      {/* TODO: Other device type dialogs */}
-      {selectedDevice?.type !== 'smart_button' && (
+      {/* Watch Configuration Dialog */}
+      {selectedDevice?.type === 'watch' && (
+        <WatchConfigDialog
+          device={selectedDevice}
+          open={isConfigDialogOpen}
+          onClose={() => {
+            setIsConfigDialogOpen(false);
+            setSelectedDevice(null);
+          }}
+          onSave={handleConfigSave}
+        />
+      )}
+
+      {/* TODO: Other device type dialogs (repeater, mobile_app) */}
+      {selectedDevice?.type !== 'smart_button' && selectedDevice?.type !== 'watch' && (
         <Dialog open={isConfigDialogOpen} onOpenChange={setIsConfigDialogOpen}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
@@ -638,6 +698,16 @@ export function DeviceManagerPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Add Device Dialog */}
+      <AddDeviceDialog
+        open={isAddDialogOpen}
+        onClose={() => setIsAddDialogOpen(false)}
+        onAdd={handleAdd}
+        locations={locations || []}
+        crewMembers={crewMembers}
+        defaultType={activeTab === 'buttons' ? 'smart_button' : activeTab === 'watches' ? 'watch' : 'repeater'}
+      />
     </div>
   );
 }

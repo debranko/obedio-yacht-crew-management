@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary Brand Colors -->
+    <color name="colorPrimary">#1E293B</color>
+    <color name="colorPrimaryDark">#0F172A</color>
+    <color name="colorAccent">#3B82F6</color>
+
+    <!-- Base Colors -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+
+    <!-- Background Colors -->
+    <color name="background_light">#F8FAFC</color>
+    <color name="background_dark">#0F172A</color>
+
+    <!-- Status Colors -->
+    <color name="status_success">#10B981</color>
+    <color name="status_warning">#F59E0B</color>
+    <color name="status_error">#EF4444</color>
+    <color name="status_info">#3B82F6</color>
+
+    <!-- Priority Colors -->
+    <color name="priority_emergency">#DC2626</color>
+    <color name="priority_urgent">#F97316</color>
+    <color name="priority_normal">#3B82F6</color>
+    <color name="priority_low">#6B7280</color>
+</resources>

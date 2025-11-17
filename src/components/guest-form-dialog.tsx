@@ -57,7 +57,7 @@ function CabinSelect({ value, onValueChange }: { value?: string; onValueChange: 
           </SelectItem>
         ) : (
           cabins.map((cabin) => (
-            <SelectItem key={cabin.id} value={cabin.name}>
+            <SelectItem key={cabin.id} value={cabin.id}>
               {cabin.name} {cabin.floor && `(${cabin.floor})`}
             </SelectItem>
           ))
@@ -77,12 +77,12 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
     lastName: '',
     preferredName: '',
     photo: undefined,
-    type: 'charter',
+    type: 'guest',
     status: 'expected',
     nationality: '',
     languages: [],
     passportNumber: '',
-    cabin: '',
+    locationId: undefined,
     checkInDate: new Date().toISOString().split('T')[0],
     checkInTime: '14:00',
     checkOutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -94,7 +94,7 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
     favoriteFoods: [],
     favoriteDrinks: [],
     specialOccasion: '',
-    specialOccasionDate: '',
+    specialOccasionDate: undefined,
     specialRequests: '',
     vipNotes: '',
     crewNotes: '',
@@ -125,12 +125,12 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
         lastName: '',
         preferredName: '',
         photo: undefined,
-        type: 'charter',
+        type: 'guest',
         status: 'expected',
         nationality: '',
         languages: [],
         passportNumber: '',
-        cabin: '',
+        locationId: undefined,
         checkInDate: new Date().toISOString().split('T')[0],
         checkInTime: '14:00',
         checkOutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -142,7 +142,7 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
         favoriteFoods: [],
         favoriteDrinks: [],
         specialOccasion: '',
-        specialOccasionDate: '',
+        specialOccasionDate: undefined,
         specialRequests: '',
         vipNotes: '',
         crewNotes: '',
@@ -208,10 +208,29 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
       return;
     }
 
+    // Transform data for backend validation
+    const dataToSend = {
+      ...formData,
+      // Convert date-only strings to ISO datetime format
+      checkInDate: formData.checkInDate ? `${formData.checkInDate}T00:00:00.000Z` : undefined,
+      checkOutDate: formData.checkOutDate ? `${formData.checkOutDate}T00:00:00.000Z` : undefined,
+      specialOccasionDate: formData.specialOccasionDate ? `${formData.specialOccasionDate}T00:00:00.000Z` : undefined,
+      // Convert empty contactPerson.email to undefined for validation
+      contactPerson: formData.contactPerson && (
+        formData.contactPerson.name ||
+        formData.contactPerson.phone ||
+        formData.contactPerson.email ||
+        formData.contactPerson.role
+      ) ? {
+        ...formData.contactPerson,
+        email: formData.contactPerson.email || undefined,
+      } : undefined,
+    };
+
     if (guest) {
       // Update existing guest via backend API
       updateGuest(
-        { id: guest.id, data: formData },
+        { id: guest.id, data: dataToSend },
         {
           onSuccess: () => {
             onOpenChange(false);
@@ -221,7 +240,7 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
     } else {
       // Add new guest via backend API
       createGuest(
-        formData as Omit<Guest, 'id' | 'createdAt' | 'updatedAt'>,
+        dataToSend as Omit<Guest, 'id' | 'createdAt' | 'updatedAt'>,
         {
           onSuccess: () => {
             onOpenChange(false);
@@ -346,13 +365,11 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="primary">Primary Guest</SelectItem>
+                      <SelectItem value="guest">Guest</SelectItem>
                       <SelectItem value="partner">Partner</SelectItem>
                       <SelectItem value="family">Family</SelectItem>
-                      <SelectItem value="child">Child</SelectItem>
                       <SelectItem value="vip">VIP</SelectItem>
                       <SelectItem value="owner">Owner</SelectItem>
-                      <SelectItem value="charter">Charter</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -513,8 +530,8 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
               <div className="space-y-2">
                 <Label htmlFor="cabin">Cabin Assignment</Label>
                 <CabinSelect
-                  value={formData.cabin}
-                  onValueChange={(value) => setFormData({ ...formData, cabin: value })}
+                  value={formData.locationId}
+                  onValueChange={(value) => setFormData({ ...formData, locationId: value })}
                 />
               </div>
 

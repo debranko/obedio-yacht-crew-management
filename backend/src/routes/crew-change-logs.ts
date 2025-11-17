@@ -1,15 +1,17 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../services/db';
 import { authMiddleware } from '../middleware/auth';
+import { calculatePagination, buildPaginationMeta } from '../utils/pagination';
+import { asyncHandler } from '../middleware/error-handler';
+import { apiSuccess, apiError } from '../utils/api-response';
 
 const router = Router();
 
 // Get crew change logs with filters
-router.get('/', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const { 
-      limit = 50, 
-      offset = 0,
+router.get('/', authMiddleware, asyncHandler(async (req: Request, res: Response) => {
+    const {
+      page = 1,
+      limit = 50,
       crewMemberId,
       changeType,
       changedBy,
@@ -17,21 +19,21 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
       endDate,
       search
     } = req.query;
-    
+
     const where: any = {};
-    
+
     if (crewMemberId) {
       where.crewMemberId = crewMemberId as string;
     }
-    
+
     if (changeType) {
       where.changeType = changeType as string;
     }
-    
+
     if (changedBy) {
       where.changedBy = changedBy as string;
     }
-    
+
     if (startDate || endDate) {
       where.createdAt = {};
       if (startDate) {
@@ -41,7 +43,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
         where.createdAt.lte = new Date(endDate as string);
       }
     }
-    
+
     // Search in reason field
     if (search) {
       where.OR = [
@@ -50,13 +52,15 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
         { newValue: { contains: search as string, mode: 'insensitive' } }
       ];
     }
-    
+
+    const { skip, take, page: pageNum, limit: limitNum } = calculatePagination(Number(page), Number(limit));
+
     const [logs, total] = await Promise.all([
       prisma.crewChangeLog.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        take: Number(limit),
-        skip: Number(offset)
+        take,
+        skip
       }),
       prisma.crewChangeLog.count({ where })
     ]);
@@ -84,8 +88,9 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
       
       return {
         id: log.id,
-        crewMember: crewMember?.name || 'Unknown',
-        changeType: mappedChangeType,
+        crewMemberId: log.crewMemberId,
+        crewMemberName: crewMember?.name || 'Unknown',
+        action: mappedChangeType,
         date,
         shift,
         details: log.reason || `${log.fieldName}: ${log.oldValue} → ${log.newValue}`,
@@ -94,87 +99,71 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
         notified: true // Assume all logged changes were notified
       };
     }));
-    
-    res.json({
-      data: transformedLogs,
-      pagination: {
-        total,
-        limit: Number(limit),
-        offset: Number(offset)
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching crew change logs:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+
+  // Wrap data + pagination in a single object so API wrapper returns both fields
+  const response = {
+    data: transformedLogs,
+    pagination: buildPaginationMeta(total, pageNum, limitNum)
+  };
+  res.json(apiSuccess(response));
+}));
 
 // Create crew change log entry
-router.post('/', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user.id;
-    const {
+router.post('/', authMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const userId = (req as any).user.id;
+  const {
+    crewMemberId,
+    changeType,
+    fieldName,
+    oldValue,
+    newValue,
+    reason
+  } = req.body;
+
+  if (!crewMemberId || !changeType || !fieldName || !newValue) {
+    return res.status(400).json(apiError(
+      'crewMemberId, changeType, fieldName, and newValue are required',
+      'VALIDATION_ERROR'
+    ));
+  }
+
+  const log = await prisma.crewChangeLog.create({
+    data: {
       crewMemberId,
       changeType,
       fieldName,
       oldValue,
       newValue,
+      changedBy: userId,
       reason
-    } = req.body;
-    
-    if (!crewMemberId || !changeType || !fieldName || !newValue) {
-      return res.status(400).json({ 
-        error: 'crewMemberId, changeType, fieldName, and newValue are required' 
-      });
     }
-    
-    const log = await prisma.crewChangeLog.create({
-      data: {
-        crewMemberId,
-        changeType,
-        fieldName,
-        oldValue,
-        newValue,
-        changedBy: userId,
-        reason
-      }
-    });
-    
-    res.status(201).json(log);
-  } catch (error) {
-    console.error('Error creating crew change log:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+  });
+
+  res.status(201).json(apiSuccess(log));
+}));
 
 // Get logs for a specific crew member
-router.get('/crew/:crewMemberId', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const { crewMemberId } = req.params;
-    const { limit = 20 } = req.query;
-    
-    const logs = await prisma.crewChangeLog.findMany({
-      where: { crewMemberId },
-      orderBy: { createdAt: 'desc' },
-      take: Number(limit)
-    });
-    
-    res.json(logs);
-  } catch (error) {
-    console.error('Error fetching crew member logs:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+router.get('/crew/:crewMemberId', authMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const { crewMemberId } = req.params;
+  const { limit = 20 } = req.query;
+
+  const logs = await prisma.crewChangeLog.findMany({
+    where: { crewMemberId },
+    orderBy: { createdAt: 'desc' },
+    take: Number(limit)
+  });
+
+  res.json(apiSuccess(logs));
+}));
 
 // Log bulk changes (e.g., from duty roster notifications)
-router.post('/bulk', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user.id;
-    const { changes } = req.body;
-    
-    if (!Array.isArray(changes) || changes.length === 0) {
-      return res.status(400).json({ error: 'changes array is required' });
-    }
+router.post('/bulk', authMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const userId = (req as any).user.id;
+  const { changes } = req.body;
+
+  if (!Array.isArray(changes) || changes.length === 0) {
+    return res.status(400).json(apiError('changes array is required', 'VALIDATION_ERROR'));
+  }
     
     const logs = await Promise.all(changes.map(async (change: any) => {
       const crewMember = await prisma.crewMember.findFirst({
@@ -226,45 +215,37 @@ router.post('/bulk', authMiddleware, async (req: Request, res: Response) => {
         }
       });
     }));
-    
-    const createdLogs = logs.filter(log => log !== null);
-    res.status(201).json(createdLogs);
-  } catch (error) {
-    console.error('Error creating bulk crew change logs:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+
+  const createdLogs = logs.filter(log => log !== null);
+  // Return count instead of array to match hook expectation
+  res.status(201).json(apiSuccess({ count: createdLogs.length }));
+}));
 
 // Get recent changes for dashboard
-router.get('/recent', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const recentLogs = await prisma.crewChangeLog.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 10
+router.get('/recent', authMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const recentLogs = await prisma.crewChangeLog.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: 10
+  });
+
+  // Manually fetch crew member details
+  const logsWithCrew = await Promise.all(recentLogs.map(async (log) => {
+    const crewMember = await prisma.crewMember.findUnique({
+      where: { id: log.crewMemberId },
+      select: {
+        id: true,
+        name: true,
+        position: true
+      }
     });
-    
-    // Manually fetch crew member details
-    const logsWithCrew = await Promise.all(recentLogs.map(async (log) => {
-      const crewMember = await prisma.crewMember.findUnique({
-        where: { id: log.crewMemberId },
-        select: {
-          id: true,
-          name: true,
-          position: true
-        }
-      });
-      
-      return {
-        ...log,
-        crewMember
-      };
-    }));
-    
-    res.json(logsWithCrew);
-  } catch (error) {
-    console.error('Error fetching recent crew changes:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+
+    return {
+      ...log,
+      crewMember
+    };
+  }));
+
+  res.json(apiSuccess(logsWithCrew));
+}));
 
 export default router;

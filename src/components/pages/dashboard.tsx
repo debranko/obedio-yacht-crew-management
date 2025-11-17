@@ -1,7 +1,8 @@
 import { DashboardGrid, DashboardGridHandle } from "../dashboard-grid";
-import { forwardRef, useImperativeHandle, useRef, useState } from "react";
-import { ManageWidgetsDialog } from "../manage-widgets-dialog";
+import { forwardRef, useImperativeHandle, useRef, useState, useEffect } from "react";
+import { ManageWidgetsDialog, getDefaultWidgetsForRole } from "../manage-widgets-dialog";
 import { useUserPreferences } from "../../hooks/useUserPreferences";
+import { useAuth } from "../../contexts/AuthContext";
 
 export interface DashboardPageHandle {
   resetLayout: () => void;
@@ -14,31 +15,44 @@ interface DashboardPageProps {
   onNavigate?: (page: string) => void;
 }
 
-// Default active widgets - Clean Dashboard Layout
-const DEFAULT_ACTIVE_WIDGETS = [
-  "serving-now",
-  "weather",
-  "clock",
-  "duty-timer",
-];
-
 export const DashboardPage = forwardRef<DashboardPageHandle, DashboardPageProps>(
   ({ isEditMode = false, onEditModeChange, onNavigate }, ref) => {
+  const { user } = useAuth();
   const dashboardGridRef = useRef<DashboardGridHandle>(null);
   const [showManageWidgets, setShowManageWidgets] = useState(false);
-  
+
   // Load active widgets from backend (user preferences)
-  const { preferences, updateDashboard } = useUserPreferences();
-  const [activeWidgets, setActiveWidgets] = useState<string[]>(() => {
-    return preferences?.activeWidgets || DEFAULT_ACTIVE_WIDGETS;
-  });
+  const { preferences, updateDashboard, isLoading } = useUserPreferences();
+
+  // Get role-based default widgets
+  const userRole = user?.role || 'crew';
+  const roleBasedDefaults = getDefaultWidgetsForRole(userRole);
+
+  // Always include DND widget (auto-managed)
+  const defaultActiveWidgets = [...roleBasedDefaults, "dnd-guests"];
+
+  const [activeWidgets, setActiveWidgets] = useState<string[]>(defaultActiveWidgets);
 
   // Update activeWidgets when preferences load from backend
-  useState(() => {
-    if (preferences?.activeWidgets) {
+  useEffect(() => {
+    if (!isLoading && preferences?.activeWidgets && preferences.activeWidgets.length > 0) {
+      console.log('📦 Dashboard: Loading active widgets from preferences:', preferences.activeWidgets);
       setActiveWidgets(preferences.activeWidgets);
+    } else if (!isLoading && (!preferences?.activeWidgets || preferences.activeWidgets.length === 0)) {
+      // No saved preferences - use role-based defaults
+      console.log('📦 Dashboard: No saved preferences, using role-based defaults for', userRole);
+      setActiveWidgets(defaultActiveWidgets);
     }
-  });
+  }, [preferences?.activeWidgets, isLoading, userRole]);
+
+  // Update backend when widgets change
+  const handleUpdateWidgets = (newWidgets: string[]) => {
+    setActiveWidgets(newWidgets);
+    updateDashboard({
+      activeWidgets: newWidgets,
+      dashboardLayout: preferences?.dashboardLayout || [],
+    });
+  };
   
   // Expose functions to parent
   useImperativeHandle(ref, () => ({
@@ -56,7 +70,7 @@ export const DashboardPage = forwardRef<DashboardPageHandle, DashboardPageProps>
         isOpen={showManageWidgets}
         onClose={() => setShowManageWidgets(false)}
         activeWidgets={activeWidgets}
-        onUpdateWidgets={setActiveWidgets}
+        onUpdateWidgets={handleUpdateWidgets}
       />
       
       <div className="space-y-6">

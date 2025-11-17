@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
-export type GuestStatus = 'onboard' | 'ashore' | 'none';
+export type GuestStatus = 'onboard' | 'none';
 
 interface AppHeaderProps {
   onThemeToggle?: () => void;
@@ -31,8 +31,6 @@ export function AppHeader({ onThemeToggle, isDark, guestStatus = 'onboard', onGu
     switch (status) {
       case 'onboard':
         return { icon: Users, label: 'Guests Onboard', color: 'text-green-600 dark:text-green-400', bgColor: 'bg-green-500/10' };
-      case 'ashore':
-        return { icon: Ship, label: 'Guests Ashore', color: 'text-amber-600 dark:text-amber-400', bgColor: 'bg-amber-500/10' };
       case 'none':
         return { icon: UserX, label: 'No Guests', color: 'text-muted-foreground', bgColor: 'bg-muted' };
     }
@@ -54,7 +52,7 @@ export function AppHeader({ onThemeToggle, isDark, guestStatus = 'onboard', onGu
                 size="sm"
                 className="h-9 px-3 gap-2"
               >
-                <div className={`w-2 h-2 rounded-full ${guestStatus === 'onboard' ? 'bg-green-500 animate-pulse' : guestStatus === 'ashore' ? 'bg-amber-500' : 'bg-muted-foreground/50'}`} />
+                <div className={`w-2 h-2 rounded-full ${guestStatus === 'onboard' ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground/50'}`} />
                 <currentStatus.icon className={`h-4 w-4 ${currentStatus.color}`} />
                 <span className="text-xs font-medium">{currentStatus.label}</span>
                 <ChevronDown className="h-3 w-3 opacity-50" />
@@ -72,21 +70,9 @@ export function AppHeader({ onThemeToggle, isDark, guestStatus = 'onboard', onGu
                 </div>
                 {guestStatus === 'onboard' && <div className="w-2 h-2 rounded-full bg-green-500" />}
               </DropdownMenuItem>
-              
-              <DropdownMenuItem
-                onClick={() => onGuestStatusChange?.('ashore')}
-                className="gap-2"
-              >
-                <Ship className="h-4 w-4 text-amber-600" />
-                <div className="flex-1">
-                  <p className="font-medium">Guests Ashore</p>
-                  <p className="text-xs text-muted-foreground">Guests on land/excursion</p>
-                </div>
-                {guestStatus === 'ashore' && <div className="w-2 h-2 rounded-full bg-amber-500" />}
-              </DropdownMenuItem>
-              
+
               <DropdownMenuSeparator />
-              
+
               <DropdownMenuItem
                 onClick={() => onGuestStatusChange?.('none')}
                 className="gap-2"

@@ -60,5 +60,13 @@ export default defineConfig({
     watch: {
       usePolling: true,
     },
+    // Proxy API requests to backend (fixes auth cookie persistence on refresh)
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false,
+      }
+    },
   },
 });

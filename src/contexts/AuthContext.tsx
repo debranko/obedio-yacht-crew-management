@@ -25,7 +25,8 @@ interface AuthContextType {
   updateUser: (updates: Partial<User>) => void;
 }
 
-const API_BASE_URL = 'http://localhost:8080/api';
+// Use relative path - Vite proxy forwards /api to backend automatically
+const API_BASE_URL = '/api';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -37,124 +38,74 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Debug: Log state changes
+  // Handle auth:logout event
   useEffect(() => {
-    console.log('📊 AuthProvider state changed:', { 
-      user: user ? `${user.name} (${user.role})` : 'null', 
-      isLoading,
-      isAuthenticated: !!user
-    });
-  }, [user, isLoading]);
+    const handleAuthLogout = (event: CustomEvent) => {
+      logout();
+    };
 
-  // Check for existing session on mount and verify token
+    window.addEventListener('auth:logout' as any, handleAuthLogout);
+
+    return () => {
+      window.removeEventListener('auth:logout' as any, handleAuthLogout);
+    };
+  }, []);
+
+  // Check for existing session on mount via HTTP-only cookie
+  // Auth token stored in cookie (server runs 24/7), no localStorage needed
   useEffect(() => {
     const checkAuth = async () => {
-      console.log('🔍 Checking for existing session...');
-      try {
-        const storedUser = localStorage.getItem('obedio-auth-user');
-        const storedToken = localStorage.getItem('obedio-auth-token');
+      console.log('🔍 [Auth] Starting session check...');
+      console.log('🔍 [Auth] API_BASE_URL:', API_BASE_URL);
 
-        console.log('📦 localStorage check:', {
-          hasUser: !!storedUser,
-          hasToken: !!storedToken
+      try {
+        // Verify session with backend - cookie sent automatically
+        console.log('🔍 [Auth] Calling /auth/verify endpoint...');
+        const response = await fetch(`${API_BASE_URL}/auth/verify`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include', // Send HTTP-only cookie
         });
 
-        if (storedUser && storedToken) {
-          console.log('✅ Found stored session, verifying token...');
-          
-          // Verify token with backend
-          try {
-            const response = await fetch(`${API_BASE_URL}/auth/verify`, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${storedToken}`,
-                'Content-Type': 'application/json',
-              },
-            });
+        console.log('🔍 [Auth] Response status:', response.status, response.ok);
 
-            if (response.ok) {
-              const data = await response.json();
-              if (data.success && data.valid && data.user) {
-                console.log('✅ Token valid, updating user data');
-                // Update user data from server (might have changed)
-                const user: User = {
-                  id: data.user.id,
-                  name: data.user.name,
-                  email: data.user.email,
-                  role: data.user.role as Role,
-                  avatar: data.user.avatar,
-                  department: data.user.department,
-                  username: data.user.username,
-                };
-                setUser(user);
-                // Update localStorage with fresh user data
-                localStorage.setItem('obedio-auth-user', JSON.stringify(user));
-                console.log('✅ Session restored and verified successfully!');
-              } else {
-                throw new Error('Invalid token');
-              }
-            } else {
-              throw new Error('Token verification failed');
-            }
-          } catch (error) {
-            console.error('❌ Token verification failed:', error);
-            // Token is invalid, try to refresh it
-            try {
-              const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ refreshToken: storedToken }),
-              });
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ [Auth] Verify response data:', data);
 
-              if (refreshResponse.ok) {
-                const refreshData = await refreshResponse.json();
-                if (refreshData.success && refreshData.data) {
-                  const { user: userData, token: newToken } = refreshData.data;
-                  console.log('✅ Token refreshed successfully');
-                  
-                  // Store new token
-                  localStorage.setItem('obedio-auth-token', newToken);
-                  
-                  // Update user
-                  const user: User = {
-                    id: userData.id,
-                    name: userData.name,
-                    email: userData.email,
-                    role: userData.role as Role,
-                    avatar: userData.avatar,
-                    department: userData.department,
-                    username: userData.username,
-                  };
-                  setUser(user);
-                  localStorage.setItem('obedio-auth-user', JSON.stringify(user));
-                } else {
-                  throw new Error('Failed to refresh token');
-                }
-              } else {
-                throw new Error('Token refresh failed');
-              }
-            } catch (refreshError) {
-              console.error('❌ Token refresh failed:', refreshError);
-              // Clear invalid session
-              localStorage.removeItem('obedio-auth-user');
-              localStorage.removeItem('obedio-auth-token');
-              setUser(null);
-              console.log('🗑️ Cleared invalid session');
-            }
+          // Backend returns { success, valid, user } directly (no wrapper)
+          if (data.success && data.valid && data.user) {
+            // Session is valid, set user from server
+            console.log('✅ [Auth] Session VALID - restoring user:', data.user.username);
+            const user: User = {
+              id: data.user.id,
+              name: data.user.name,
+              email: data.user.email,
+              role: data.user.role as Role,
+              avatar: data.user.avatar,
+              department: data.user.department,
+              username: data.user.username,
+            };
+            setUser(user);
+          } else {
+            // Invalid session
+            console.warn('⚠️ [Auth] Session INVALID - data structure wrong:', data);
+            setUser(null);
           }
         } else {
-          console.log('❌ No stored session found');
+          // No valid session
+          console.warn('⚠️ [Auth] No valid session - status:', response.status);
+          const errorData = await response.json().catch(() => null);
+          console.warn('⚠️ [Auth] Error data:', errorData);
+          setUser(null);
         }
       } catch (error) {
-        console.error('❌ Auth check failed:', error);
-        // Clear invalid session
-        localStorage.removeItem('obedio-auth-user');
-        localStorage.removeItem('obedio-auth-token');
-        console.log('🗑️ Cleared invalid session');
+        console.error('❌ [Auth] Session check failed:', error);
+        setUser(null);
       } finally {
-        console.log('🏁 Auth check complete, setting isLoading = false');
+        console.log('🏁 [Auth] Session check complete. isLoading = false');
         setIsLoading(false);
       }
     };
@@ -163,55 +114,52 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    console.log('🔑 AuthContext.login called');
-    console.log('🔑 Current state before login:', { user, isLoading });
     try {
-      console.log('⏳ Setting isLoading = true');
       setIsLoading(true);
 
-      console.log('📡 Fetching http://localhost:8080/api/auth/login...');
-      
-      // Call backend API for authentication
+      // Backend sets HTTP-only cookie on successful login
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Receive HTTP-only cookie
         body: JSON.stringify({ username: email, password }),
       });
-
-      console.log('📥 Response received:', response.status, response.statusText);
 
       if (!response.ok) {
         let errorMessage = 'Login failed';
         try {
           const error = await response.json();
-          errorMessage = error.message || error.error || errorMessage;
+          if (response.status === 401) {
+            errorMessage = error.message || 'Invalid username or password';
+          } else if (response.status === 404) {
+            errorMessage = 'User not found';
+          } else {
+            errorMessage = error.message || error.error || `Server error: ${response.status}`;
+          }
         } catch {
-          errorMessage = `Server error: ${response.status} ${response.statusText}`;
+          if (response.status === 401) {
+            errorMessage = 'Invalid username or password';
+          } else {
+            errorMessage = `Server error: ${response.status} ${response.statusText}`;
+          }
         }
-        console.error('🔴 Response not OK:', errorMessage);
         throw new Error(errorMessage);
       }
 
       const data = await response.json();
-      console.log('📦 Response data:', data);
 
       if (!data.success) {
-        console.error('🔴 Data.success is false');
         throw new Error(data.message || 'Login failed');
       }
 
-      if (!data.data || !data.data.user || !data.data.token) {
-        console.error('🔴 Invalid data structure:', data);
+      if (!data.data || !data.data.user) {
         throw new Error('Invalid login response from server');
       }
 
-      // Extract user and token from response
-      const { user: userData, token } = data.data;
-      console.log('👤 User data extracted:', userData);
+      const { user: userData } = data.data;
 
-      // Map backend user data to frontend User type
       const user: User = {
         id: userData.id,
         name: userData.name,
@@ -222,26 +170,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
         username: userData.username,
       };
 
-      console.log('💾 Storing to localStorage...');
-      // Store in localStorage
-      localStorage.setItem('obedio-auth-user', JSON.stringify(user));
-      localStorage.setItem('obedio-auth-token', token);
-      console.log('📦 Stored user:', user);
-      console.log('🔑 Stored token:', token.substring(0, 20) + '...');
-
-      console.log('✅ Setting user state...');
-      // Update state
+      // Auth token in HTTP-only cookie (server manages 24/7)
+      // No localStorage needed - state in memory only
       setUser(user);
-      console.log('👤 User state set:', user);
-      console.log('🎉 Login complete! isAuthenticated should be:', !!user);
     } catch (error) {
-      console.error('Login error:', error);
-      
+      console.error('[Auth] Login failed:', error);
+
       // Re-throw with better message if it's a network error
       if (error instanceof TypeError && error.message.includes('fetch')) {
         throw new Error('Cannot connect to server. Please check if backend is running on http://localhost:8080');
       }
-      
+
       throw error;
     } finally {
       setIsLoading(false);
@@ -252,16 +191,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Clear user state
     setUser(null);
 
-    // Clear localStorage
-    localStorage.removeItem('obedio-auth-user');
-    localStorage.removeItem('obedio-auth-token');
-
-    // Optional: Call backend to invalidate token
+    // Call backend to clear HTTP-only cookie
     fetch(`${API_BASE_URL}/auth/logout`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('obedio-auth-token')}`,
-      },
+      credentials: 'include', // Send cookie to be cleared
     }).catch(error => {
       console.error('Logout error:', error);
     });
@@ -271,10 +204,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!user) return;
 
     const updatedUser = { ...user, ...updates };
+    // State in memory only - no localStorage needed
     setUser(updatedUser);
-
-    // Update localStorage
-    localStorage.setItem('obedio-auth-user', JSON.stringify(updatedUser));
   };
 
   const value: AuthContextType = {
