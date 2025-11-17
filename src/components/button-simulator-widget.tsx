@@ -543,13 +543,7 @@ export function ButtonSimulatorWidget() {
   const handleAuxButtonClick = (button: AuxButton, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    // Special handling for DND button
-    if (button.function === 'dnd') {
-      handleDNDToggle();
-      return;
-    }
-    
+
     // Environmental controls (Crestron integration) - Direct actions, no service request
     if (button.function === 'lights') {
       toast.success('💡 Lights toggled', {
@@ -557,11 +551,12 @@ export function ButtonSimulatorWidget() {
       });
       return;
     }
-    
-    // Service requests for crew
+
+    // All buttons (including DND) now send MQTT messages to backend
+    // Backend MQTT handler will toggle DND for aux1, create service requests for others
     const labels: Record<ButtonFunction, string> = {
-      dnd: "Do Not Disturb Toggle", // Won't reach here
-      lights: "Lights Control", // Won't reach here
+      dnd: "Do Not Disturb Toggle",
+      lights: "Lights Control",
       prepare_food: "Prepare Food",
       bring_drinks: "Bring Drinks"
     };

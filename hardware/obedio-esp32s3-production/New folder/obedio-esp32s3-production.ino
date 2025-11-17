@@ -51,7 +51,7 @@ const int MQTT_PORT = 1883;
 const char* MQTT_USER = "";  // No authentication
 const char* MQTT_PASS = "";
 const int MQTT_BUFFER_SIZE = 4096;
-const int MQTT_KEEPALIVE = 60;
+const int MQTT_KEEPALIVE_SECONDS = 60;
 
 // Backend Configuration
 const char* BACKEND_HOST = "10.10.0.207";
@@ -331,7 +331,7 @@ void setupMQTT() {
   mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
   mqttClient.setCallback(mqttCallback);
   mqttClient.setBufferSize(MQTT_BUFFER_SIZE);
-  mqttClient.setKeepAlive(MQTT_KEEPALIVE);
+  mqttClient.setKeepAlive(MQTT_KEEPALIVE_SECONDS);
 
   reconnectMQTT();
 }

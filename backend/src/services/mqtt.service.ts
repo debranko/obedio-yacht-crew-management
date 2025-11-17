@@ -292,11 +292,55 @@ class MQTTService {
         requestType = ServiceRequestType.voice;
         priority = 'normal';
       }
-      // Button-specific functions (from ESP32 spec lines 177-184)
+      // ============================================
+      // AUX1 BUTTON = DND TOGGLE (SPECIAL HANDLING)
+      // ============================================
+      // AUX1 does NOT create a service request - it toggles DND directly
+      // This matches the virtual button simulator behavior
       else if (message.button === 'aux1') {
-        requestType = ServiceRequestType.service;
-        priority = 'normal';
+        console.log('🔕 DND Toggle requested via MQTT (aux1 button)', {
+          deviceId,
+          locationId: device.locationId,
+          location: device.location?.name,
+          currentDND: device.location?.doNotDisturb
+        });
+
+        // Get current DND state and toggle it
+        const currentDNDState = device.location?.doNotDisturb || false;
+        const newDNDState = !currentDNDState;
+
+        // Update location DND status
+        const updatedLocation = await prisma.location.update({
+          where: { id: device.locationId! },
+          data: { doNotDisturb: newDNDState },
+          include: {
+            guests: true,
+            servicerequests: true
+          }
+        });
+
+        // Update guest DND status if guest exists at this location
+        if (guest?.id) {
+          await prisma.guest.update({
+            where: { id: guest.id },
+            data: { doNotDisturb: newDNDState }
+          });
+
+          console.log(`✅ Guest DND also toggled: ${guest.firstName} ${guest.lastName} → ${newDNDState ? 'ON' : 'OFF'}`);
+        }
+
+        // Broadcast DND toggle event to all connected clients
+        if (this.io) {
+          this.io.emit('location:dnd-toggled', updatedLocation);
+          console.log(`📡 WebSocket event emitted: location:dnd-toggled`);
+        }
+
+        console.log(`✅ DND toggled for ${device.location?.name}: ${currentDNDState ? 'ON' : 'OFF'} → ${newDNDState ? 'ON' : 'OFF'}`);
+
+        // Return early - do NOT create service request for DND toggle
+        return;
       }
+      // Button-specific functions (from ESP32 spec lines 177-184)
       else if (message.button === 'aux2') {
         requestType = ServiceRequestType.lights;
         priority = 'normal';

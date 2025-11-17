@@ -237,6 +237,26 @@ export class WebSocketService {
       } as ServiceRequestEvent);
     });
 
+    // Handle service request assignment (when crew accepts/delegates)
+    this.socket.on('service-request:assigned', (data: any) => {
+      console.log('📞 Service request assigned:', data);
+      this.notifyListeners('service-request', {
+        type: 'service-request-updated',
+        data,
+        timestamp: new Date().toISOString()
+      } as ServiceRequestEvent);
+    });
+
+    // Handle service request status changes
+    this.socket.on('service-request:status-changed', (data: any) => {
+      console.log('📞 Service request status changed:', data);
+      this.notifyListeners('service-request', {
+        type: 'service-request-updated',
+        data,
+        timestamp: new Date().toISOString()
+      } as ServiceRequestEvent);
+    });
+
     // Emergency Events
     this.socket.on('emergency:alert', (data: any) => {
       this.notifyListeners('emergency', {
