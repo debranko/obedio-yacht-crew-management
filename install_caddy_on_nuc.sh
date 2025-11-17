@@ -8,7 +8,7 @@ echo "=== Installing Caddy Reverse Proxy on OBEDIO NUC ==="
 echo ""
 
 # Navigate to project directory
-cd /home/obedio/obedio-yacht-crew-management
+cd /opt/obedio-yacht-crew-management
 
 # Backup current docker-compose
 echo "1. Backing up docker-compose.prod.yml..."

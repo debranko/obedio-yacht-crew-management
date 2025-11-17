@@ -148,7 +148,7 @@ If port 80 or 443 is already in use:
 
 ## Configuration Files
 
-- **Caddyfile:** `/Users/nicolas/vibecoding/obedio/obedio-yacht-crew-management/Caddyfile`
+- **Caddyfile:** `/opt/obedio-yacht-crew-management/Caddyfile`
 - **Docker Compose:** `docker-compose.prod.yml`
 - **Caddy Data:** Docker volume `caddy-data`
 - **Caddy Config:** Docker volume `caddy-config`
