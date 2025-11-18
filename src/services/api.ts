@@ -209,8 +209,8 @@ export interface ServiceRequestDTO {
   guestId: string;
   locationId?: string | null;
   requestType: 'call' | 'service' | 'emergency' | 'voice' | 'dnd' | 'lights' | 'prepare_food' | 'bring_drinks';
-  // Changed to match actual backend values (IN_PROGRESS with underscore)
-  status: 'pending' | 'in_progress' | 'IN_PROGRESS' | 'completed' | 'cancelled' | 'serving' | 'accepted' | 'delegated';
+  // Status values: pending → serving → completed/cancelled
+  status: 'pending' | 'completed' | 'cancelled' | 'serving' | 'accepted' | 'delegated';
   priority: 'low' | 'normal' | 'urgent' | 'emergency';
   message?: string | null;
   notes?: string | null;

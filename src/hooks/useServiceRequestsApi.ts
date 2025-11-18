@@ -89,8 +89,6 @@ function transformServiceRequest(dto: ServiceRequestDTOWithRelations): ServiceRe
 function mapBackendStatusToFrontend(backendStatus: string): ServiceRequest['status'] {
   const statusMap: Record<string, ServiceRequest['status']> = {
     'pending': 'pending',
-    'in-progress': 'accepted',
-    'in_progress': 'accepted',  // Backend uses underscore format
     'completed': 'completed',
     'cancelled': 'completed', // Map cancelled to completed for now
     'serving': 'accepted',

@@ -257,7 +257,7 @@ export class DatabaseService {
     const where: any = {};
     
     if (filters?.status && filters.status !== 'All') {
-      where.status = filters.status.toUpperCase();
+      where.status = filters.status;
     }
     
     if (filters?.type && filters.type !== 'All') {
@@ -411,7 +411,7 @@ export class DatabaseService {
     const where: any = {};
     
     if (filters?.status && filters.status !== 'All') {
-      where.status = filters.status.toUpperCase();
+      where.status = filters.status;
     }
     
     if (filters?.priority && filters.priority !== 'All') {
@@ -516,11 +516,9 @@ export class DatabaseService {
       guestCabin: request.location?.name || null
     };
 
-    // If confirmed (from watch), change status to IN_PROGRESS
-    if (confirmed) {
-      updateData.status = 'IN_PROGRESS';
-      updateData.acceptedAt = new Date();
-    }
+    // Always set status to 'serving' when accepted (whether from watch or web app)
+    updateData.status = 'serving';
+    updateData.acceptedAt = new Date();
 
     const updatedRequest = await this.prisma.serviceRequest.update({
       where: { id: requestId },
@@ -564,7 +562,7 @@ export class DatabaseService {
     const request = await this.prisma.serviceRequest.update({
       where: { id: requestId },
       data: {
-        status: 'COMPLETED',
+        status: 'completed',
         completedAt: new Date()
       },
       include: {
@@ -584,7 +582,7 @@ export class DatabaseService {
         data: {
           originalRequestId: request.id,
           action: 'completed',
-          newStatus: 'COMPLETED',
+          newStatus: 'completed',
           completedBy: request.assignedTo || 'Unknown',
           completedAt: request.completedAt!,
           responseTime,

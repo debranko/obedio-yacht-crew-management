@@ -331,7 +331,7 @@ export function ServiceRequestsPage({
         data: {
           categoryId: selectedCategoryId,
           // Don't change status - backend doesn't support 'delegated'
-          // Request keeps its current status (pending/IN_PROGRESS/etc)
+          // Request keeps its current status (pending/serving/etc)
         },
       },
       {

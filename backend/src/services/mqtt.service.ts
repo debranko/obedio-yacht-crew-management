@@ -1031,8 +1031,8 @@ class MQTTService {
         data: {
           type: 'service_request',
           action: 'Request Accepted',
-          details: `${crewMember.name} accepted service request from ${serviceRequest.guest ? serviceRequest.guest.firstName + ' ' + serviceRequest.guest.lastName : serviceRequest.guestName || 'Guest'} at ${serviceRequest.location?.name || serviceRequest.guestCabin || 'Unknown'}`,
-          userId: crewMember.userId,
+          details: `${watch.crewmember.name} accepted service request from ${serviceRequest.guest ? serviceRequest.guest.firstName + ' ' + serviceRequest.guest.lastName : serviceRequest.guestName || 'Guest'} at ${serviceRequest.location?.name || serviceRequest.guestCabin || 'Unknown'}`,
+          userId: watch.crewmember.userId,
           locationId: serviceRequest.locationId,
           guestId: serviceRequest.guestId,
           deviceId: watch?.id,
@@ -1054,9 +1054,30 @@ class MQTTService {
       this.publish(this.TOPICS.SERVICE_UPDATE, {
         requestId,
         status: 'serving',
-        assignedTo: crewMember.name,
+        assignedTo: watch.crewmember.name,
         acknowledgedAt: new Date().toISOString()
       });
+
+      // Send LED feedback to button that created this request
+      const deviceLog = await prisma.deviceLog.findFirst({
+        where: {
+          eventType: 'button_press',
+          eventData: {
+            path: ['serviceRequestId'],
+            equals: requestId
+          }
+        },
+        include: { device: true }
+      });
+
+      if (deviceLog?.device) {
+        this.sendDeviceCommand(deviceLog.device.deviceId, {
+          command: 'request_accepted'
+        });
+        console.log(`💚 LED feedback sent to button: ${deviceLog.device.deviceId}`);
+      } else {
+        console.log(`⚠️ Could not find device for service request: ${requestId}`);
+      }
 
     } catch (error) {
       console.error('❌ Error handling watch acknowledge:', error);
