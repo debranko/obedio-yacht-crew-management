@@ -1,0 +1,29 @@
+obedio, obedio.local, obedio.yacht {
+    tls internal
+    reverse_proxy frontend:80 {
+        header_up Host {host}
+        header_up X-Real-IP {remote}
+        header_up X-Forwarded-For {remote}
+        header_up X-Forwarded-Proto {scheme}
+        health_uri /
+        health_interval 10s
+        health_timeout 5s
+    }
+    log {
+        output stdout
+        format console
+        level INFO
+    }
+    encode gzip
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "microphone=(self), camera=(self)"
+    }
+}
+:2019 {
+    respond /health 200
+}
