@@ -12,7 +12,14 @@
       "Bash(npm run db:seed:*)",
       "Bash(git checkout:*)",
       "Bash(npx prisma:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(git mv:*)",
+      "Bash(\"C:/Users/debra/AppData/Local/Android/Sdk/platform-tools/adb.exe\" -s adb-C101X3A271199-pMG9i0._adb-tls-connect._tcp shell monkey -p com.example.obediowear -c android.intent.category.LAUNCHER 1)",
+      "Bash(find:*)",
+      "Bash(cat:*)",
+      "Bash(rm:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nMajor repository cleanup and reorganization\n\nOrganized documentation into logical structure and removed 100+ outdated files:\n- Created orchestration/ folder for all deployment scripts and Docker configs\n- Moved API reference to docs/project/\n- Removed outdated METSTRADE planning docs (event completed)\n- Removed 48 BMAD workflow files (generic AI system, not project-specific)\n- Removed all process logs, audits, and status reports (outdated)\n- Removed design decision docs (already implemented)\n- Removed 115+ archived task lists and old documentation\n- Deleted 3 outdated hardware firmware folders (kept METSTRADE-FINAL)\n- Deleted obedio-pm folder (unknown/unused content)\n- Removed location photos and design assets (moved to archive)\n- Cleaned up misc test files and utilities\n\nResult: Clean, focused repository with only current architecture docs and API reference.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []
