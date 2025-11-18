@@ -71,6 +71,23 @@ router.put('/:id/complete', requirePermission('service-requests.complete'), asyn
   res.json(apiSuccess(request));
 }));
 
+router.post('/:id/cancel', requirePermission('service-requests.update'), asyncHandler(async (req, res) => {
+  const request = await dbService.cancelServiceRequest(req.params.id);
+
+  // Broadcast service request cancellation to all connected clients
+  websocketService.emitServiceRequestStatusChanged(request);
+
+  // Publish MQTT update for watches to clear notifications
+  mqttService.publish('obedio/service/update', {
+    requestId: request.id,
+    status: 'cancelled',
+    assignedTo: request.assignedToId,
+    cancelledAt: new Date().toISOString()
+  });
+
+  res.json(apiSuccess(request));
+}));
+
 router.put('/:id', requirePermission('service-requests.update'), validate(UpdateServiceRequestSchema), asyncHandler(async (req, res) => {
   const request = await dbService.updateServiceRequest(req.params.id, req.body);
 
