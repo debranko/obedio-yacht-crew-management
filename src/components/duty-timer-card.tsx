@@ -359,6 +359,7 @@ export function DutyTimerCard() {
 
   return (
     <>
+      <Card className="p-0 overflow-hidden h-full">
         {/* Body - Cards with Ring Timer */}
         <div className="flex items-stretch">
         {/* Left: Currently on duty - Gradient fades towards center */}
@@ -423,14 +424,15 @@ export function DutyTimerCard() {
           </div>
         </div>
       </div>
+      </Card>
 
-        {/* Call Backup Dialog */}
-        <CallBackupDialog
-          open={callBackupOpen}
-          onOpenChange={setCallBackupOpen}
-          backupCrew={dutyStatus.backup}
-          onBackupCalled={handleBackupCalled}
-        />
-      </>
-    );
+      {/* Call Backup Dialog */}
+      <CallBackupDialog
+        open={callBackupOpen}
+        onOpenChange={setCallBackupOpen}
+        backupCrew={dutyStatus.backup}
+        onBackupCalled={handleBackupCalled}
+      />
+    </>
+  );
 }

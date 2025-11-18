@@ -71,6 +71,15 @@ router.put('/:id/complete', requirePermission('service-requests.complete'), asyn
   res.json(apiSuccess(request));
 }));
 
+router.put('/:id', requirePermission('service-requests.update'), validate(UpdateServiceRequestSchema), asyncHandler(async (req, res) => {
+  const request = await dbService.updateServiceRequest(req.params.id, req.body);
+
+  // Broadcast service request update to all connected clients
+  websocketService.emitServiceRequestUpdated(request);
+
+  res.json(apiSuccess(request));
+}));
+
 router.delete('/clear-all', requirePermission('service-requests.delete'), asyncHandler(async (req, res) => {
   await dbService.deleteAllServiceRequests();
   res.json(apiSuccess({ message: 'All service requests deleted' }));

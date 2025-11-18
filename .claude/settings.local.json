@@ -11,7 +11,8 @@
       "Bash(pio --version:*)",
       "Bash(npm run db:seed:*)",
       "Bash(git checkout:*)",
-      "Bash(npx prisma:*)"
+      "Bash(npx prisma:*)",
+      "Bash(git stash:*)"
     ],
     "deny": [],
     "ask": []

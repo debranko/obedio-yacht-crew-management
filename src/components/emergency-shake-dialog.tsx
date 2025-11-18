@@ -37,6 +37,7 @@ interface EmergencyShakeDialogProps {
   guest: Guest | null;
   onAccept: () => void;
   onCallAll: () => void;
+  silent?: boolean; // When true, shows dialog but no alarm sound
 }
 
 export function EmergencyShakeDialog({
@@ -45,7 +46,8 @@ export function EmergencyShakeDialog({
   request,
   guest,
   onAccept,
-  onCallAll
+  onCallAll,
+  silent = false
 }: EmergencyShakeDialogProps) {
   const [showConfirmClose, setShowConfirmClose] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -56,15 +58,17 @@ export function EmergencyShakeDialog({
   useEffect(() => {
     if (!isOpen || !request) return;
 
-    // Vibration API (if supported)
-    if ('vibrate' in navigator) {
-      // Vibrate in pattern: 200ms on, 100ms off, repeated
-      const vibratePattern = [200, 100, 200, 100, 200];
-      navigator.vibrate(vibratePattern);
-    }
+    // Only play alarm and vibrate if not in silent mode
+    if (!silent) {
+      // Vibration API (if supported)
+      if ('vibrate' in navigator) {
+        // Vibrate in pattern: 200ms on, 100ms off, repeated
+        const vibratePattern = [200, 100, 200, 100, 200];
+        navigator.vibrate(vibratePattern);
+      }
 
-    // Create alarm sound
-    try {
+      // Create alarm sound
+      try {
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
@@ -101,9 +105,10 @@ export function EmergencyShakeDialog({
           oscillator.stop();
         }
       }, 6000);
-    } catch (error) {
-      console.error('Failed to play emergency sound:', error);
-    }
+      } catch (error) {
+        console.error('Failed to play emergency sound:', error);
+      }
+    } // End of !silent check
 
     return () => {
       // Cleanup audio

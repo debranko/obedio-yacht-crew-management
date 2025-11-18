@@ -49,7 +49,8 @@ const BUTTON_ACTIONS = [
   { value: 'call', label: 'Simple Call' },
   { value: 'urgent', label: 'Urgent Call' },
   { value: 'voice', label: 'Voice Message' },
-  { value: 'emergency', label: 'Emergency' },
+  { value: 'emergency', label: 'Emergency (All Crew)' },
+  { value: 'custom', label: 'Custom Message' },
   { value: 'disabled', label: 'Disabled' },
 ];
 
@@ -74,12 +75,14 @@ export function SmartButtonConfigDialog({
     doubleTouchPress: device?.config?.doubleTouchPress || 'disabled',
     longPress: device?.config?.longPress || 'voice',
     shake: device?.config?.shake || 'emergency',
-    
+    customShakeMessage: device?.config?.customShakeMessage || '',
+    shakeThreshold: device?.config?.shakeThreshold || 3,
+
     // Audio Settings
     micEnabled: device?.config?.micEnabled ?? true,
     micGain: device?.config?.micGain || 60,
     speakerVolume: device?.config?.speakerVolume || 70,
-    
+
     // LED Settings
     ledEnabled: device?.config?.ledEnabled ?? true,
     ledBrightness: device?.config?.ledBrightness || 80,
@@ -379,6 +382,45 @@ export function SmartButtonConfigDialog({
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Custom Shake Message - shown when shake is 'custom' */}
+              {config.shake === 'custom' && (
+                <div className="space-y-2">
+                  <Label htmlFor="customShakeMessage">Custom Shake Message</Label>
+                  <Input
+                    id="customShakeMessage"
+                    placeholder="Enter custom message (e.g., 'Need medical assistance')"
+                    value={config.customShakeMessage}
+                    onChange={(e) => setConfig({ ...config, customShakeMessage: e.target.value })}
+                  />
+                  <p className="text-xs text-gray-500">
+                    This message will appear in the service request when the device is shaken
+                  </p>
+                </div>
+              )}
+
+              {/* Shake Sensitivity */}
+              <div className="space-y-2">
+                <Label htmlFor="shakeThreshold">Shake Sensitivity</Label>
+                <Select
+                  value={String(config.shakeThreshold)}
+                  onValueChange={(value: string) => setConfig({ ...config, shakeThreshold: Number(value) })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Very Sensitive (2.0g)</SelectItem>
+                    <SelectItem value="2">Sensitive (2.5g)</SelectItem>
+                    <SelectItem value="3">Normal (3.5g)</SelectItem>
+                    <SelectItem value="4">Less Sensitive (4.5g)</SelectItem>
+                    <SelectItem value="5">Very Low (5.5g)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500">
+                  Lower = detects gentle shaking, Higher = requires vigorous shaking
+                </p>
               </div>
             </div>
           </div>

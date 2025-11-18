@@ -405,7 +405,7 @@ export function LocationsPage() {
         formData.append('image', uploadedFile);
 
         // Auth handled by HTTP-only cookies (server runs 24/7)
-        const uploadResponse = await fetch('http://localhost:8080/api/upload/image', {
+        const uploadResponse = await fetch('/api/upload/image', {
           method: 'POST',
           credentials: 'include',
           body: formData
@@ -417,8 +417,8 @@ export function LocationsPage() {
         }
 
         const uploadData = await uploadResponse.json();
-        // Get the URL from the upload response
-        finalImageUrl = `http://localhost:8080${uploadData.data.url}`;
+        // Get the URL from the upload response (already relative path from backend)
+        finalImageUrl = uploadData.data.url;
         console.log('✅ Image uploaded:', finalImageUrl);
       }
 

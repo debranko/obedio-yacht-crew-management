@@ -32,6 +32,7 @@
 #include <Adafruit_MCP23X17.h>
 #include <Adafruit_NeoPixel.h>
 #include <ArduinoJson.h>
+#include <LIS3DHTR.h>  // ← SHAKE DETECTION!
 #include "driver/i2s.h"
 
 // ==================== CONFIGURATION ====================
@@ -53,6 +54,7 @@ const uint16_t MQTT_PORT = 1883;
 #define I2C_SDA_PIN  3
 #define I2C_SCL_PIN  2
 #define MCP_ADDR     0x20
+#define LIS3DH_ADDR  0x19  // ← Accelerometer for shake detection
 
 // Button Configuration (MCP23017 Port A)
 // T1=GPA7 (main), T2=GPA6, T3=GPA5, T4=GPA4, T5=GPA3
@@ -93,6 +95,7 @@ const unsigned long HEARTBEAT_INTERVAL = 60000;  // 60 seconds
 
 Adafruit_MCP23X17 mcp;
 Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
+LIS3DHTR<TwoWire> accel;  // ← Accelerometer for shake detection
 
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
@@ -113,6 +116,16 @@ unsigned long mainPressStart = 0;
 int16_t* audioBuffer = nullptr;
 size_t recordedSamples = 0;
 
+// Shake Detection Configuration
+float shakeThreshold = 2.5;             // G-force threshold (2.5g = sensitive)
+const int SHAKE_MIN_COUNT = 3;          // Minimum shake movements required
+const int SHAKE_TIME_WINDOW_MS = 500;   // Time window for shake detection
+const int SHAKE_COOLDOWN_MS = 2000;     // Cooldown between shake events
+unsigned long shakeEventTimes[10];      // Circular buffer for shake timestamps
+int shakeEventIndex = 0;
+unsigned long lastShakeDetectionTime = 0;
+bool shakeEnabled = true;               // Can be disabled via device config
+
 // Heartbeat Timer
 unsigned long lastHeartbeat = 0;
 
@@ -132,6 +145,9 @@ void initMCP23017();
 void initLEDRing();
 void initI2SMicrophone();
 void initI2SSpeaker();
+void initAccelerometer();
+void handleShakeDetection();
+void sendShakeEvent();
 
 void updateButtons();
 void handleMainButtonPress();
@@ -161,21 +177,44 @@ void setup() {
   Serial.println("OBEDIO ESP32-S3 Smart Button - Voice");
   Serial.println("========================================\n");
 
+  // ✅ CHECK PSRAM - CRITICAL!
+  if (psramFound()) {
+    Serial.printf("✅ PSRAM detected: %d bytes (%d MB)\n", ESP.getPsramSize(), ESP.getPsramSize() / 1048576);
+    Serial.printf("   PSRAM free: %d bytes\n", ESP.getFreePsram());
+  } else {
+    Serial.println("❌ PSRAM NOT FOUND!");
+    Serial.println("⚠️  Go to Tools → PSRAM → OPI PSRAM");
+    ledError();
+    while (true) delay(1000);
+  }
+  Serial.printf("SRAM free: %d bytes\n\n", ESP.getFreeHeap());
+
   // Initialize hardware
   initI2C();
   initMCP23017();
   initLEDRing();
   initI2SSpeaker();
   initI2SMicrophone();
+  initAccelerometer();  // ← SHAKE DETECTION!
 
-  // Allocate audio buffer
-  audioBuffer = (int16_t*)malloc(MAX_SAMPLES * sizeof(int16_t));
+  // Allocate audio buffer in PSRAM (8MB) instead of SRAM (512KB)
+  audioBuffer = (int16_t*)ps_malloc(MAX_SAMPLES * sizeof(int16_t));
+  if (audioBuffer == nullptr) {
+    Serial.println("❌ Failed to allocate audio buffer in PSRAM!");
+    Serial.println("⚠️  Trying SRAM fallback...");
+    audioBuffer = (int16_t*)malloc(MAX_SAMPLES * sizeof(int16_t));
+  }
+
   if (audioBuffer == nullptr) {
     Serial.println("❌ Failed to allocate audio buffer!");
     ledError();
     while (true) delay(1000);
   }
-  Serial.printf("✅ Audio buffer allocated: %d bytes\n", MAX_SAMPLES * sizeof(int16_t));
+
+  Serial.printf("✅ Audio buffer allocated: %d bytes in %s\n",
+    MAX_SAMPLES * sizeof(int16_t),
+    heap_caps_get_free_size(MALLOC_CAP_SPIRAM) > 0 ? "PSRAM" : "SRAM"
+  );
 
   // Connect to WiFi and MQTT
   setupWiFi();
@@ -204,6 +243,11 @@ void loop() {
   // Update inputs
   updateButtons();
   checkLongPress();
+
+  // Shake detection
+  if (shakeEnabled) {
+    handleShakeDetection();
+  }
 
   // Heartbeat
   unsigned long now = millis();
@@ -839,4 +883,104 @@ void playBeep() {
     size_t written;
     i2s_write(I2S_SPK_PORT, &sample, sizeof(sample), &written, 10 / portTICK_PERIOD_MS);
   }
+}
+
+// ==================== SHAKE DETECTION ====================
+
+void initAccelerometer() {
+  Serial.print("🔄 Initializing LIS3DH accelerometer... ");
+
+  // Initialize shake event buffer
+  for (int i = 0; i < 10; i++) {
+    shakeEventTimes[i] = 0;
+  }
+
+  // Initialize accelerometer with I2C
+  if (accel.begin(Wire, LIS3DH_ADDR)) {
+    // Configure accelerometer
+    accel.setOutputDataRate(LIS3DHTR_DATARATE_50HZ);  // 50Hz sampling rate
+    accel.setFullScaleRange(LIS3DHTR_RANGE_16G);      // ±16g range for shake detection
+    accel.setHighSolution(true);                       // High resolution mode
+
+    Serial.println("✅");
+    Serial.println("  Data Rate: 50Hz");
+    Serial.println("  Range: ±16g");
+    Serial.printf("  Shake Threshold: %.1fg\n", shakeThreshold);
+    Serial.println("  Shake Detection: " + String(shakeEnabled ? "Enabled" : "Disabled"));
+  } else {
+    Serial.println("❌ Failed!");
+    Serial.println("⚠️  Shake detection will be disabled");
+    shakeEnabled = false;
+  }
+  Serial.println();
+}
+
+void handleShakeDetection() {
+  unsigned long currentMillis = millis();
+
+  // Enforce cooldown period between shake detections
+  if (currentMillis - lastShakeDetectionTime < SHAKE_COOLDOWN_MS) {
+    return;
+  }
+
+  // Read acceleration values (in g's)
+  float x = accel.getAccelerationX();
+  float y = accel.getAccelerationY();
+  float z = accel.getAccelerationZ();
+
+  // Calculate total acceleration magnitude
+  float magnitude = sqrt(x*x + y*y + z*z);
+
+  // Remove gravity component (1g) to get actual motion
+  float motion = abs(magnitude - 1.0);
+
+  // Check if motion exceeds threshold
+  if (motion > shakeThreshold) {
+    // Record this shake event in circular buffer
+    shakeEventTimes[shakeEventIndex] = currentMillis;
+    shakeEventIndex = (shakeEventIndex + 1) % 10;  // Wrap around
+
+    // Count recent shake events within time window
+    int recentShakeCount = 0;
+    for (int i = 0; i < 10; i++) {
+      if (shakeEventTimes[i] > 0 && (currentMillis - shakeEventTimes[i]) < SHAKE_TIME_WINDOW_MS) {
+        recentShakeCount++;
+      }
+    }
+
+    // If we have enough shakes in the time window, trigger shake event
+    if (recentShakeCount >= SHAKE_MIN_COUNT) {
+      Serial.println("🚨 SHAKE DETECTED!");
+      Serial.println("  Motion: " + String(motion) + "g");
+      Serial.println("  Threshold: " + String(shakeThreshold) + "g");
+      Serial.println("  Shake count: " + String(recentShakeCount) + " in " + String(SHAKE_TIME_WINDOW_MS) + "ms");
+
+      // Send shake event
+      sendShakeEvent();
+
+      // LED feedback - Red flash for emergency shake
+      ledFill(255, 0, 0);  // Red
+      delay(200);
+      ledFill(0, 0, 0);    // Off
+      delay(100);
+      ledFill(255, 0, 0);  // Red flash again
+      delay(200);
+      ledFill(0, 0, 0);    // Off
+
+      // Reset shake event buffer
+      for (int i = 0; i < 10; i++) {
+        shakeEventTimes[i] = 0;
+      }
+
+      // Update last detection time to enforce cooldown
+      lastShakeDetectionTime = currentMillis;
+    }
+  }
+}
+
+void sendShakeEvent() {
+  String audioUrl = "";
+  String transcript = "";
+  publishButtonPress("main", "shake", audioUrl, transcript);
+  Serial.println("✅ Shake event published via MQTT");
 }

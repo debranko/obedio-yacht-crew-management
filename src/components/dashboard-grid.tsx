@@ -317,9 +317,7 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
         {activeWidgets.includes("duty-timer") && (
           <div key="duty-timer" className="dashboard-widget">
             <WidgetWrapper id="duty-timer">
-              <Card className="p-0 overflow-hidden h-full">
-                <DutyTimerCard />
-              </Card>
+              <DutyTimerCard />
             </WidgetWrapper>
           </div>
         )}

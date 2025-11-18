@@ -142,9 +142,10 @@ function AppContent() {
   
   const handleCallAllCrew = () => {
     if (emergencyRequest) {
-      // Accept request with all on-duty crew
-      const allOnDuty = dutyStatus.onDuty.map((c: any) => c.name).join(', ');
-      acceptServiceRequest(emergencyRequest.id, allOnDuty || 'All Crew');
+      // Accept request with ALL crew members (not just on-duty)
+      // Emergency broadcasts to everyone regardless of duty status
+      const allCrewNames = crewMembers.map((c: any) => c.name).join(', ');
+      acceptServiceRequest(emergencyRequest.id, allCrewNames || 'All Crew');
       setShowEmergencyDialog(false);
       setEmergencyRequest(null);
     }

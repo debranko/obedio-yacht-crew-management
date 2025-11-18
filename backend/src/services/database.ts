@@ -620,6 +620,21 @@ export class DatabaseService {
     return request;
   }
 
+  async updateServiceRequest(requestId: string, data: any) {
+    const request = await this.prisma.serviceRequest.update({
+      where: { id: requestId },
+      data,
+      include: {
+        guest: true,
+        location: true,
+        category: true,
+        crewmember: true
+      }
+    });
+
+    return request;
+  }
+
   async deleteAllServiceRequests() {
     // Delete all service request history first (foreign key constraint)
     await this.prisma.serviceRequestHistory.deleteMany({});

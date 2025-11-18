@@ -863,50 +863,86 @@ class MQTTService {
         console.log(`✅ Found ${watches.length} watch(es) for assigned crew member (${watches[0].crewmember?.name})`);
 
       } else {
-        // CASE 2: Request is NOT assigned - notify all ON-DUTY crew members
-        console.log('📢 Request not assigned - notifying all ON-DUTY crew members');
+        // CASE 2: Request is NOT assigned
+        // For EMERGENCY priority: notify ALL crew members (regardless of duty status)
+        // For other priorities: notify only ON-DUTY crew members
+        const isEmergency = serviceRequest.priority === 'emergency';
 
-        // Find all watches assigned to ON-DUTY crew members
-        watches = await prisma.device.findMany({
-          where: {
-            type: 'watch',
-            crewMemberId: { not: null }, // Only watches assigned to crew
-            crewmember: {
-              status: 'on-duty' // Only notify on-duty crew members
+        if (isEmergency) {
+          console.log('🚨 EMERGENCY - notifying ALL crew members (on-duty and off-duty)');
+
+          // Find ALL watches assigned to any crew member
+          watches = await prisma.device.findMany({
+            where: {
+              type: 'watch',
+              crewMemberId: { not: null } // Only watches assigned to crew
+            },
+            include: {
+              crewmember: true
             }
-          },
-          include: {
-            crewmember: true
-          }
-        });
+          });
+        } else {
+          console.log('📢 Request not assigned - notifying all ON-DUTY crew members');
+
+          // Find all watches assigned to ON-DUTY crew members
+          watches = await prisma.device.findMany({
+            where: {
+              type: 'watch',
+              crewMemberId: { not: null }, // Only watches assigned to crew
+              crewmember: {
+                status: 'on-duty' // Only notify on-duty crew members
+              }
+            },
+            include: {
+              crewmember: true
+            }
+          });
+        }
 
         if (watches.length === 0) {
-          console.log('⚠️ No watches assigned to ON-DUTY crew members');
+          console.log(`⚠️ No watches assigned to ${isEmergency ? 'ANY' : 'ON-DUTY'} crew members`);
           return;
         }
 
-        console.log(`✅ Found ${watches.length} on-duty crew watch(es)`);
+        console.log(`✅ Found ${watches.length} ${isEmergency ? 'total' : 'on-duty'} crew watch(es)`);
       }
 
       // Send notification to each watch
       for (const watch of watches) {
         const notificationTopic = `obedio/watch/${watch.deviceId}/notification`;
 
+        // Customize message based on priority
+        const isEmergency = serviceRequest.priority === 'emergency';
+        const title = isEmergency ? '🚨 EMERGENCY ALERT' : 'Service Request';
+        const message = isEmergency
+          ? `EMERGENCY at ${locationName} - Immediate response required!`
+          : `Guest needs assistance at ${locationName}`;
+
         const notification = {
           requestId: serviceRequest.id,
           type: serviceRequest.requestType || 'service_request',
-          title: 'Service Request',
-          message: `Guest needs assistance at ${locationName}`,
+          title,
+          message,
           location: locationName,
           guest: guest ? `${guest.firstName} ${guest.lastName}` : 'Guest',
           priority: serviceRequest.priority,
+          emergency: isEmergency, // Flag for watch to show red/urgent UI
           timestamp: new Date().toISOString(),
           voiceTranscript: serviceRequest.voiceTranscript || null,
-          voiceAudioUrl: serviceRequest.voiceAudioUrl || null
+          voiceAudioUrl: serviceRequest.voiceAudioUrl || null,
+          // For emergencies, include guest medical info if available
+          ...(isEmergency && guest && {
+            medicalInfo: {
+              allergies: guest.allergies || [],
+              medicalConditions: guest.medicalConditions || [],
+              emergencyContact: guest.emergencyContactName || null,
+              emergencyPhone: guest.emergencyContactPhone || null
+            }
+          })
         };
 
         this.publish(notificationTopic, notification);
-        console.log(`📳 Notification sent to ${watch.crewmember?.name || 'crew'}'s watch (${watch.deviceId})`);
+        console.log(`📳 ${isEmergency ? '🚨 EMERGENCY' : ''} Notification sent to ${watch.crewmember?.name || 'crew'}'s watch (${watch.deviceId})`);
       }
 
     } catch (error) {
