@@ -7,7 +7,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 object ApiClient {
 
-    private const val BASE_URL = "http://192.168.5.152:8080/"
+    private const val BASE_URL = "http://10.10.0.207:8080/"
 
     // JWT Token for Sophie Laurent (Chief Stewardess) - expires 2035
     private const val AUTH_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWhyanc5aWIwMDAwMTRtaHdrNGdxdzB0IiwidXNlcklkIjoiY21ocmp3OWliMDAwMDE0bWh3azRncXcwdCIsInJvbGUiOiJjaGllZl9zdGV3YXJkZXNzIiwidXNlcm5hbWUiOiJzb3BoaWUubGF1cmVudCIsInR5cGUiOiJ3YXRjaC1hdXRoIiwiaWF0IjoxNzYyNjgyOTE0LCJleHAiOjIwNzgwNDI5MTR9.XjDtSwwlxT5tyLBDSWDUVO6sKS9taMlmce2LbDDFGNU"
