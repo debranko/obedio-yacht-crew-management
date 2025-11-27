@@ -19,7 +19,7 @@ object WebSocketManager {
 
     private const val TAG = "WebSocketManager"
 
-    private const val SERVER_URL = "http://192.168.5.152:8080"
+    private const val SERVER_URL = "http://10.10.0.207:8080"
 
     enum class ConnectionStatus { CONNECTING, CONNECTED, DISCONNECTED }
 

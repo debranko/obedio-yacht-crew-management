@@ -94,6 +94,13 @@ interface ApiService {
     ): ApiResponse<List<CrewMember>>
 
     /**
+     * Fetches ALL crew members without filters.
+     * Uses existing backend endpoint GET /api/crew
+     */
+    @GET("api/crew")
+    suspend fun getAllCrewMembers(): ApiResponse<List<CrewMember>>
+
+    /**
      * Updates yacht GPS location from watch.
      */
     @PUT("api/yacht-settings")

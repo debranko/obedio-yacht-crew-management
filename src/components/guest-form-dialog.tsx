@@ -71,14 +71,13 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
   const { createGuest, updateGuest, isCreating, isUpdating } = useGuestMutations();
   const [isCameraOpen, setIsCameraOpen] = useState(false);
 
-  // Form state
+  // Form state (status is computed from dates, not stored)
   const [formData, setFormData] = useState<Partial<Guest>>({
     firstName: '',
     lastName: '',
     preferredName: '',
     photo: undefined,
     type: 'guest',
-    status: 'expected',
     nationality: '',
     languages: [],
     passportNumber: '',
@@ -119,14 +118,13 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
     if (guest) {
       setFormData(guest);
     } else {
-      // Reset form
+      // Reset form (status is computed from dates, not stored)
       setFormData({
         firstName: '',
         lastName: '',
         preferredName: '',
         photo: undefined,
         type: 'guest',
-        status: 'expected',
         nationality: '',
         languages: [],
         passportNumber: '',
@@ -353,42 +351,24 @@ export function GuestFormDialog({ open, onOpenChange, guest }: GuestFormDialogPr
                 />
               </div>
 
-              {/* Type & Status */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="type">Guest Type</Label>
-                  <Select
-                    value={formData.type}
-                    onValueChange={(value: string) => setFormData({ ...formData, type: value as Guest['type'] })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="guest">Guest</SelectItem>
-                      <SelectItem value="partner">Partner</SelectItem>
-                      <SelectItem value="family">Family</SelectItem>
-                      <SelectItem value="vip">VIP</SelectItem>
-                      <SelectItem value="owner">Owner</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value: string) => setFormData({ ...formData, status: value as Guest['status'] })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="expected">Expected</SelectItem>
-                      <SelectItem value="onboard">Onboard</SelectItem>
-                      <SelectItem value="departed">Departed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              {/* Guest Type (Status is auto-calculated from check-in/check-out dates) */}
+              <div className="space-y-2">
+                <Label htmlFor="type">Guest Type</Label>
+                <Select
+                  value={formData.type}
+                  onValueChange={(value: string) => setFormData({ ...formData, type: value as Guest['type'] })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="guest">Guest</SelectItem>
+                    <SelectItem value="partner">Partner</SelectItem>
+                    <SelectItem value="family">Family</SelectItem>
+                    <SelectItem value="vip">VIP</SelectItem>
+                    <SelectItem value="owner">Owner</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Nationality & Passport */}

@@ -58,6 +58,7 @@ import {
 } from '../ui/select';
 import { Label } from '../ui/label';
 import { toast } from 'sonner';
+import { playNotificationSound, playEmergencySound } from '../../utils/notification-sound';
 
 interface ServiceRequestsPageProps {
   isFullscreen?: boolean;
@@ -89,6 +90,10 @@ export function ServiceRequestsPage({
     servingNowTimeout: preferences?.serviceRequestServingTimeout || 5,
     requestDialogRepeatInterval: preferences?.requestDialogRepeatInterval || 60,
     soundEnabled: preferences?.serviceRequestSoundAlerts !== false,
+    visualFlash: preferences?.serviceRequestVisualFlash || false,
+    responseTimeWarning: preferences?.serviceRequestResponseWarning || 5,
+    viewStyle: (preferences?.serviceRequestViewStyle || 'expanded') as 'expanded' | 'compact',
+    sortOrder: (preferences?.serviceRequestSortOrder || 'newest') as 'newest' | 'priority' | 'location',
   };
 
   const createServiceRequest = useCreateServiceRequest();
@@ -117,6 +122,7 @@ export function ServiceRequestsPage({
   const [completingRequests, setCompletingRequests] = useState<Record<string, number>>({});
   const [showHistory, setShowHistory] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [flashActive, setFlashActive] = useState(false);
   
   // Update time every second for live timers in ServingRequestCard
   useEffect(() => {
@@ -126,23 +132,32 @@ export function ServiceRequestsPage({
     return () => clearInterval(interval);
   }, []);
 
-  // WebSocket listeners for sound notifications only
+  // WebSocket listeners for sound and visual notifications
   // NOTE: Query invalidation is handled in useServiceRequestsApi hook to prevent duplicate fetches
   useEffect(() => {
     if (!wsOn || !wsOff) return;
 
-    // Handle new service request sound notification
+    // Handle new service request - sound and visual flash
     const handleServiceRequestCreated = (data: any) => {
-      console.log('📞 New service request - playing sound');
+      console.log('📞 New service request - triggering notifications');
 
-      // Play notification sound for new requests
+      // Play notification sound using Web Audio API
       if (userPreferences?.soundEnabled !== false) {
         try {
-          const audio = new Audio('/sounds/notification.mp3');
-          audio.play().catch((e) => console.log('Could not play notification sound:', e));
+          if (data.priority === 'emergency') {
+            playEmergencySound();
+          } else {
+            playNotificationSound();
+          }
         } catch (e) {
-          console.log('Notification sound not available');
+          console.log('Notification sound not available:', e);
         }
+      }
+
+      // Visual flash for urgent/emergency requests
+      if (userPreferences?.visualFlash && (data.priority === 'urgent' || data.priority === 'emergency')) {
+        setFlashActive(true);
+        setTimeout(() => setFlashActive(false), 1000);
       }
     };
 
@@ -219,11 +234,45 @@ export function ServiceRequestsPage({
   const activeCategories = serviceCategories.filter(cat => cat.isActive);
 
   // Separate pending, serving, and completing requests
+  // CRITICAL: 'delegated' = assigned to crew but waiting for watch acceptance
+  // These should show in Pending column, NOT Serving Now
+  // Filter and sort pending requests based on user preferences
   const pendingRequests = useMemo(() => {
-    return serviceRequests.filter(request => request.status === 'pending');
-  }, [serviceRequests]);
+    const filtered = serviceRequests.filter(request =>
+      request.status === 'pending' || request.status === 'delegated'
+    );
+
+    // Sort based on user preference
+    return [...filtered].sort((a, b) => {
+      switch (userPreferences.sortOrder) {
+        case 'priority':
+          const priorityOrder: Record<string, number> = { emergency: 0, urgent: 1, normal: 2 };
+          return (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2);
+        case 'location':
+          return (a.guestCabin || '').localeCompare(b.guestCabin || '');
+        case 'newest':
+        default:
+          return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+      }
+    });
+  }, [serviceRequests, userPreferences.sortOrder]);
+
+  // Helper function to check if request is overdue (exceeds response time warning)
+  const isOverdue = useCallback((request: ServiceRequest) => {
+    if (userPreferences.responseTimeWarning === 0) return false; // Disabled
+    const ageMs = Date.now() - new Date(request.timestamp).getTime();
+    const ageMinutes = ageMs / 60000;
+    return ageMinutes > userPreferences.responseTimeWarning;
+  }, [userPreferences.responseTimeWarning]);
+
+  // Get age in minutes for display
+  const getAgeMinutes = useCallback((request: ServiceRequest) => {
+    const ageMs = Date.now() - new Date(request.timestamp).getTime();
+    return Math.floor(ageMs / 60000);
+  }, []);
 
   const servingRequests = useMemo(() => {
+    // Only 'accepted' status = crew confirmed on watch, actively serving
     return serviceRequests.filter(request => request.status === 'accepted');
   }, [serviceRequests]);
 
@@ -233,14 +282,16 @@ export function ServiceRequestsPage({
     );
   }, [serviceRequests, completingRequests]);
 
-  // Get stats
+  // Get stats - include 'delegated' in pending counts (waiting for watch acceptance)
   const stats = useMemo(() => {
-    const pending = serviceRequests.filter(r => r.status === 'pending').length;
-    const urgent = serviceRequests.filter(r => r.priority === 'urgent' && r.status === 'pending').length;
-    const emergency = serviceRequests.filter(r => r.priority === 'emergency' && r.status === 'pending').length;
+    const isPending = (r: ServiceRequest) => r.status === 'pending' || r.status === 'delegated';
+    const pending = serviceRequests.filter(isPending).length;
+    const urgent = serviceRequests.filter(r => r.priority === 'urgent' && isPending(r)).length;
+    const emergency = serviceRequests.filter(r => r.priority === 'emergency' && isPending(r)).length;
     const accepted = serviceRequests.filter(r => r.status === 'accepted').length;
+    const delegated = serviceRequests.filter(r => r.status === 'delegated').length;
 
-    return { pending, urgent, emergency, accepted };
+    return { pending, urgent, emergency, accepted, delegated };
   }, [serviceRequests]);
 
   // Get crew organized by duty status (matching popup window implementation)
@@ -631,6 +682,15 @@ export function ServiceRequestsPage({
                                 >
                                   <span className="mr-1">{request.category.icon}</span>
                                   {request.category.name}
+                                </Badge>
+                              )}
+                              {/* Response Time Warning Badge */}
+                              {isOverdue(request) && (
+                                <Badge
+                                  variant="destructive"
+                                  className={`${isFullscreen ? 'text-sm px-3 py-1' : 'text-xs'} animate-pulse`}
+                                >
+                                  ⚠ Waiting {getAgeMinutes(request)}m
                                 </Badge>
                               )}
                             </div>
@@ -1124,6 +1184,11 @@ export function ServiceRequestsPage({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Visual Flash Overlay for urgent/emergency requests */}
+      {flashActive && (
+        <div className="fixed inset-0 z-[99999] pointer-events-none bg-destructive/30 animate-pulse" />
+      )}
     </div>
   );
 }

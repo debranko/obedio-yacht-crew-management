@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Luxury Theme Colors (OLED Optimized) -->
+    <color name="obedio_black">#FF000000</color>
+    <color name="champagne_gold">#FFD4AF37</color>
+    <color name="champagne_gold_dim">#80D4AF37</color>
+    <color name="alert_red">#FFB00020</color>
+    <color name="alert_red_bright">#FFFF1744</color>
+    <color name="success_green">#FF10B981</color>
+    <color name="urgent_amber">#FFF59E0B</color>
+
+    <!-- Text Colors -->
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_secondary">#B3FFFFFF</color>
+    <color name="text_muted">#66FFFFFF</color>
+
+    <!-- Status Colors -->
+    <color name="status_online">#FF10B981</color>
+    <color name="status_offline">#FFEF4444</color>
+    <color name="status_busy">#FFF59E0B</color>
+
+    <!-- Request Type Colors -->
+    <color name="type_lights">#FF3B82F6</color>
+    <color name="type_food">#FFF97316</color>
+    <color name="type_drinks">#FF06B6D4</color>
+    <color name="type_emergency">#FFFF1744</color>
+    <color name="type_dnd">#FF6B7280</color>
+
+    <!-- Battery Colors -->
+    <color name="battery_good">#FF10B981</color>
+    <color name="battery_medium">#FFF59E0B</color>
+    <color name="battery_low">#FFEF4444</color>
+</resources>

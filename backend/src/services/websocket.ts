@@ -142,6 +142,14 @@ export class WebSocketService {
   }
 
   /**
+   * Emit service request deleted event
+   */
+  emitServiceRequestDeleted(requestId: string): void {
+    this.broadcast('service-request:deleted', { id: requestId });
+    console.log(`🗑️ Service request deleted: ${requestId}`);
+  }
+
+  /**
    * Emit emergency alert
    */
   emitEmergencyAlert(emergency: any): void {

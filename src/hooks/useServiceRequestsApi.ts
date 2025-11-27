@@ -85,6 +85,12 @@ function transformServiceRequest(dto: ServiceRequestDTOWithRelations): ServiceRe
 
 /**
  * Map backend status to frontend status
+ *
+ * Status Flow:
+ * - 'pending': New request, not yet assigned
+ * - 'assigned': Delegated to crew, waiting for watch acceptance (shows as 'delegated' in UI)
+ * - 'serving': Crew accepted on watch, now serving (shows as 'accepted' in UI)
+ * - 'completed': Service finished
  */
 function mapBackendStatusToFrontend(backendStatus: string): ServiceRequest['status'] {
   const statusMap: Record<string, ServiceRequest['status']> = {
@@ -93,7 +99,8 @@ function mapBackendStatusToFrontend(backendStatus: string): ServiceRequest['stat
     'cancelled': 'completed', // Map cancelled to completed for now
     'serving': 'accepted',
     'accepted': 'accepted',
-    'delegated': 'delegated'
+    'delegated': 'delegated',
+    'assigned': 'delegated'  // CRITICAL: Assigned (waiting for watch accept) shows as delegated, NOT serving
   };
 
   return statusMap[backendStatus.toLowerCase()] || 'pending';

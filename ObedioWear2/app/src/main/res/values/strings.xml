@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Obedio Radar</string>
+
+    <!-- Notification Channel -->
+    <string name="notification_channel_name">Service Requests</string>
+    <string name="notification_channel_description">Notifications for incoming service requests</string>
+    <string name="emergency_channel_name">Emergency Alerts</string>
+    <string name="emergency_channel_description">Critical emergency notifications</string>
+
+    <!-- Screen Titles -->
+    <string name="screen_roster">Roster</string>
+    <string name="screen_radar">Radar</string>
+    <string name="screen_serving">Serving Now</string>
+    <string name="screen_settings">Settings</string>
+
+    <!-- Request Types -->
+    <string name="request_type_call">Service Call</string>
+    <string name="request_type_voice">Voice Request</string>
+    <string name="request_type_lights">Lights</string>
+    <string name="request_type_prepare_food">Prepare Food</string>
+    <string name="request_type_bring_drinks">Bring Drinks</string>
+    <string name="request_type_emergency">Emergency</string>
+    <string name="request_type_dnd">Do Not Disturb</string>
+
+    <!-- Priorities -->
+    <string name="priority_normal">Normal</string>
+    <string name="priority_urgent">Urgent</string>
+    <string name="priority_emergency">Emergency</string>
+
+    <!-- Actions -->
+    <string name="action_accept">Accept</string>
+    <string name="action_delegate">Delegate</string>
+    <string name="action_dismiss">Dismiss</string>
+    <string name="action_complete">Complete</string>
+    <string name="action_respond_now">Respond Now</string>
+
+    <!-- Settings -->
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_vibration">Vibration Intensity</string>
+    <string name="settings_emergency_sound">Emergency Sound</string>
+    <string name="settings_dnd_alerts">DND Alerts</string>
+    <string name="settings_shake">Shake to Delegate</string>
+    <string name="settings_shake_enable">Enable</string>
+    <string name="settings_shake_sensitivity">Sensitivity</string>
+    <string name="settings_shake_confirm">Require Confirmation</string>
+    <string name="settings_connection">Connection</string>
+    <string name="settings_server_ip">Server IP</string>
+    <string name="settings_mqtt_port">MQTT Port</string>
+    <string name="settings_api_port">API Port</string>
+    <string name="settings_battery">Battery &amp; Telemetry</string>
+    <string name="settings_telemetry_interval">Report Interval</string>
+    <string name="settings_low_battery">Low Battery Warning</string>
+    <string name="settings_profile">Profile</string>
+    <string name="settings_crew_name">Crew Member</string>
+    <string name="settings_device_id">Device ID</string>
+    <string name="settings_about">About</string>
+    <string name="settings_app_version">App Version</string>
+
+    <!-- Status Messages -->
+    <string name="status_connected">Connected</string>
+    <string name="status_disconnected">Disconnected</string>
+    <string name="status_connecting">Connecting...</string>
+    <string name="status_on_duty">On Duty</string>
+    <string name="status_off_duty">Off Duty</string>
+    <string name="status_busy">Busy</string>
+
+    <!-- Voice Playback -->
+    <string name="voice_tap_to_play">Voice message - tap to play</string>
+    <string name="voice_loading">Loading audio...</string>
+    <string name="voice_error">Error playing audio</string>
+
+    <!-- Delegation -->
+    <string name="delegate_confirm_title">Delegate Request?</string>
+    <string name="delegate_confirm_message">Pass this request to %s?</string>
+    <string name="delegate_success">Delegated to %s</string>
+    <string name="delegate_no_crew">No other crew available</string>
+
+    <!-- Shift -->
+    <string name="shift_remaining">%s remaining</string>
+    <string name="shift_ended">Shift ended</string>
+
+    <!-- DND -->
+    <string name="dnd_active">DND Active</string>
+    <string name="dnd_since">Since %s</string>
+</resources>

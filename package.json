@@ -71,6 +71,7 @@
             "start:backend": "cd backend && npm run dev",
             "start:full-stack": "concurrently \"npm run dev\" \"npm run start:backend\"",
             "setup:backend": "cd backend && npm install && npm run db:push && npm run db:seed",
+            "db:seed:images": "cd backend && npm run db:seed-images",
             "test": "vitest",
             "test:ui": "vitest --ui",
             "test:run": "vitest run",

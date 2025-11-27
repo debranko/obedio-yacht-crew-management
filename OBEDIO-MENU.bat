@@ -373,7 +373,7 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4 Address"') do (
 )
 echo.
 echo Wear OS Configuration:
-findstr "BASE_URL" "ObedioWear\app\src\main\java\com\example\obediowear\data\api\ApiClient.kt" | findstr "http"
+findstr "DEFAULT_IP" "ObedioWear2\app\src\main\java\com\example\obediowear2\utils\ServerConfig.kt"
 echo.
 pause
 goto menu
@@ -386,7 +386,7 @@ echo    UPDATE WEAR OS IP ADDRESS
 echo ========================================
 echo.
 echo Current IP in Wear OS app:
-for /f "tokens=2 delims==" %%a in ('findstr "BASE_URL" "ObedioWear\app\src\main\java\com\example\obediowear\data\api\ApiClient.kt"') do (
+for /f "tokens=2 delims==" %%a in ('findstr "DEFAULT_IP" "ObedioWear2\app\src\main\java\com\example\obediowear2\utils\ServerConfig.kt"') do (
     echo   %%a
 )
 echo.
@@ -418,9 +418,7 @@ echo.
 echo You are about to change IP address to: %NEW_IP%
 echo.
 echo This will update:
-echo   1. ApiClient.kt (HTTP API)
-echo   2. MqttManager.kt (MQTT Broker)
-echo   3. WebSocketManager.kt (WebSocket)
+echo   1. ServerConfig.kt (centralized IP config for ObedioWear2)
 echo.
 choice /c YN /n /m "Continue? (Y/N): "
 if errorlevel 2 goto menu
@@ -429,17 +427,9 @@ echo.
 echo Updating IP address in Wear OS files...
 echo.
 
-REM Update ApiClient.kt
-powershell -Command "(Get-Content 'ObedioWear\app\src\main\java\com\example\obediowear\data\api\ApiClient.kt') -replace 'http://[0-9.]+:8080/', 'http://%NEW_IP%:8080/' | Set-Content 'ObedioWear\app\src\main\java\com\example\obediowear\data\api\ApiClient.kt'"
-echo   [OK] ApiClient.kt updated
-
-REM Update MqttManager.kt
-powershell -Command "(Get-Content 'ObedioWear\app\src\main\java\com\example\obediowear\data\mqtt\MqttManager.kt') -replace 'tcp://[0-9.]+:1883', 'tcp://%NEW_IP%:1883' | Set-Content 'ObedioWear\app\src\main\java\com\example\obediowear\data\mqtt\MqttManager.kt'"
-echo   [OK] MqttManager.kt updated
-
-REM Update WebSocketManager.kt
-powershell -Command "(Get-Content 'ObedioWear\app\src\main\java\com\example\obediowear\data\websocket\WebSocketManager.kt') -replace 'http://[0-9.]+:8080', 'http://%NEW_IP%:8080' | Set-Content 'ObedioWear\app\src\main\java\com\example\obediowear\data\websocket\WebSocketManager.kt'"
-echo   [OK] WebSocketManager.kt updated
+REM Update ServerConfig.kt (ObedioWear2 uses centralized config)
+powershell -Command "(Get-Content 'ObedioWear2\app\src\main\java\com\example\obediowear2\utils\ServerConfig.kt') -replace 'DEFAULT_IP = \"[0-9.]+\"', 'DEFAULT_IP = \"%NEW_IP%\"' | Set-Content 'ObedioWear2\app\src\main\java\com\example\obediowear2\utils\ServerConfig.kt'"
+echo   [OK] ServerConfig.kt updated (centralized IP config)
 
 echo.
 echo ========================================
@@ -462,7 +452,7 @@ echo ========================================
 echo    BUILDING APK...
 echo ========================================
 echo.
-cd ObedioWear
+cd ObedioWear2
 call gradlew.bat assembleDebug
 if %errorlevel% neq 0 (
     echo.
@@ -494,12 +484,14 @@ if %errorlevel% neq 0 (
 )
 
 echo Uninstalling old version...
-"C:\Users\debra\AppData\Local\Android\Sdk\platform-tools\adb.exe" -s adb-C101X3A271199-pMG9i0._adb-tls-connect._tcp uninstall com.example.obediowear 2>nul
-"C:\Users\debra\AppData\Local\Android\Sdk\platform-tools\adb.exe" -s adb-C101X3B220410-Q2LfOc._adb-tls-connect._tcp uninstall com.example.obediowear 2>nul
+"C:\Users\debra\AppData\Local\Android\Sdk\platform-tools\adb.exe" -s adb-C101X3A271199-pMG9i0._adb-tls-connect._tcp uninstall com.example.obediowear2 2>nul
+"C:\Users\debra\AppData\Local\Android\Sdk\platform-tools\adb.exe" -s adb-C101X3B220410-Q2LfOc._adb-tls-connect._tcp uninstall com.example.obediowear2 2>nul
+"C:\Users\debra\AppData\Local\Android\Sdk\platform-tools\adb.exe" -s adb-C102X3B090815-ecGxOW._adb-tls-connect._tcp uninstall com.example.obediowear2 2>nul
 
 echo Installing new version...
-"C:\Users\debra\AppData\Local\Android\Sdk\platform-tools\adb.exe" -s adb-C101X3A271199-pMG9i0._adb-tls-connect._tcp install "ObedioWear\app\build\outputs\apk\debug\app-debug.apk"
-"C:\Users\debra\AppData\Local\Android\Sdk\platform-tools\adb.exe" -s adb-C101X3B220410-Q2LfOc._adb-tls-connect._tcp install "ObedioWear\app\build\outputs\apk\debug\app-debug.apk"
+"C:\Users\debra\AppData\Local\Android\Sdk\platform-tools\adb.exe" -s adb-C101X3A271199-pMG9i0._adb-tls-connect._tcp install "ObedioWear2\app\build\outputs\apk\debug\app-debug.apk"
+"C:\Users\debra\AppData\Local\Android\Sdk\platform-tools\adb.exe" -s adb-C101X3B220410-Q2LfOc._adb-tls-connect._tcp install "ObedioWear2\app\build\outputs\apk\debug\app-debug.apk"
+"C:\Users\debra\AppData\Local\Android\Sdk\platform-tools\adb.exe" -s adb-C102X3B090815-ecGxOW._adb-tls-connect._tcp install "ObedioWear2\app\build\outputs\apk\debug\app-debug.apk"
 
 echo.
 echo ========================================
@@ -574,14 +566,14 @@ echo.
 echo Updating files...
 echo.
 
-REM 1. Update backend\.env
-powershell -Command "(Get-Content 'backend\.env') -replace 'CORS_ORIGIN=\"http://[0-9.]+:5173\"', 'CORS_ORIGIN=\"http://%WIFI_IP%:5173\"' | Set-Content 'backend\.env'"
+REM 1. Update backend\.env (uses HTTPS for CORS)
+powershell -Command "(Get-Content 'backend\.env') -replace 'CORS_ORIGIN=\"https?://[0-9.]+:5173\"', 'CORS_ORIGIN=\"https://%WIFI_IP%:5173\"' | Set-Content 'backend\.env'"
 powershell -Command "(Get-Content 'backend\.env') -replace 'MQTT_BROKER=\"mqtt://[0-9.]+:1883\"', 'MQTT_BROKER=\"mqtt://%WIFI_IP%:1883\"' | Set-Content 'backend\.env'"
 echo   [1/8] backend\.env updated
 
-REM 2. Update frontend .env
-powershell -Command "(Get-Content '.env') -replace 'VITE_API_URL=http://[0-9.]+:8080/api', 'VITE_API_URL=http://%WIFI_IP%:8080/api' | Set-Content '.env'"
-powershell -Command "(Get-Content '.env') -replace 'VITE_WS_URL=http://[0-9.]+:8080', 'VITE_WS_URL=http://%WIFI_IP%:8080' | Set-Content '.env'"
+REM 2. Update frontend .env (uses HTTPS)
+powershell -Command "(Get-Content '.env') -replace 'VITE_API_URL=https?://[0-9.]+:8080/api', 'VITE_API_URL=https://%WIFI_IP%:8080/api' | Set-Content '.env'"
+powershell -Command "(Get-Content '.env') -replace 'VITE_WS_URL=https?://[0-9.]+:8080', 'VITE_WS_URL=https://%WIFI_IP%:8080' | Set-Content '.env'"
 powershell -Command "(Get-Content '.env') -replace 'VITE_MQTT_BROKER=ws://[0-9.]+:9001', 'VITE_MQTT_BROKER=ws://%WIFI_IP%:9001' | Set-Content '.env'"
 echo   [2/8] .env (Frontend) updated
 
@@ -589,8 +581,8 @@ REM 3. Update vite.config.ts
 powershell -Command "(Get-Content 'vite.config.ts') -replace 'target: ''http://[0-9.]+:8080''', 'target: ''http://%WIFI_IP%:8080''' | Set-Content 'vite.config.ts'"
 echo   [3/8] vite.config.ts updated
 
-REM 4. Update Wear OS ServerConfig.kt
-powershell -Command "(Get-Content 'ObedioWear\app\src\main\java\com\example\obediowear\utils\ServerConfig.kt') -replace 'DEFAULT_IP = \"[0-9.]+\"', 'DEFAULT_IP = \"%WIFI_IP%\"' | Set-Content 'ObedioWear\app\src\main\java\com\example\obediowear\utils\ServerConfig.kt'"
+REM 4. Update Wear OS ServerConfig.kt (ObedioWear2)
+powershell -Command "(Get-Content 'ObedioWear2\app\src\main\java\com\example\obediowear2\utils\ServerConfig.kt') -replace 'DEFAULT_IP = \"[0-9.]+\"', 'DEFAULT_IP = \"%WIFI_IP%\"' | Set-Content 'ObedioWear2\app\src\main\java\com\example\obediowear2\utils\ServerConfig.kt'"
 echo   [4/8] ServerConfig.kt updated
 
 REM 5. Update backend\src\server.ts

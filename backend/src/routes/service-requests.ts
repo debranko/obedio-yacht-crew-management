@@ -50,7 +50,62 @@ router.put('/:id/accept', requirePermission('service-requests.accept'), asyncHan
     );
   }
 
+  // CRITICAL: Publish MQTT update for ALL watches to dismiss this request
+  // This allows cross-device sync - when one watch accepts, others dismiss
+  mqttService.publish('obedio/service/update', {
+    requestId: request.id,
+    status: 'serving',
+    assignedTo: request.assignedTo,
+    assignedToId: request.assignedToId,
+    acknowledgedAt: new Date().toISOString()
+  });
+
   res.json(apiSuccess(request));
+}));
+
+router.put('/:id/delegate', requirePermission('service-requests.update'), asyncHandler(async (req, res) => {
+  const { toCrewMemberId, fromCrewMemberId, reason } = req.body;
+  const requestId = req.params.id;
+
+  if (!toCrewMemberId) {
+    res.status(400).json(apiError('toCrewMemberId is required'));
+    return;
+  }
+
+  // Get current request
+  const currentRequest = await dbService.getServiceRequestById(requestId);
+  if (!currentRequest) {
+    res.status(404).json(apiError('Service request not found'));
+    return;
+  }
+
+  // Update request - reassign to new crew member, keep status as pending
+  const noteAddition = `[Delegated${fromCrewMemberId ? ` from ${fromCrewMemberId}` : ''}: ${reason || 'via watch'}]`;
+  const updatedRequest = await dbService.updateServiceRequest(requestId, {
+    assignedToId: toCrewMemberId,
+    notes: currentRequest.notes ? `${currentRequest.notes}\n${noteAddition}` : noteAddition
+  });
+
+  // Broadcast via WebSocket
+  websocketService.emitServiceRequestUpdated(updatedRequest);
+
+  // Send MQTT notification to new crew member's watch
+  await mqttService.notifyAssignedCrewWatch(
+    updatedRequest,
+    updatedRequest.location?.name || updatedRequest.guestCabin || 'Unknown',
+    updatedRequest.guest
+  );
+
+  // Publish MQTT update for cross-device sync (original watch should dismiss)
+  mqttService.publish('obedio/service/update', {
+    requestId: requestId,
+    status: 'delegated',
+    delegatedTo: toCrewMemberId,
+    delegatedFrom: fromCrewMemberId,
+    timestamp: new Date().toISOString()
+  });
+
+  res.json(apiSuccess(updatedRequest));
 }));
 
 router.put('/:id/complete', requirePermission('service-requests.complete'), asyncHandler(async (req, res) => {
@@ -82,7 +137,32 @@ router.put('/:id', requirePermission('service-requests.update'), validate(Update
 
 router.delete('/clear-all', requirePermission('service-requests.delete'), asyncHandler(async (req, res) => {
   await dbService.deleteAllServiceRequests();
+
+  // Publish MQTT update for watches to clear all pending requests
+  mqttService.publish('obedio/service/update', {
+    action: 'clear-all',
+    status: 'deleted',
+    timestamp: new Date().toISOString()
+  });
+
   res.json(apiSuccess({ message: 'All service requests deleted' }));
+}));
+
+router.delete('/:id', requirePermission('service-requests.delete'), asyncHandler(async (req, res) => {
+  const requestId = req.params.id;
+  await dbService.deleteServiceRequest(requestId);
+
+  // Publish MQTT update for watches to remove this request
+  mqttService.publish('obedio/service/update', {
+    requestId: requestId,
+    status: 'deleted',
+    timestamp: new Date().toISOString()
+  });
+
+  // Broadcast via WebSocket
+  websocketService.emitServiceRequestDeleted(requestId);
+
+  res.json(apiSuccess({ message: 'Service request deleted', id: requestId }));
 }));
 
 export default router;

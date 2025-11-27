@@ -37,7 +37,8 @@ interface WeatherWindyWidgetProps {
 }
 
 export function WeatherWindyWidget({ className }: WeatherWindyWidgetProps) {
-  const { getCurrentCoordinates, settings } = useYachtSettings();
+  // Note: Hardcoded to Amsterdam for demo purposes
+  // const { getCurrentCoordinates, settings } = useYachtSettings();
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -51,17 +52,10 @@ export function WeatherWindyWidget({ className }: WeatherWindyWidgetProps) {
   const fetchWeather = async () => {
     try {
       setLoading(true);
-      const coords = getCurrentCoordinates();
-
-      // Guard: Return early if no coordinates available
-      if (!coords || coords.latitude == null || coords.longitude == null) {
-        console.warn('⚠️ Weather widget: No coordinates available');
-        setLoading(false);
-        return;
-      }
-
-      const lat = coords.latitude;
-      const lon = coords.longitude;
+      
+      // Hardcoded Amsterdam coordinates for demo/presentation
+      const lat = 52.3676;
+      const lon = 4.9041;
 
       const response = await fetch(
         `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,visibility&timezone=auto`
@@ -112,10 +106,9 @@ export function WeatherWindyWidget({ className }: WeatherWindyWidgetProps) {
     }
   };
 
-  // Windy map configuration with safe coordinates
-  const coords = getCurrentCoordinates();
-  const lat = coords?.latitude ?? 43.7384; // Default to Monaco if unavailable
-  const lon = coords?.longitude ?? 7.4246;
+  // Hardcoded Amsterdam coordinates for demo/presentation
+  const lat = 52.3676;
+  const lon = 4.9041;
   const zoom = 8;
 
   const windyUrl = `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&width=650&height=350&zoom=${zoom}&level=surface&overlay=wind&product=ecmwf&menu=&message=true&marker=&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1`;
@@ -133,7 +126,7 @@ export function WeatherWindyWidget({ className }: WeatherWindyWidgetProps) {
             <Cloud className="h-4 w-4 text-primary" />
             <h3 className="text-sm font-semibold">Current Weather</h3>
           </div>
-          <span className="text-xs text-muted-foreground">{settings?.locationName || 'Current Location'}</span>
+          <span className="text-xs text-muted-foreground">Amsterdam</span>
         </div>
 
         {loading ? (

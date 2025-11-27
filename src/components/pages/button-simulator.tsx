@@ -1,7 +1,7 @@
 /**
- * Smart Button Simulator - Development Testing Tool
- * For testing ESP32 firmware integration with the application
- * Simulates physical button presses and generates real service requests
+ * Smart Button Simulator - Production Demo Tool
+ * Enhanced layout with location sidebar for easier demonstrations
+ * Simulates ESP32 button behavior for testing backend integration
  */
 
 import { useState, useRef } from "react";
@@ -19,9 +19,7 @@ import {
   Fan,
   Bell,
   BellOff,
-  Wind,
   Settings as SettingsIcon,
-  CheckCircle2,
   MapPin
 } from "lucide-react";
 import { toast } from "sonner";
@@ -43,7 +41,7 @@ import {
 } from "../ui/select";
 import { Label } from "../ui/label";
 
-// Button function types that can be mapped
+// Button function types
 type ButtonFunction = 
   | "call_service" 
   | "request_drink" 
@@ -95,22 +93,15 @@ export function ButtonSimulatorPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  // Get all locations (include DND locations for selection)
   const allLocations = locations;
-  
-  // Get on-duty crew
   const onDutyCrew = crew.filter(member => member.status === "on-duty");
-  
-  // Get current location details
   const currentLocation = locations.find(loc => loc.id === selectedLocation);
 
-  // Start real audio recording
+  // Start audio recording
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm'
-      });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
       
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -125,13 +116,11 @@ export function ButtonSimulatorPage() {
       console.log('🎙️ Started recording audio');
     } catch (error) {
       console.error('Failed to start recording:', error);
-      toast.error('Microphone access denied', {
-        description: 'Please allow microphone access to use voice messages'
-      });
+      toast.error('Microphone access denied');
     }
   };
 
-  // Stop recording and upload to server (like ESP32 does)
+  // Stop recording and upload
   const stopRecording = async () => {
     return new Promise<{
       transcript: string | null;
@@ -146,15 +135,9 @@ export function ButtonSimulatorPage() {
       }
 
       mediaRecorder.onstop = async () => {
-        console.log('🎙️ Stopped recording, processing audio...');
-        
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        console.log('Audio blob size:', audioBlob.size, 'bytes');
-
-        // Stop all tracks
         mediaRecorder.stream.getTracks().forEach(track => track.stop());
 
-        // Upload audio to server (permanent storage + auto-create service request)
         try {
           setIsTranscribing(true);
           const result = await uploadAudioToServer(audioBlob, recordingDuration);
@@ -162,7 +145,6 @@ export function ButtonSimulatorPage() {
           resolve(result);
         } catch (error) {
           setIsTranscribing(false);
-          console.error('Audio upload failed:', error);
           resolve({ transcript: null, audioUrl: null, serviceRequestId: null });
         }
       };
@@ -171,7 +153,7 @@ export function ButtonSimulatorPage() {
     });
   };
 
-  // Upload audio to server for permanent storage, transcription, and auto-service-request
+  // Upload audio to server
   const uploadAudioToServer = async (
     audioBlob: Blob,
     duration: number
@@ -185,59 +167,38 @@ export function ButtonSimulatorPage() {
       formData.append('audio', audioBlob, 'recording.webm');
       formData.append('duration', duration.toFixed(2));
       
-      // Add location info if available
       if (selectedLocation) {
         formData.append('locationId', selectedLocation);
       }
-
-      console.log('📤 Uploading audio to server (like ESP32)...');
 
       const response = await fetch('/api/upload/upload-audio', {
         method: 'POST',
         body: formData
       });
 
-      if (!response.ok) {
-        throw new Error('Audio upload failed');
-      }
+      if (!response.ok) throw new Error('Audio upload failed');
 
       const data = await response.json();
 
       if (data.success) {
         const englishText = data.data.translation || data.data.transcript;
-        const audioUrl = data.data.audioUrl;
-        const requestId = data.data.serviceRequest?.id || null;
-
-        console.log('✅ Audio uploaded successfully:', {
-          audioUrl,
-          transcript: data.data.transcript,
-          translation: englishText,
-          language: data.data.language,
-          serviceRequestId: requestId
-        });
-
-        toast.success('Voice message uploaded!', {
-          description: englishText ? englishText.substring(0, 100) : 'Audio saved'
-        });
-
+        toast.success('Voice message uploaded!');
+        
         return {
           transcript: englishText,
-          audioUrl,
-          serviceRequestId: requestId
+          audioUrl: data.data.audioUrl,
+          serviceRequestId: data.data.serviceRequest?.id || null
         };
       }
 
       return { transcript: null, audioUrl: null, serviceRequestId: null };
     } catch (error) {
-      console.error('Audio upload error:', error);
-      toast.error('Failed to upload audio', {
-        description: 'Please try again'
-      });
+      toast.error('Failed to upload audio');
       return { transcript: null, audioUrl: null, serviceRequestId: null };
     }
   };
 
-  // Generate service request based on button press
+  // Generate service request
   const generateServiceRequest = (
     requestType: string,
     requestLabel: string,
@@ -250,96 +211,34 @@ export function ButtonSimulatorPage() {
     }
 
     if (currentLocation?.doNotDisturb) {
-      toast.error("🔕 Do Not Disturb Active", {
-        description: `${currentLocation.name} is not accepting service requests`
-      });
+      toast.error("🔕 Do Not Disturb Active");
       return;
     }
 
     const location = currentLocation!;
-    
-    // Find guest at this location using proper foreign key relationship
-    // If multiple guests in same cabin, prefer owner > vip > partner > guest
     const guestsAtLocation = guests.filter(g => g.locationId === location.id);
-    let guestAtLocation = null;
-    
-    if (guestsAtLocation.length > 0) {
-      // Sort by priority: owner > vip > partner > family > guest
-      const priorityOrder = { owner: 1, vip: 2, partner: 3, family: 4, guest: 5 };
-      guestsAtLocation.sort((a, b) => {
-        const aPriority = priorityOrder[a.type as keyof typeof priorityOrder] || 10;
-        const bPriority = priorityOrder[b.type as keyof typeof priorityOrder] || 10;
-        return aPriority - bPriority;
-      });
-      guestAtLocation = guestsAtLocation[0];  // Take highest priority guest
-    } else {
-      // Fallback: try context helper, but don't default to guests[0]
-      guestAtLocation = getGuestByLocationId(location.id);
-    }
-
-    // Determine which crew member should handle this
-    const assignedCrew = onDutyCrew[0]; // For now, assign to first on-duty crew
+    let guestAtLocation = guestsAtLocation[0] || getGuestByLocationId(location.id);
 
     const guestName = guestAtLocation 
       ? `${guestAtLocation.firstName} ${guestAtLocation.lastName}` 
       : 'Guest';
 
-    // Mock audio URL - use a reliable test audio file
-    // For production: implement real voice recording and upload to /public/uploads/voice/
-    const mockAudioUrl = 'https://www2.cs.uic.edu/~i101/SoundFiles/preamble10.wav';
-
-    // Create actual service request and add to context
-    const newRequest = addServiceRequest({
-      guestName: guestName,
+    addServiceRequest({
+      guestName,
       guestCabin: location.name,
       cabinId: location.id,
-      requestType: 'call' as const,
-      priority: 'normal' as const,
-      status: 'pending' as const,
-      voiceTranscript: isVoice 
-        ? `Voice message (${voiceDuration?.toFixed(1)}s): ${requestLabel}`
-        : undefined,
-      voiceAudioUrl: isVoice ? mockAudioUrl : undefined,
-      cabinImage: location.image || 'https://images.unsplash.com/photo-1597126729864-51740ac05236?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080',
+      requestType: 'call',
+      priority: 'normal',
+      status: 'pending',
+      voiceTranscript: isVoice ? `Voice: ${requestLabel}` : undefined,
+      cabinImage: location.image,
       notes: requestLabel,
     });
 
-    // Show toast notification (no longer shows full request details to avoid duplication with dialog)
-    toast.success("Service Request Created", {
-      description: `${requestLabel} from ${location.name}`,
-      duration: 3000
-    });
-
-    // Log to console for ESP32 firmware development
-    console.log("🔘 BUTTON PRESS SIMULATED:", {
-      timestamp: new Date().toISOString(),
-      buttonType: isVoice ? "MAIN_HOLD" : requestType === "main" ? "MAIN_TAP" : "AUX_" + requestType.toUpperCase(),
-      location: {
-        id: location.id,
-        name: location.name,
-        floor: location.floor,
-        smartButtonId: location.smartButtonId
-      },
-      request: {
-        id: newRequest.id,
-        type: requestType,
-        label: requestLabel,
-        isVoice,
-        voiceDuration: isVoice ? voiceDuration : null
-      },
-      guest: guestAtLocation ? {
-        id: guestAtLocation.id,
-        name: guestName
-      } : null,
-      assignedTo: assignedCrew ? {
-        id: assignedCrew.id,
-        name: assignedCrew.name,
-        role: assignedCrew.role
-      } : null
-    });
+    toast.success("Service Request Created", { description: `${requestLabel} from ${location.name}` });
   };
 
-  // Main button - Press & Hold for voice
+  // Main button handlers
   const handleMainButtonDown = () => {
     if (!selectedLocation) return;
     setIsMainPressed(true);
@@ -347,8 +246,6 @@ export function ButtonSimulatorPage() {
     pressTimerRef.current = setTimeout(() => {
       setIsRecording(true);
       setRecordingDuration(0);
-      
-      // Start real audio recording
       startRecording();
       
       recordingTimerRef.current = setInterval(() => {
@@ -374,54 +271,36 @@ export function ButtonSimulatorPage() {
       setIsRecording(false);
       
       if (recordingDuration > 0.3) {
-        // Upload audio to server - backend auto-creates service request
-        const { transcript, audioUrl, serviceRequestId } = await stopRecording();
-        
-        if (serviceRequestId) {
-          // Backend successfully created service request
-          console.log('✅ Voice service request created by backend:', serviceRequestId);
-          toast.success('Voice request sent!', {
-            description: transcript || 'Audio uploaded successfully'
-          });
-        } else {
-          // Fallback: create request manually if backend didn't
-          const voiceMessage = transcript || "Voice Message";
-          generateServiceRequest("main", voiceMessage, true, recordingDuration);
-        }
+        const { transcript } = await stopRecording();
+        const voiceMessage = transcript || "Voice Message";
+        generateServiceRequest("main", voiceMessage, true, recordingDuration);
       } else {
         toast.error("Recording too short");
       }
       
       setRecordingDuration(0);
     } else {
-      // Quick tap
       generateServiceRequest("main", "Service Call");
     }
   };
 
-  // Auxiliary button press
+  // Aux button click
   const handleAuxButtonClick = (button: AuxButton) => {
-    // Environmental controls (Crestron integration) - Direct actions, no service request
     if (button.function === 'lights_toggle') {
-      toast.success('💡 Lights toggled', {
-        description: 'Crestron command sent'
-      });
+      toast.success('💡 Lights toggled');
       return;
     }
     
     if (button.function === 'ac_control') {
-      toast.success('❄️ Climate control adjusted', {
-        description: 'Crestron command sent'
-      });
+      toast.success('❄️ Climate control adjusted');
       return;
     }
     
-    // Service requests - Create actual service request for crew
     const labels: Record<ButtonFunction, string> = {
       call_service: "Service Call",
       request_drink: "Drink Request",
-      lights_toggle: "Lights Control", // Won't reach here
-      ac_control: "Climate Control", // Won't reach here
+      lights_toggle: "Lights Control",
+      ac_control: "Climate Control",
       call_housekeeping: "Housekeeping Request",
       need_assistance: "Need Assistance"
     };
@@ -429,7 +308,7 @@ export function ButtonSimulatorPage() {
     generateServiceRequest(button.function, labels[button.function]);
   };
 
-  // Configure button function
+  // Configure button
   const handleConfigureButton = (button: AuxButton) => {
     setEditingButton(button);
     setIsConfigOpen(true);
@@ -451,18 +330,14 @@ export function ButtonSimulatorPage() {
     toast.success("Button function updated");
   };
 
-  // Toggle DND for current location - ATOMIC OPERATION
+  // Toggle DND
   const handleToggleDND = async () => {
-    if (!currentLocation) {
-      toast.error("Please select a location first");
-      return;
-    }
+    if (!currentLocation) return;
 
     const newDNDStatus = !currentLocation.doNotDisturb;
     const guest = getGuestByLocationId(currentLocation.id);
 
     try {
-      // Use atomic DND service to prevent desync
       const result = await DNDService.toggleDND(
         currentLocation.id,
         newDNDStatus,
@@ -472,375 +347,281 @@ export function ButtonSimulatorPage() {
       );
 
       if (result.success) {
-        toast.success(
-          newDNDStatus ? "🔕 Do Not Disturb Enabled (Atomic)" : "🔔 Do Not Disturb Disabled (Atomic)",
-          {
-            description: newDNDStatus
-              ? `${currentLocation.name} will not receive service requests`
-              : `${currentLocation.name} can now receive service requests`
-          }
-        );
-
-        console.log("🔕 ATOMIC DND TOGGLE:", {
-          timestamp: new Date().toISOString(),
-          operation: 'atomic',
-          location: { id: currentLocation.id, name: currentLocation.name },
-          guest: guest ? { id: guest.id, name: `${guest.firstName} ${guest.lastName}` } : null,
-          newState: newDNDStatus,
-          locationUpdated: result.locationUpdated,
-          guestUpdated: result.guestUpdated
-        });
-      } else {
-        toast.error("Failed to update DND status", {
-          description: result.error || "Atomic operation failed"
-        });
+        toast.success(newDNDStatus ? "🔕 DND Enabled" : "🔔 DND Disabled");
       }
     } catch (error) {
-      toast.error("Failed to update DND status", {
-        description: "Atomic operation exception"
-      });
+      toast.error("Failed to update DND status");
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header with Location Selector */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex-1 max-w-md">
-          <Label htmlFor="location-select" className="mb-2 block">
-            Select Location (Simulating button in...)
-          </Label>
-          <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-            <SelectTrigger id="location-select">
-              <SelectValue placeholder="Choose a location..." />
-            </SelectTrigger>
-            <SelectContent>
-              {allLocations.length === 0 ? (
-                <SelectItem value="none" disabled>
-                  No locations available
-                </SelectItem>
-              ) : (
-                allLocations.map((location) => (
-                  <SelectItem key={location.id} value={location.id}>
+    <div className="flex gap-4 h-[calc(100vh-8rem)]">
+      {/* LEFT SIDEBAR - Location List */}
+      <Card className="w-80 flex-shrink-0 overflow-hidden flex flex-col">
+        <div className="p-4 border-b border-border space-y-3">
+          <h3 className="font-semibold">Select Location</h3>
+          <Badge variant="outline" className="gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
+            {allLocations.length} Locations
+          </Badge>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-2 space-y-1">
+            {allLocations.map((location) => (
+              <button
+                key={location.id}
+                onClick={() => setSelectedLocation(location.id)}
+                className={`w-full text-left p-3 rounded-lg transition-all ${
+                  selectedLocation === location.id
+                    ? 'bg-accent text-accent-foreground shadow-md'
+                    : 'hover:bg-muted/50'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <MapPin className="h-3.5 w-3.5" />
-                      <span>{location.name}</span>
-                      {location.floor && (
-                        <span className="text-xs text-muted-foreground">({location.floor})</span>
-                      )}
-                      {location.doNotDisturb && (
-                        <span className="text-xs text-destructive flex items-center gap-0.5">
-                          <BellOff className="h-3 w-3" />
-                          DND
-                        </span>
-                      )}
+                      <MapPin className="h-4 w-4 flex-shrink-0" />
+                      <span className="font-medium text-sm truncate">{location.name}</span>
                     </div>
-                  </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
-          {currentLocation && (
-            <div className="space-y-1 mt-1">
-              <p className="text-xs text-muted-foreground">
-                {currentLocation.smartButtonId ? (
-                  <>Button ID: {currentLocation.smartButtonId}</>
-                ) : (
-                  <>No smart button assigned</>
-                )}
-              </p>
-              {currentLocation.doNotDisturb && (
-                <div className="flex items-center gap-1.5 text-xs text-destructive">
-                  <BellOff className="h-3 w-3" />
-                  <span>Do Not Disturb is active - Service requests blocked</span>
+                    {location.floor && (
+                      <p className="text-xs text-muted-foreground mt-1 pl-6">{location.floor}</p>
+                    )}
+                    {location.smartButtonId && (
+                      <p className="text-xs text-muted-foreground mt-1 pl-6 font-mono">{location.smartButtonId}</p>
+                    )}
+                  </div>
+                  {location.doNotDisturb && (
+                    <BellOff className="h-4 w-4 text-destructive flex-shrink-0" />
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </Card>
+
+      {/* RIGHT CONTENT - Button Simulator */}
+      <div className="flex-1 space-y-4 overflow-y-auto">
+        {/* IP Configuration Header */}
+        <Card className="bg-gradient-to-r from-accent/10 to-accent/5">
+          <div className="p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="font-semibold">Backend Configuration</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  HTTP API: <strong className="text-accent font-mono">10.10.0.207:5555</strong> •{' '}
+                  MQTT: <strong className="text-accent font-mono">10.10.0.207:1883</strong>
+                </p>
+              </div>
+              {currentLocation && (
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Current Location</p>
+                  <p className="font-semibold">{currentLocation.name}</p>
+                  {currentLocation.doNotDisturb && (
+                    <Badge variant="destructive" className="mt-1">DND Active</Badge>
+                  )}
                 </div>
               )}
             </div>
-          )}
-        </div>
-        
-        <div className="flex items-center gap-3">
-          {/* DND Toggle Button */}
-          {currentLocation && (
-            <Button
-              variant={currentLocation.doNotDisturb ? "destructive" : "outline"}
-              size="sm"
-              onClick={handleToggleDND}
-              className="gap-2"
-            >
-              <BellOff className="h-4 w-4" />
-              {currentLocation.doNotDisturb ? "DND Active" : "Enable DND"}
-            </Button>
-          )}
-          
-          <Badge variant="outline" className="gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
-            Simulator Active
-          </Badge>
-        </div>
-      </div>
+          </div>
+        </Card>
 
-      {/* Status Info */}
-      {selectedLocation && (
-        <Card className="bg-muted/50">
-          <div className="p-4">
-            <div className="grid grid-cols-3 gap-4 text-sm">
+        {!selectedLocation ? (
+          <Card className="bg-muted/30">
+            <div className="p-16 text-center space-y-3">
+              <MapPin className="h-20 w-20 mx-auto text-muted-foreground opacity-30" />
               <div>
-                <p className="text-muted-foreground">On Duty Crew</p>
-                <p className="font-medium">{onDutyCrew.length} member{onDutyCrew.length !== 1 ? 's' : ''}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Total Locations</p>
-                <p className="font-medium">{allLocations.length} locations</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Current Guest</p>
-                <p className="font-medium">
-                  {guests.find(g => 
-                    g.preferences?.cabin?.toLowerCase().includes(currentLocation?.name.toLowerCase() || '')
-                  )?.name || "Not assigned"}
+                <h3 className="font-semibold text-xl">Select a Location</h3>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Choose a room from the sidebar to begin button simulation
                 </p>
               </div>
             </div>
-          </div>
-        </Card>
-      )}
-
-      {/* Main Simulator */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Button Visual */}
-        <Card className="bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900 border-accent/20">
-          <div className="aspect-square flex items-center justify-center p-12 relative">
-            {!selectedLocation && (
-              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-10 flex items-center justify-center">
-                <div className="text-center space-y-2">
-                  <MapPin className="h-12 w-12 mx-auto text-muted-foreground opacity-50" />
-                  <p className="text-muted-foreground">Select a location to start testing</p>
-                </div>
-              </div>
-            )}
-
-            {/* Decorative background */}
-            <div className="absolute inset-0 opacity-10" style={{
-              backgroundImage: `radial-gradient(circle at 20% 50%, transparent 0%, rgba(200, 169, 107, 0.1) 100%)`
-            }} />
-            
-            {/* Button Container */}
-            <div className="relative w-full max-w-md aspect-square">
-              {/* Stitching */}
-              <div className="absolute inset-0 rounded-3xl border-2 border-dashed border-accent/30" 
-                   style={{ margin: '8px' }} />
-              
-              {/* Auxiliary Buttons */}
-              {auxButtons.map((button) => {
-                const ButtonIcon = button.icon;
-                const positions = {
-                  "top-left": "top-[15%] left-[15%]",
-                  "top-right": "top-[15%] right-[15%]",
-                  "bottom-left": "bottom-[15%] left-[15%]",
-                  "bottom-right": "bottom-[15%] right-[15%]"
-                };
+          </Card>
+        ) : (
+          <div className="grid lg:grid-cols-2 gap-4">
+            {/* Button Visual */}
+            <Card className="bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900 border-accent/20">
+              <div className="aspect-square flex items-center justify-center p-12 relative">
+                <div className="absolute inset-0 opacity-10" style={{
+                  backgroundImage: `radial-gradient(circle at 20% 50%, transparent 0%, rgba(200, 169, 107, 0.1) 100%)`
+                }} />
                 
-                return (
-                  <div key={button.id} className={`absolute ${positions[button.position]}`}>
-                    <motion.button
-                      whileTap={{ scale: 0.85 }}
-                      whileHover={{ scale: 1.05 }}
-                      onClick={() => handleAuxButtonClick(button)}
-                      disabled={!selectedLocation}
-                      className={`w-14 h-14 rounded-full bg-gradient-to-br from-neutral-800 to-neutral-900
-                                border-2 border-accent flex items-center justify-center
-                                shadow-lg hover:shadow-xl transition-all relative
-                                ${!selectedLocation ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}
-                                group`}
-                    >
-                      <div className="absolute inset-0 rounded-full bg-accent/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      <ButtonIcon className="h-5 w-5 text-accent relative z-10" />
-                    </motion.button>
-                    {/* Config button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleConfigureButton(button);
-                      }}
-                      className="absolute -bottom-2 -right-2 w-6 h-6 rounded-full bg-muted border border-border
-                               flex items-center justify-center hover:bg-accent hover:text-accent-foreground
-                               transition-colors z-20"
-                    >
-                      <SettingsIcon className="h-3 w-3" />
-                    </button>
-                  </div>
-                );
-              })}
-
-              {/* Alignment dots */}
-              <div className="absolute top-[50%] left-[35%] w-1.5 h-1.5 rounded-full bg-accent/60" />
-              <div className="absolute top-[50%] right-[35%] w-1.5 h-1.5 rounded-full bg-accent/60" />
-
-              {/* Main Button */}
-              <motion.div
-                animate={{
-                  scale: isMainPressed ? 0.95 : 1,
-                  boxShadow: isMainPressed 
-                    ? "0 0 40px rgba(200, 169, 107, 0.6)" 
-                    : "0 0 20px rgba(200, 169, 107, 0.3)"
-                }}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-                         w-36 h-36 rounded-full cursor-pointer"
-                onMouseDown={selectedLocation ? handleMainButtonDown : undefined}
-                onMouseUp={selectedLocation ? handleMainButtonUp : undefined}
-                onMouseLeave={selectedLocation ? handleMainButtonUp : undefined}
-                onTouchStart={selectedLocation ? handleMainButtonDown : undefined}
-                onTouchEnd={selectedLocation ? handleMainButtonUp : undefined}
-              >
-                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-accent via-accent to-accent/80
-                              border-2 border-accent/50" />
-                
-                <div className="absolute inset-2 rounded-full bg-gradient-to-br from-neutral-900 to-black
-                              flex items-center justify-center">
-                  <AnimatePresence mode="wait">
-                    {isRecording ? (
-                      <motion.div
-                        key="recording"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        exit={{ scale: 0 }}
-                        className="flex flex-col items-center gap-2"
-                      >
-                        <motion.div
-                          animate={{ scale: [1, 1.2, 1] }}
-                          transition={{ repeat: Infinity, duration: 1 }}
+                <div className="relative w-full max-w-md aspect-square">
+                  <div className="absolute inset-0 rounded-3xl border-2 border-dashed border-accent/30" 
+                       style={{ margin: '8px' }} />
+                  
+                  {/* Auxiliary Buttons */}
+                  {auxButtons.map((button) => {
+                    const ButtonIcon = button.icon;
+                    const positions = {
+                      "top-left": "top-[15%] left-[15%]",
+                      "top-right": "top-[15%] right-[15%]",
+                      "bottom-left": "bottom-[15%] left-[15%]",
+                      "bottom-right": "bottom-[15%] right-[15%]"
+                    };
+                    
+                    return (
+                      <div key={button.id} className={`absolute ${positions[button.position]}`}>
+                        <motion.button
+                          whileTap={{ scale: 0.85 }}
+                          whileHover={{ scale: 1.05 }}
+                          onClick={() => handleAuxButtonClick(button)}
+                          className={`w-14 h-14 rounded-full bg-gradient-to-br from-neutral-800 to-neutral-900
+                                    border-2 border-accent flex items-center justify-center
+                                    shadow-lg hover:shadow-xl transition-all relative group`}
                         >
-                          <Mic className="h-10 w-10 text-destructive" />
-                        </motion.div>
-                        <span className="text-xs text-destructive font-medium">
-                          {recordingDuration.toFixed(1)}s
-                        </span>
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        key="idle"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        exit={{ scale: 0 }}
-                      >
-                        <Phone className="h-10 w-10 text-accent" />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                {isRecording && (
-                  <motion.div
-                    className="absolute inset-0 rounded-full border-2 border-destructive"
-                    animate={{
-                      scale: [1, 1.3, 1],
-                      opacity: [0.5, 0, 0.5]
-                    }}
-                    transition={{ repeat: Infinity, duration: 1.5 }}
-                  />
-                )}
-              </motion.div>
-            </div>
-          </div>
-
-          <div className="border-t border-accent/20 bg-black/20 px-6 py-4">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">OBEDIO Smart Button - ESP32 Simulator</span>
-              {currentLocation?.smartButtonId && (
-                <Badge variant="outline" className="border-accent/30 text-accent">
-                  {currentLocation.smartButtonId}
-                </Badge>
-              )}
-            </div>
-          </div>
-        </Card>
-
-        {/* Instructions */}
-        <div className="space-y-6">
-          <Card>
-            <div className="p-6 space-y-4">
-              <h3>Testing Instructions</h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex gap-3 p-3 rounded-lg bg-muted/50">
-                  <Phone className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium">Main Button - Quick Tap</p>
-                    <p className="text-muted-foreground">
-                      Generates service call to selected location
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 p-3 rounded-lg bg-muted/50">
-                  <Mic className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium">Main Button - Hold 500ms+</p>
-                    <p className="text-muted-foreground">
-                      Records voice message (ready for Google Speech API)
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 p-3 rounded-lg bg-muted/50">
-                  <Bell className="h-5 w-5 text-accent flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium">Auxiliary Buttons (4x)</p>
-                    <p className="text-muted-foreground">
-                      Configurable quick actions - click ⚙️ to change function
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          <Card>
-            <div className="p-6 space-y-4">
-              <h3>Current Button Mapping</h3>
-              <div className="space-y-2">
-                {auxButtons.map((button) => {
-                  const ButtonIcon = button.icon;
-                  return (
-                    <div 
-                      key={button.id} 
-                      className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center">
-                          <ButtonIcon className="h-4 w-4 text-accent" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm">{button.label}</p>
-                          <p className="text-xs text-muted-foreground capitalize">
-                            {button.position.replace("-", " ")}
-                          </p>
-                        </div>
+                          <div className="absolute inset-0 rounded-full bg-accent/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <ButtonIcon className="h-5 w-5 text-accent relative z-10" />
+                        </motion.button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleConfigureButton(button);
+                          }}
+                          className="absolute -bottom-2 -right-2 w-6 h-6 rounded-full bg-muted border border-border
+                                   flex items-center justify-center hover:bg-accent hover:text-accent-foreground
+                                   transition-colors z-20"
+                        >
+                          <SettingsIcon className="h-3 w-3" />
+                        </button>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleConfigureButton(button)}
-                      >
-                        <SettingsIcon className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </Card>
+                    );
+                  })}
 
-          <Card className="bg-muted/30">
-            <div className="p-6 space-y-3">
-              <h3 className="text-sm">Console Output</h3>
-              <p className="text-xs text-muted-foreground">
-                All button presses are logged to browser console with full payload data for ESP32 firmware development.
-                Open DevTools to see JSON output.
-              </p>
+                  {/* Main Button */}
+                  <motion.div
+                    animate={{
+                      scale: isMainPressed ? 0.95 : 1,
+                      boxShadow: isMainPressed 
+                        ? "0 0 40px rgba(200, 169, 107, 0.6)" 
+                        : "0 0 20px rgba(200, 169, 107, 0.3)"
+                    }}
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
+                             w-36 h-36 rounded-full cursor-pointer"
+                    onMouseDown={handleMainButtonDown}
+                    onMouseUp={handleMainButtonUp}
+                    onMouseLeave={handleMainButtonUp}
+                    onTouchStart={handleMainButtonDown}
+                    onTouchEnd={handleMainButtonUp}
+                  >
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-accent via-accent to-accent/80
+                                  border-2 border-accent/50" />
+                    
+                    <div className="absolute inset-2 rounded-full bg-gradient-to-br from-neutral-900 to-black
+                                  flex items-center justify-center">
+                      <AnimatePresence mode="wait">
+                        {isRecording ? (
+                          <motion.div
+                            key="recording"
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            exit={{ scale: 0 }}
+                            className="flex flex-col items-center gap-2"
+                          >
+                            <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1 }}>
+                              <Mic className="h-10 w-10 text-destructive" />
+                            </motion.div>
+                            <span className="text-xs text-destructive font-medium">
+                              {recordingDuration.toFixed(1)}s
+                            </span>
+                          </motion.div>
+                        ) : (
+                          <motion.div key="idle" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+                            <Phone className="h-10 w-10 text-accent" />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    {isRecording && (
+                      <motion.div
+                        className="absolute inset-0 rounded-full border-2 border-destructive"
+                        animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }}
+                        transition={{ repeat: Infinity, duration: 1.5 }}
+                      />
+                    )}
+                  </motion.div>
+                </div>
+              </div>
+
+              <div className="border-t border-accent/20 bg-black/20 px-6 py-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">OBEDIO Smart Button</span>
+                  {currentLocation?.smartButtonId && (
+                    <Badge variant="outline" className="border-accent/30 text-accent">
+                      {currentLocation.smartButtonId}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </Card>
+
+            {/* Instructions */}
+            <div className="space-y-4">
+              <Card>
+                <div className="p-6 space-y-4">
+                  <h3 className="font-semibold">Instructions</h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex gap-3 p-3 rounded-lg bg-muted/50">
+                      <Phone className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium">Quick Tap</p>
+                        <p className="text-muted-foreground">Service call</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 p-3 rounded-lg bg-muted/50">
+                      <Mic className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium">Hold 500ms+</p>
+                        <p className="text-muted-foreground">Voice message</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 p-3 rounded-lg bg-muted/50">
+                      <Bell className="h-5 w-5 text-accent flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium">Aux Buttons</p>
+                        <p className="text-muted-foreground">Click ⚙️ to configure</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              <Card>
+                <div className="p-6 space-y-4">
+                  <h3 className="font-semibold">Button Mapping</h3>
+                  <div className="space-y-2">
+                    {auxButtons.map((button) => {
+                      const ButtonIcon = button.icon;
+                      return (
+                        <div key={button.id} className="flex items-center justify-between p-3 rounded-lg border">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center">
+                              <ButtonIcon className="h-4 w-4 text-accent" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">{button.label}</p>
+                              <p className="text-xs text-muted-foreground capitalize">
+                                {button.position.replace("-", " ")}
+                              </p>
+                            </div>
+                          </div>
+                          <Button variant="ghost" size="sm" onClick={() => handleConfigureButton(button)}>
+                            <SettingsIcon className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </Card>
             </div>
-          </Card>
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Configure Button Dialog */}
@@ -866,7 +647,7 @@ export function ButtonSimulatorPage() {
                 <Label htmlFor="function-select">Function</Label>
                 <Select 
                   defaultValue={editingButton.function}
-                  onValueChange={(value) => handleSaveButtonConfig(value as ButtonFunction)}
+                  onValueChange={(value: string) => handleSaveButtonConfig(value as ButtonFunction)}
                 >
                   <SelectTrigger id="function-select">
                     <SelectValue />

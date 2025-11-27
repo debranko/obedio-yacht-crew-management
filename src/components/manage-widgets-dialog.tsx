@@ -201,15 +201,19 @@ export function getAvailableWidgetsForRole(role: string): WidgetConfig[] {
 
 /**
  * Get default active widgets for a role
- * Returns widget IDs that are recommended for this role
+ * Returns widget IDs that match the standard dashboard layout (from screenshot)
+ * This ensures a consistent experience for all users
  */
 export function getDefaultWidgetsForRole(role: string): string[] {
+  // Standard layout matching the screenshot: Serving Now, Duty Timer, Clock, Guest Status, Weather Map
+  // This is the same for all roles to ensure consistency
+  const standardWidgets = ["serving-now", "duty-timer", "clock", "guest-status", "weather-windy"];
+  
+  // Filter to only include widgets the user has permission to see
   const availableForRole = getAvailableWidgetsForRole(role);
-
-  // Return widgets that are recommended for this role
-  return availableForRole
-    .filter(widget => widget.recommendedForRoles?.includes(role))
-    .map(widget => widget.id);
+  const availableIds = availableForRole.map(w => w.id);
+  
+  return standardWidgets.filter(id => availableIds.includes(id));
 }
 
 interface ManageWidgetsDialogProps {

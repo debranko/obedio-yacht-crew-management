@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Bell } from "lucide-react";
 import { getCrewAvatar } from "./crew-avatars";
 import { useAppData } from "../contexts/AppDataContext";
+import { useUpdateCrewMember } from "../hooks/useCrewMembers";
 import { CallBackupDialog } from "./call-backup-dialog";
 
 // Helper: Convert HH:MM to seconds
@@ -212,8 +213,9 @@ function CrewItem({
 }
 
 export function DutyTimerCard() {
-  const { getCurrentDutyStatus, assignments, shifts, crewMembers, setCrewMembers } = useAppData();
-  
+  const { getCurrentDutyStatus, assignments, shifts, crewMembers } = useAppData();
+  const updateCrewMutation = useUpdateCrewMember();
+
   // Force re-render every minute for live countdown
   const [currentTime, setCurrentTime] = useState(getCurrentTime());
   
@@ -222,13 +224,14 @@ export function DutyTimerCard() {
   
   // Handler when backup crew is called - activate them to on-duty
   const handleBackupCalled = (crewName: string, urgency: string, reason: string) => {
-    // Find the crew member by name and set their status to 'on-duty'
-    const updatedCrew = crewMembers.map(member => 
-      member.name === crewName 
-        ? { ...member, status: 'on-duty' as const }
-        : member
-    );
-    setCrewMembers(updatedCrew);
+    // Find the crew member by name and update their status in the database
+    const crewMember = crewMembers.find(member => member.name === crewName);
+    if (crewMember) {
+      updateCrewMutation.mutate({
+        id: crewMember.id,
+        data: { status: 'on-duty' }
+      });
+    }
   };
   
   useEffect(() => {

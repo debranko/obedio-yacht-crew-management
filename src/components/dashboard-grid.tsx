@@ -47,21 +47,23 @@ interface WidgetLayout {
 }
 
 const defaultLayout: WidgetLayout[] = [
-  // Top row - Service and Duty Timer
-  { i: "serving-now", x: 0, y: 0, w: 4, h: 3, minW: 2, minH: 3 },
-  { i: "duty-timer", x: 4, y: 0, w: 4, h: 3, minW: 3, minH: 3 },
+  // Top row - Service and Duty Timer (as shown in screenshot)
+  { i: "serving-now", x: 0, y: 0, w: 5, h: 3, minW: 3, minH: 3 },
+  { i: "duty-timer", x: 5, y: 0, w: 3, h: 3, minW: 3, minH: 3 },
 
-  // Second row - DND, Guests, and Button Simulator
-  { i: "dnd-auto", x: 0, y: 3, w: 3, h: 3, minW: 3, minH: 3 },
-  { i: "guest-status", x: 3, y: 3, w: 2, h: 3, minW: 2, minH: 2 },
-  { i: "button-simulator", x: 5, y: 3, w: 3, h: 4, minW: 3, minH: 4 },
+  // Second row - Clock, Guest Status, Weather Map (as shown in screenshot)
+  { i: "clock", x: 0, y: 3, w: 2, h: 2, minW: 2, minH: 2 },
+  { i: "guest-status", x: 2, y: 3, w: 3, h: 4, minW: 2, minH: 3 },
+  { i: "weather-windy", x: 5, y: 3, w: 3, h: 4, minW: 3, minH: 4 },
 
-  // Third row - Clock and Weather
-  { i: "clock", x: 0, y: 6, w: 2, h: 2, minW: 2, minH: 2 },
-  { i: "weather", x: 2, y: 6, w: 6, h: 3, minW: 2, minH: 3 },
+  // Third row - DND Widget (top right corner as shown)
+  { i: "dnd-auto", x: 5, y: 7, w: 3, h: 2, minW: 2, minH: 2 },
 
-  // Bottom row - Wind & Weather map
-  { i: "weather-windy", x: 0, y: 9, w: 8, h: 5, minW: 3, minH: 4 },
+  // Button Simulator - bottom (collapsed by default)
+  { i: "button-simulator", x: 0, y: 10, w: 3, h: 3, minW: 3, minH: 3 },
+
+  // Optional weather widget (can be hidden)
+  { i: "weather", x: 0, y: 5, w: 2, h: 2, minW: 2, minH: 2 },
 ];
 
 interface DashboardGridProps {
@@ -176,9 +178,9 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
   // Expose functions to parent via ref
   useImperativeHandle(ref, () => ({
     resetLayout: () => {
-      // Reset to complete default layout with all widgets properly positioned
-      const resetWidgets = ["serving-now", "duty-timer", "guest-status", "clock", "weather", "weather-windy", "button-simulator"];
-      const resetLayout = defaultLayout.filter(l => resetWidgets.includes(l.i) || l.i === "dnd-auto");
+      // Reset to match screenshot: Serving Now, Duty Timer, Clock, Guest Status, Weather Map, DND
+      const resetWidgets = ["serving-now", "duty-timer", "clock", "guest-status", "weather-windy", "dnd-auto"];
+      const resetLayout = defaultLayout.filter(l => resetWidgets.includes(l.i));
 
       setLayout(resetLayout);
 

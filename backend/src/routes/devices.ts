@@ -5,6 +5,7 @@ import { prisma } from '../services/db';
 import { websocketService } from '../services/websocket';
 import { calculatePagination, buildPaginationMeta } from '../utils/pagination';
 import { apiSuccess, apiError } from '../utils/api-response';
+import jwt from 'jsonwebtoken';
 
 const router = Router();
 
@@ -36,7 +37,8 @@ router.get('/discover', asyncHandler(async (req, res) => {
         select: {
           id: true,
           name: true,
-          position: true
+          position: true,
+          userId: true
         }
       }
     }
@@ -47,7 +49,64 @@ router.get('/discover', asyncHandler(async (req, res) => {
   }
 
   console.log(`📱 Device discovery: ${device.name} (MAC: ${macAddress}) assigned to ${device.crewmember?.name || 'nobody'}`);
-  res.json(apiSuccess(device));
+
+  // Generate JWT token if device has an assigned crew member
+  let authToken: string | null = null;
+  if (device.crewmember) {
+    const JWT_SECRET = process.env.JWT_SECRET;
+    if (JWT_SECRET) {
+      // If crew member has a linked user account, use that
+      // Otherwise, create a watch-specific token for the crew member
+      const userId = device.crewmember.userId;
+
+      if (userId) {
+        // Get user details for proper token
+        const user = await prisma.user.findUnique({
+          where: { id: userId }
+        });
+
+        if (user) {
+          authToken = jwt.sign(
+            {
+              sub: user.id,
+              userId: user.id,
+              username: user.username,
+              role: user.role,
+              crewMemberId: device.crewmember.id,
+              deviceId: device.id,
+              type: 'watch-auth'
+            },
+            JWT_SECRET,
+            { expiresIn: '365d' }  // Long-lived token for watch devices
+          );
+          console.log(`🔑 Generated auth token for user: ${user.username}`);
+        }
+      } else {
+        // No user linked - create a crew-member-only token
+        authToken = jwt.sign(
+          {
+            sub: device.crewmember.id,
+            crewMemberId: device.crewmember.id,
+            crewMemberName: device.crewmember.name,
+            role: device.crewmember.position || 'crew',
+            deviceId: device.id,
+            type: 'watch-auth'
+          },
+          JWT_SECRET,
+          { expiresIn: '365d' }
+        );
+        console.log(`🔑 Generated crew-only auth token for: ${device.crewmember.name}`);
+      }
+    } else {
+      console.warn('⚠️ JWT_SECRET not configured - cannot generate auth token');
+    }
+  }
+
+  // Return device info along with auth token
+  res.json(apiSuccess({
+    ...device,
+    authToken
+  }));
 }));
 
 /**

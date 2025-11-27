@@ -16,6 +16,8 @@
     "db:seed-demo": "tsx prisma/seed-demo-users.ts",
     "db:seed-yersin": "tsx prisma/seed-yersin-locations.ts",
     "db:seed-images": "tsx prisma/seed-yersin-images.ts",
+    "db:update-images": "tsx prisma/update-images.ts",
+    "db:update-location-images": "tsx prisma/update-location-images.ts",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset --force",
     "db:setup": "prisma generate && prisma db push && tsx prisma/seed.ts",

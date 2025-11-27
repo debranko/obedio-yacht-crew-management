@@ -10,6 +10,66 @@ import { calculatePagination, buildPaginationMeta } from '../utils/pagination';
 
 const router = Router();
 
+// ═══════════════════════════════════════════════════════════════════════════
+// GUEST STATUS CALCULATION (computed from dates, not stored)
+// ═══════════════════════════════════════════════════════════════════════════
+
+type GuestStatus = 'expected' | 'onboard' | 'departed';
+
+/**
+ * Calculate guest status based on check-in/check-out dates
+ * - today < checkInDate → 'expected'
+ * - checkInDate <= today <= checkOutDate → 'onboard'
+ * - today > checkOutDate → 'departed'
+ */
+function calculateGuestStatus(checkInDate: Date | null, checkOutDate: Date | null): GuestStatus {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (!checkInDate || !checkOutDate) {
+    return 'expected'; // Default if no dates
+  }
+
+  const checkIn = new Date(checkInDate);
+  checkIn.setHours(0, 0, 0, 0);
+
+  const checkOut = new Date(checkOutDate);
+  checkOut.setHours(0, 0, 0, 0);
+
+  if (today < checkIn) {
+    return 'expected';
+  } else if (today <= checkOut) {
+    return 'onboard';
+  } else {
+    return 'departed';
+  }
+}
+
+/**
+ * Build Prisma WHERE clause for status filtering based on dates
+ */
+function buildStatusDateFilter(status: string): any {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayISO = today.toISOString();
+
+  switch (status) {
+    case 'expected':
+      return { checkInDate: { gt: todayISO } };
+    case 'onboard':
+      return {
+        AND: [
+          { checkInDate: { lte: todayISO } },
+          { checkOutDate: { gte: todayISO } }
+        ]
+      };
+    case 'departed':
+      return { checkOutDate: { lt: todayISO } };
+    default:
+      return {};
+  }
+}
+
 // Apply auth middleware to ALL guest routes
 router.use(authMiddleware);
 
@@ -47,9 +107,9 @@ router.get('/', asyncHandler(async (req, res) => {
       });
     }
 
-    // Status filter
+    // Status filter (computed from dates, not stored value)
     if (status && status !== 'All') {
-      where.AND.push({ status: status as any });
+      where.AND.push(buildStatusDateFilter(status));
     }
 
     // Type filter
@@ -115,7 +175,7 @@ router.get('/', asyncHandler(async (req, res) => {
     const { skip, take, page: pageNum, limit: limitNum } = calculatePagination(parseInt(page), parseInt(limit));
 
     // Execute queries using Prisma (secure and type-safe)
-    const [data, total] = await Promise.all([
+    const [rawData, total] = await Promise.all([
       prisma.guest.findMany({
         where,
         orderBy,
@@ -125,20 +185,44 @@ router.get('/', asyncHandler(async (req, res) => {
       prisma.guest.count({ where })
     ]);
 
+    // Add computed status to each guest
+    const data = rawData.map(guest => ({
+      ...guest,
+      status: calculateGuestStatus(guest.checkInDate, guest.checkOutDate)
+    }));
+
     // Return paginated response using apiSuccess
     res.json(apiSuccess(data, buildPaginationMeta(total, pageNum, limitNum)));
 }));
 
-// GET /api/guests/stats - Get guest statistics
+// GET /api/guests/stats - Get guest statistics (computed from dates)
 router.get('/stats', asyncHandler(async (req, res) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayISO = today.toISOString();
+
   const [onboard, expected, vip, dietaryAlerts] = await Promise.all([
-    prisma.guest.count({ where: { status: 'onboard' } }),
-    prisma.guest.count({ where: { status: 'expected' } }),
-    prisma.guest.count({ where: { OR: [{ type: 'vip' }, { type: 'owner' }] } }),
+    // Onboard: checkInDate <= today <= checkOutDate
     prisma.guest.count({
       where: {
         AND: [
-          { status: 'onboard' },
+          { checkInDate: { lte: todayISO } },
+          { checkOutDate: { gte: todayISO } }
+        ]
+      }
+    }),
+    // Expected: checkInDate > today
+    prisma.guest.count({
+      where: { checkInDate: { gt: todayISO } }
+    }),
+    // VIP count (unchanged)
+    prisma.guest.count({ where: { OR: [{ type: 'vip' }, { type: 'owner' }] } }),
+    // Dietary alerts for onboard guests (using date-based onboard check)
+    prisma.guest.count({
+      where: {
+        AND: [
+          { checkInDate: { lte: todayISO } },
+          { checkOutDate: { gte: todayISO } },
           {
             OR: [
               { NOT: { allergies: { isEmpty: true } } },
@@ -213,16 +297,22 @@ router.post('/', requirePermission('guests.create'), validate(CreateGuestSchema)
 
 router.get('/:id', asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const data = await prisma.guest.findUnique({
+  const rawData = await prisma.guest.findUnique({
     where: { id },
     include: {
       servicerequests: true
     }
   });
 
-  if (!data) {
+  if (!rawData) {
     return res.status(404).json(apiError('Guest not found', 'NOT_FOUND'));
   }
+
+  // Add computed status
+  const data = {
+    ...rawData,
+    status: calculateGuestStatus(rawData.checkInDate, rawData.checkOutDate)
+  };
 
   res.json(apiSuccess(data));
 }));

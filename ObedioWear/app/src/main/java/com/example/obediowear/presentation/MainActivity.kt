@@ -377,6 +377,7 @@ fun HomeScreen(
 
 /**
  * Crew member selection screen for delegating requests
+ * Shows on-duty crew in blue, off-duty in gray
  */
 @Composable
 fun CrewMemberSelectionScreen(
@@ -407,6 +408,10 @@ fun CrewMemberSelectionScreen(
         ) {
             items(crewMembers.size) { index ->
                 val crewMember = crewMembers[index]
+                val isOnDuty = crewMember.status == "on-duty"
+
+                // Blue for on-duty, Gray for off-duty
+                val buttonColor = if (isOnDuty) Color(0xFF2196F3) else Color(0xFF757575)
 
                 Button(
                     onClick = { onCrewMemberSelected(crewMember.id) },
@@ -414,7 +419,7 @@ fun CrewMemberSelectionScreen(
                         .fillMaxWidth()
                         .padding(vertical = 4.dp),
                     colors = ButtonDefaults.buttonColors(
-                        backgroundColor = Color(0xFF2196F3)
+                        backgroundColor = buttonColor
                     )
                 ) {
                     Text(

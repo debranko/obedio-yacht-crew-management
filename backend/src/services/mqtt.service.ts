@@ -409,8 +409,8 @@ class MQTTService {
         }
       });
 
-      // Log button press to device logs with full ESP32 telemetry
-      await prisma.deviceLog.create({
+      // Log button press to device logs (fire-and-forget for faster response)
+      prisma.deviceLog.create({
         data: {
           deviceId: device.id,
           eventType: 'button_press',
@@ -433,12 +433,12 @@ class MQTTService {
           },
           severity: priority === 'emergency' ? 'warning' : 'info'
         }
-      });
+      }).catch(err => console.error('Device log failed:', err));
 
       console.log('✅ Service request created:', serviceRequest.id);
 
-      // Log activity: Button press and service request created
-      await prisma.activityLog.create({
+      // Log activity (fire-and-forget for faster response)
+      prisma.activityLog.create({
         data: {
           type: 'device',
           action: 'Button Press',
@@ -454,7 +454,7 @@ class MQTTService {
             firmwareVersion: message.firmwareVersion
           })
         }
-      });
+      }).catch(err => console.error('Activity log failed:', err));
 
       // Emit to WebSocket clients
       if (this.io) {
@@ -473,8 +473,14 @@ class MQTTService {
         timestamp: new Date().toISOString(),
       });
 
-      // Send notification to assigned crew member's watch
-      await this.notifyAssignedCrewWatch(serviceRequest, device.location?.name || 'Unknown', guest);
+      // Send notification to assigned crew member's watch (in background for faster response)
+      setImmediate(async () => {
+        try {
+          await this.notifyAssignedCrewWatch(serviceRequest, device.location?.name || 'Unknown', guest);
+        } catch (err) {
+          console.error('Watch notification failed:', err);
+        }
+      });
 
       // Send acknowledgment to button
       this.sendDeviceCommand(deviceId, {

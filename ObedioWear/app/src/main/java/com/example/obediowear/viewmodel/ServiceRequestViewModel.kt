@@ -119,8 +119,8 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
                     Log.i("Device", "✅ Discovered my device ID: $myDeviceId")
 
                     // Also extract crew member ID if assigned
-                    // API returns crewMember object, not crewMemberId directly
-                    val crewMember = deviceData.getAsJsonObject("crewMember")
+                    // API returns crewmember object (lowercase) from Prisma
+                    val crewMember = deviceData.getAsJsonObject("crewmember")
                     currentCrewMemberId = crewMember?.get("id")?.asString
                     if (currentCrewMemberId != null) {
                         Log.i("Device", "✅ Assigned to crew member: $currentCrewMemberId")
@@ -171,19 +171,21 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
 
     /**
      * Load crew members for delegation
+     * Uses GET /api/crew to get ALL crew members
+     * Sorts by status: on-duty first, then off-duty
      */
     private fun loadCrewMembers() {
         viewModelScope.launch {
             try {
-                val response = apiService.getCrewMembers(
-                    status = "on-duty",
-                    department = "Interior"
-                )
+                val response = apiService.getAllCrewMembers()
                 if (response.success) {
-                    _crewMembers.value = response.data
+                    // Sort: on-duty first, then others
+                    _crewMembers.value = response.data.sortedByDescending {
+                        it.status == "on-duty"
+                    }
                 }
             } catch (e: Exception) {
-                // Silently fail - delegation will still work with empty list
+                Log.e("Crew", "Failed to load crew members: ${e.message}")
             }
         }
     }
@@ -198,6 +200,7 @@ class ServiceRequestViewModel(application: Application) : AndroidViewModel(appli
         if (currentCrewMemberId == null) {
             _errorMessage.value = "Watch not assigned to crew member"
             Log.e("Accept", "Cannot accept request - watch not assigned to crew")
+            _currentRequest.value = null  // Close dialog even on error
             return
         }
 

@@ -1,7 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { createServer } from 'http';
+import { createServer as createHttpsServer } from 'https';
+import { createServer as createHttpServer } from 'http';
+import fs from 'fs';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
@@ -45,8 +47,19 @@ import path from 'path';
 dotenv.config();
 
 const app = express();
-const httpServer = createServer(app);
+const httpsOptions = {
+  key: fs.readFileSync(path.join(__dirname, '../.cert-key-private.pem')),
+  cert: fs.readFileSync(path.join(__dirname, '../.cert-key.pem')),
+};
+
+// HTTPS server for web/mobile clients (port 8080)
+const httpsServer = createHttpsServer(httpsOptions, app);
+
+// HTTP server for ESP32 devices (port 8081) - ESP32 doesn't support TLS easily
+const httpServer = createHttpServer(app);
+
 const PORT = parseInt(process.env.PORT || '8080', 10);
+const HTTP_PORT = 8081;  // Plain HTTP for ESP32 devices
 
 // Security Headers - Helmet protects against common vulnerabilities
 app.use(helmet({
@@ -94,6 +107,9 @@ const globalLimiter = rateLimit({
 });
 
 // Auth limiter removed - no rate limiting on login for development
+
+// Bypass rate limiting for upload routes (ESP32 large file uploads)
+app.use('/api/upload', (req, res, next) => next());
 
 // Apply global rate limiter to all API routes
 app.use('/api/', globalLimiter);
@@ -175,38 +191,56 @@ async function startServer() {
     // Test database connection
     await prisma.$connect();
     console.log('✅ Database connected successfully');
-    
-    // Initialize WebSocket server
-    websocketService.initialize(httpServer);
+
+    // Initialize WebSocket server on HTTPS server
+    websocketService.initialize(httpsServer);
     console.log('✅ WebSocket server initialized');
-    
+
     // Initialize MQTT service
     await mqttService.connect(websocketService.getIO());
     console.log('✅ MQTT service connected');
 
     // Start MQTT Monitor Dashboard
     mqttMonitor.start();
-    
-    httpServer.listen(PORT, '0.0.0.0', () => {
-      console.log(`
+
+    // Configure HTTP server timeouts for large ESP32 uploads
+    httpServer.setTimeout(300000);  // 5 minutes for large audio uploads
+    httpServer.keepAliveTimeout = 65000;
+    httpServer.headersTimeout = 66000;
+
+    // Start HTTPS server on port 8080 (for web/mobile clients)
+    httpsServer.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ HTTPS server listening on port ${PORT}`);
+    });
+
+    // Start HTTP server on port 8081 (for ESP32 devices)
+    httpServer.listen(HTTP_PORT, '0.0.0.0', () => {
+      console.log(`✅ HTTP server listening on port ${HTTP_PORT} (for ESP32)`);
+    });
+
+    console.log(`
 🚀 Obedio Server Started Successfully!
 
 📍 Server Details:
-   • Host: 0.0.0.0:${PORT} (accessible from network)
-   • Local: localhost:${PORT}
-   • Network: 100.105.189.77:${PORT}
+   • HTTPS: 0.0.0.0:${PORT} (web/mobile clients)
+   • HTTP:  0.0.0.0:${HTTP_PORT} (ESP32 devices)
+   • Network: 10.10.0.207
    • Environment: ${process.env.NODE_ENV || 'development'}
 
 🌐 Access URLs:
-   • API Health: http://localhost:${PORT}/api/health
-   • Auth: http://localhost:${PORT}/api/auth/login
-   • WebSocket: ws://localhost:${PORT}
+   • API Health: https://localhost:${PORT}/api/health
+   • Auth: https://localhost:${PORT}/api/auth/login
+   • WebSocket: wss://localhost:${PORT}
    • MQTT Monitor: http://localhost:${process.env.MQTT_MONITOR_PORT || 8889}
-   • API Docs: http://localhost:${PORT}/api-docs 📚
+   • API Docs: https://localhost:${PORT}/api-docs 📚
 
 📱 Wear OS Access:
-   • API: http://10.10.0.207:${PORT}/api
-   • WebSocket: ws://10.10.0.207:${PORT}
+   • API: https://10.10.0.207:${PORT}/api
+   • WebSocket: wss://10.10.0.207:${PORT}
+
+🔌 ESP32 Access (Plain HTTP):
+   • API: http://10.10.0.207:${HTTP_PORT}/api
+   • Audio Upload: http://10.10.0.207:${HTTP_PORT}/api/upload/upload-audio
 
 📊 Available Endpoints:
    • GET /api/crew - List crew members
@@ -214,16 +248,59 @@ async function startServer() {
    • GET /api/guests - List guests
    • GET /api/service-requests - List service requests
    • POST /api/auth/login - Login (admin/admin123)
-   
+
 🔧 Development:
    • Database: PostgreSQL connected
    • WebSocket: Real-time events enabled ⚡
    • MQTT: ESP32 integration ready 📡
    • Seed data: Use 'npm run db:seed'
-   
+
 Ready to receive yacht crew management requests! 🛥️
-      `);
-    });
+    `);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // AUTO-ARCHIVE: Scheduled job to clean up old completed service requests
+    // ═══════════════════════════════════════════════════════════════════════
+    async function runAutoArchive() {
+      try {
+        // Fetch admin user preferences for auto-archive setting
+        const adminPrefs = await prisma.userPreferences.findFirst({
+          where: {
+            user: { role: 'ADMIN' }
+          }
+        });
+
+        const archiveMinutes = adminPrefs?.serviceRequestAutoArchive || 30;
+        if (archiveMinutes === 0) return; // Auto-archive is disabled
+
+        const cutoffTime = new Date(Date.now() - archiveMinutes * 60 * 1000);
+
+        // Delete completed requests older than the cutoff time
+        const deleted = await prisma.serviceRequest.deleteMany({
+          where: {
+            status: 'completed',
+            completedAt: { lt: cutoffTime }
+          }
+        });
+
+        if (deleted.count > 0) {
+          console.log(`🗑️ Auto-archived ${deleted.count} completed service request(s) older than ${archiveMinutes} minutes`);
+
+          // Broadcast to WebSocket so UI updates
+          websocketService.getIO()?.emit('service-requests:archived', {
+            count: deleted.count,
+            timestamp: new Date().toISOString()
+          });
+        }
+      } catch (error) {
+        console.error('❌ Auto-archive error:', error);
+      }
+    }
+
+    // Run auto-archive every minute
+    setInterval(runAutoArchive, 60 * 1000);
+    console.log('✅ Auto-archive scheduler started (runs every 60s)');
+
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);

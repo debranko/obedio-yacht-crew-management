@@ -44,6 +44,11 @@ const navItems: NavItem[] = [
     href: "/device-manager"
   },
   {
+    label: "Button Simulator",
+    icon: Radio,
+    href: "/button-simulator"
+  },
+  {
     label: "Locations",
     icon: MapPin,
     href: "/locations"
@@ -161,8 +166,9 @@ export function AppSidebar({ currentPath = "/dashboard", onNavigate }: AppSideba
           </nav>
         </div>
 
-        {/* Button Simulator Widget - Always visible when not collapsed */}
-        {!collapsed && <ButtonSimulatorWidget />}
+        {/* Button Simulator Widget - HIDDEN FOR PRODUCTION DEMO */}
+        {/* Uncomment below for development/testing */}
+        {/* {!collapsed && <ButtonSimulatorWidget />} */}
 
         {/* Collapse Toggle */}
         <div className="p-3 border-t border-sidebar-border">

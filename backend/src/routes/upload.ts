@@ -116,18 +116,17 @@ const audioUpload = multer({
 /**
  * POST /api/upload/upload-audio
  * Upload audio file from ESP32, transcribe with OpenAI Whisper, and create service request
- * 
- * This endpoint handles voice recordings from ESP32 smart buttons:
- * 1. Receives audio file (WAV/WebM) from ESP32
- * 2. Saves file to uploads/audio/
- * 3. Transcribes using OpenAI Whisper (if configured)
- * 4. Creates service request with voice transcript
- * 5. Notifies crew via WebSocket and MQTT
- * 
- * ESP32 sends: audio file + optional deviceId, locationId, priority
+ *
+ * NEW ASYNC ARCHITECTURE (2025-01-25):
+ * - Returns 200 IMMEDIATELY after file is saved (ESP32 doesn't need to wait)
+ * - Transcription happens in BACKGROUND
+ * - Service request created on server (ESP32 doesn't send MQTT for voice)
+ * - Dashboard notified via WebSocket
+ *
+ * ESP32 sends: audio file + deviceId (required for service request creation)
  */
 router.post('/upload-audio', audioUpload.single('audio'), async (req, res) => {
-  console.log('📥 Audio upload endpoint hit from ESP32');
+  console.log('📥 Audio upload endpoint hit');
 
   try {
     if (!req.file) {
@@ -139,82 +138,168 @@ router.post('/upload-audio', audioUpload.single('audio'), async (req, res) => {
       originalName: req.file.originalname,
       mimetype: req.file.mimetype,
       size: req.file.size,
-      filename: req.file.filename,
-      path: req.file.path
+      filename: req.file.filename
     });
 
-    // Extract optional parameters from request body
+    // Extract parameters from request body
     const deviceId = req.body.deviceId || null;
-    const locationId = req.body.locationId || null;
-    const priority = req.body.priority || 'normal';
 
-    // Generate audio URL for access (full backend URL so frontend can load it)
-    const audioUrl = `http://localhost:8080/uploads/audio/${req.file.filename}`;
+    // Generate audio URL for access (use actual host from request)
+    const protocol = req.secure ? 'https' : 'http';
+    const host = req.get('host') || 'localhost:8080';
+    const audioUrl = `${protocol}://${host}/uploads/audio/${req.file.filename}`;
 
-    let transcript = null;
-    let translation = null;
-    let detectedLanguage = null;
+    // Store file info for background processing
+    const filePath = req.file.path;
+    const fileSize = req.file.size;
 
-    // STEP 1: Transcribe audio if OpenAI is configured
-    if (openai) {
-      try {
-        console.log('🌍 Transcribing audio with OpenAI Whisper...');
-        
-        // Get original transcription in guest's language
-        const audioFileOriginal = fs.createReadStream(req.file.path);
-        const originalTranscription = await openai.audio.transcriptions.create({
-          file: audioFileOriginal,
-          model: 'whisper-1',
-          response_format: 'verbose_json' // Get language info
-        });
-
-        transcript = originalTranscription.text;
-        detectedLanguage = originalTranscription.language;
-
-        console.log('✅ Original transcription:', {
-          text: transcript,
-          language: detectedLanguage
-        });
-
-        // Get English translation if not already English
-        if (detectedLanguage !== 'en' && detectedLanguage !== 'english') {
-          console.log('🇬🇧 Translating to English...');
-          const audioFileTranslation = fs.createReadStream(req.file.path);
-          const translationResult = await openai.audio.translations.create({
-            file: audioFileTranslation,
-            model: 'whisper-1',
-            response_format: 'json'
-          });
-          translation = translationResult.text;
-          console.log('✅ English translation:', translation);
-        } else {
-          translation = transcript; // Already in English
-        }
-
-      } catch (transcriptionError: any) {
-        console.error('⚠️ Transcription failed, but audio saved:', transcriptionError.message);
-        // Continue anyway - audio is saved, we'll create request without transcript
-        transcript = '[Transcription failed - audio saved for manual review]';
-        translation = transcript;
-      }
-    } else {
-      console.warn('⚠️ OpenAI not configured - skipping transcription');
-      transcript = '[Transcription service not configured - audio saved for manual review]';
-      translation = transcript;
-    }
-
-    // STEP 2: Return response (audio saved + transcribed)
-    // Service request will be created by MQTT handler when widget publishes MQTT message
+    // ============================================================
+    // RESPOND IMMEDIATELY - Don't make ESP32 wait for transcription!
+    // ============================================================
     res.json(apiSuccess({
       audioUrl,
       filename: req.file.filename,
-      size: req.file.size,
-      transcript: transcript,
-      translation: translation,
-      language: detectedLanguage,
-      duration: req.body.duration ? parseFloat(req.body.duration) : null,
-      message: 'Audio uploaded and transcribed successfully'
+      size: fileSize,
+      message: 'Audio uploaded - processing in background'
     }));
+
+    // ============================================================
+    // BACKGROUND PROCESSING - Transcribe & create service request
+    // ============================================================
+    setImmediate(async () => {
+      let transcript: string | null = null;
+      let translation: string | null = null;
+      let detectedLanguage: string | null = null;
+
+      // STEP 1: Transcribe audio if OpenAI is configured
+      if (openai) {
+        try {
+          const startTime = Date.now();
+          console.log('🌍 [Background] Transcribing audio with OpenAI Whisper...');
+
+          // Run transcription and translation IN PARALLEL
+          const audioFileOriginal = fs.createReadStream(filePath);
+          const audioFileTranslation = fs.createReadStream(filePath);
+
+          const [originalTranscription, translationResult] = await Promise.all([
+            openai.audio.transcriptions.create({
+              file: audioFileOriginal,
+              model: 'whisper-1',
+              response_format: 'verbose_json'
+            }),
+            openai.audio.translations.create({
+              file: audioFileTranslation,
+              model: 'whisper-1',
+              response_format: 'json'
+            })
+          ]);
+
+          const apiTime = Date.now() - startTime;
+
+          transcript = originalTranscription.text;
+          detectedLanguage = originalTranscription.language;
+          translation = translationResult.text;
+
+          // If already English, use original as translation
+          if (detectedLanguage === 'en' || detectedLanguage === 'english') {
+            translation = transcript;
+          }
+
+          console.log(`✅ [Background] Transcription completed in ${apiTime}ms:`, {
+            text: transcript?.substring(0, 100),
+            language: detectedLanguage
+          });
+
+        } catch (transcriptionError: any) {
+          console.error('⚠️ [Background] Transcription failed:', transcriptionError.message);
+          transcript = '[Transcription failed - audio saved for manual review]';
+          translation = transcript;
+        }
+      } else {
+        console.warn('⚠️ [Background] OpenAI not configured');
+        transcript = '[Transcription service not configured]';
+        translation = transcript;
+      }
+
+      // STEP 2: Create service request if deviceId provided
+      if (deviceId) {
+        try {
+          // Find the device and its location
+          const device = await prisma.device.findFirst({
+            where: {
+              OR: [
+                { id: deviceId },
+                { deviceId: deviceId }
+              ]
+            },
+            include: {
+              location: {
+                include: {
+                  guests: {
+                    where: { status: 'onboard' },
+                    take: 1,
+                    orderBy: { createdAt: 'desc' }
+                  }
+                }
+              }
+            }
+          });
+
+          if (device) {
+            const guest = device.location?.guests?.[0];
+
+            // Create service request
+            const serviceRequest = await prisma.serviceRequest.create({
+              data: {
+                ...(guest?.id && {
+                  guest: { connect: { id: guest.id } }
+                }),
+                ...(device.locationId && {
+                  location: { connect: { id: device.locationId } }
+                }),
+                status: 'pending',
+                priority: 'normal',
+                requestType: ServiceRequestType.call,
+                notes: `Voice request from ${device.location?.name || 'Unknown location'}`,
+                guestName: guest ? `${guest.firstName} ${guest.lastName}` : 'Guest',
+                guestCabin: device.location?.name || 'Unknown',
+                voiceTranscript: translation || transcript,
+                voiceAudioUrl: audioUrl,
+              },
+              include: {
+                guest: true,
+                location: true,
+              }
+            });
+
+            console.log('✅ [Background] Service request created:', serviceRequest.id);
+
+            // Emit to WebSocket clients
+            websocketService.emitServiceRequestCreated(serviceRequest);
+
+            // Publish to MQTT for watches
+            mqttService.publish('obedio/service/created', {
+              requestId: serviceRequest.id,
+              type: serviceRequest.requestType,
+              priority: serviceRequest.priority,
+              locationId: serviceRequest.locationId,
+              locationName: serviceRequest.location?.name,
+              guestName: serviceRequest.guestName,
+              voiceTranscript: serviceRequest.voiceTranscript,
+              voiceAudioUrl: serviceRequest.voiceAudioUrl,
+              timestamp: new Date().toISOString()
+            });
+
+          } else {
+            console.warn('⚠️ [Background] Device not found:', deviceId);
+          }
+        } catch (dbError: any) {
+          console.error('❌ [Background] Service request creation failed:', dbError.message);
+        }
+      } else {
+        console.log('ℹ️ [Background] No deviceId provided - skipping service request creation');
+      }
+    });
 
   } catch (error: any) {
     console.error('❌ Audio upload error:', error);

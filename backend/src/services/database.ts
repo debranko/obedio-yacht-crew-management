@@ -448,8 +448,42 @@ export class DatabaseService {
   }
 
   async createServiceRequest(data: any) {
+    // ═══════════════════════════════════════════════════════════════════════
+    // AUTO-PRIORITY LOGIC: Check if request should be auto-escalated
+    // ═══════════════════════════════════════════════════════════════════════
+    let priority = data.priority || 'normal';
+
+    // Fetch admin user preferences for auto-priority settings
+    const adminPrefs = await this.prisma.userPreferences.findFirst({
+      where: {
+        user: { role: 'ADMIN' }
+      }
+    });
+
+    // Auto-Priority for VIP/Owner Guests
+    if (adminPrefs?.serviceRequestAutoPriorityVIP && data.guestId) {
+      const guest = await this.prisma.guest.findUnique({
+        where: { id: data.guestId }
+      });
+      if (guest?.type === 'vip' || guest?.type === 'owner') {
+        priority = 'urgent';
+        logger.info(`Auto-priority: Escalated to urgent (VIP/Owner guest: ${guest.firstName} ${guest.lastName})`);
+      }
+    }
+
+    // Auto-Priority for Owner's Stateroom location
+    if (adminPrefs?.serviceRequestAutoPriorityMaster && data.locationId) {
+      const location = await this.prisma.location.findUnique({
+        where: { id: data.locationId }
+      });
+      if (location?.name === "Owner's Stateroom") {
+        priority = 'urgent';
+        logger.info(`Auto-priority: Escalated to urgent (Owner's Stateroom location)`);
+      }
+    }
+
     const newRequest = await this.prisma.serviceRequest.create({
-      data,
+      data: { ...data, priority },
       include: {
         guest: true,
         location: true,
@@ -516,9 +550,16 @@ export class DatabaseService {
       guestCabin: request.location?.name || null
     };
 
-    // Always set status to 'serving' when accepted (whether from watch or web app)
-    updateData.status = 'serving';
-    updateData.acceptedAt = new Date();
+    // CRITICAL FIX: Distinguish between web delegation and watch acceptance
+    // - confirmed=false (web app delegation): Set to 'assigned' - waiting for crew to accept on watch
+    // - confirmed=true (watch acceptance): Set to 'serving' - crew confirmed they're handling it
+    if (confirmed) {
+      updateData.status = 'serving';
+      updateData.acceptedAt = new Date();
+    } else {
+      updateData.status = 'assigned';
+      // Don't set acceptedAt yet - will be set when crew accepts on watch
+    }
 
     const updatedRequest = await this.prisma.serviceRequest.update({
       where: { id: requestId },
@@ -639,6 +680,20 @@ export class DatabaseService {
 
     // Delete all service requests
     const result = await this.prisma.serviceRequest.deleteMany({});
+
+    return result;
+  }
+
+  async deleteServiceRequest(id: string) {
+    // Delete service request history first (foreign key constraint)
+    await this.prisma.serviceRequestHistory.deleteMany({
+      where: { serviceRequestId: id }
+    });
+
+    // Delete the service request
+    const result = await this.prisma.serviceRequest.delete({
+      where: { id }
+    });
 
     return result;
   }

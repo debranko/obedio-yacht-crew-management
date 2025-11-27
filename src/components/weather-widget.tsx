@@ -40,7 +40,8 @@ interface WeatherWidgetProps {
 }
 
 export function WeatherWidget({ className }: WeatherWidgetProps) {
-  const { getCurrentCoordinates, settings } = useYachtSettings();
+  // Note: Hardcoded to Amsterdam for demo purposes
+  // const { getCurrentCoordinates, settings } = useYachtSettings();
   const { ref, mode } = useSizeMode();
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,19 +59,9 @@ export function WeatherWidget({ className }: WeatherWidgetProps) {
       setLoading(true);
       setError(null);
 
-      // Get yacht's current coordinates from settings
-      const coords = getCurrentCoordinates();
-
-      // Guard: Return early if no coordinates available
-      if (!coords || coords.latitude == null || coords.longitude == null) {
-        console.warn('⚠️ Weather widget: No coordinates available - using default location (Monaco)');
-        setError('No coordinates set');
-        setLoading(false);
-        return;
-      }
-
-      const lat = coords.latitude;
-      const lon = coords.longitude;
+      // Hardcoded Amsterdam coordinates for demo/presentation
+      const lat = 52.3676;
+      const lon = 4.9041;
 
       const response = await fetch(
         `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,pressure_msl,visibility&timezone=Europe%2FParis`
@@ -92,7 +83,7 @@ export function WeatherWidget({ className }: WeatherWidgetProps) {
         wind_speed: Math.round(data.current.wind_speed_10m),
         visibility: Math.round((data.current.visibility || 10000) / 1000), // Convert to km
         weather: weatherInfo,
-        location: settings?.locationName || 'Current Location'
+        location: 'Amsterdam'
       });
       
       setLoading(false);

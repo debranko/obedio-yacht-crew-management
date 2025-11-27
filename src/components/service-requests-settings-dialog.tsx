@@ -25,6 +25,7 @@ import {
   Timer
 } from 'lucide-react';
 import { useUserPreferences } from '../hooks/useUserPreferences';
+import { toast } from 'sonner';
 
 interface ServiceRequestsSettingsDialogProps {
   open: boolean;

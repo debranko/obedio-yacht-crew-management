@@ -10,5 +10,8 @@ data class CrewMember(
     val name: String,
 
     @SerializedName("position")
-    val position: String
+    val position: String,
+
+    @SerializedName("status")
+    val status: String? = null  // "on-duty", "off-duty", "on-leave", etc.
 )
