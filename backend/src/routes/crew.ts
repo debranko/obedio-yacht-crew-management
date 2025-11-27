@@ -6,6 +6,7 @@ import { asyncHandler, validate } from '../middleware/error-handler';
 import { CreateCrewMemberSchema, UpdateCrewMemberSchema } from '../validators/schemas';
 import { websocketService } from '../services/websocket';
 import { apiSuccess, apiError } from '../utils/api-response';
+import { authMiddleware, requirePermission } from '../middleware/auth';
 
 const r = Router();
 
@@ -166,6 +167,45 @@ r.delete('/:id', asyncHandler(async (req, res) => {
   });
 
   res.json(apiSuccess({ deleted: true, id: req.params.id }));
+}));
+
+/**
+ * Reset crew member password (admin or permitted users only)
+ * Admin manually enters new password
+ */
+r.post('/:id/reset-password', authMiddleware, requirePermission('crew.reset-password'), asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { newPassword } = req.body;
+
+  // Validate password (min 6 chars)
+  if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
+    return res.status(400).json(apiError('Password must be at least 6 characters', 'VALIDATION_ERROR'));
+  }
+
+  // Find crew member's user account
+  const crew = await prisma.crewMember.findUnique({
+    where: { id },
+    include: { user: true }
+  });
+
+  if (!crew) {
+    return res.status(404).json(apiError('Crew member not found', 'NOT_FOUND'));
+  }
+
+  if (!crew.user) {
+    return res.status(400).json(apiError('Crew member has no user account', 'NO_USER_ACCOUNT'));
+  }
+
+  // Hash new password (same pattern as crew creation - 10 rounds)
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+  // Update password
+  await prisma.user.update({
+    where: { id: crew.user.id },
+    data: { password: hashedPassword }
+  });
+
+  res.json(apiSuccess({ message: 'Password reset successfully' }));
 }));
 
 export default r;

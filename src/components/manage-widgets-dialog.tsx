@@ -118,16 +118,17 @@ export const availableWidgets: WidgetConfig[] = [
     requiredPermissions: ["crew.view"],
     recommendedForRoles: ["admin", "chief-stewardess"],
   },
-  {
-    id: "button-simulator",
-    name: "ESP32 Button Simulator",
-    description: "Virtual smart button for testing MQTT and service requests",
-    icon: Radio,
-    defaultSize: { w: 3, h: 4, minW: 3, minH: 4 },
-    category: "status",
-    // Not shown by default - can be added manually from Manage Widgets
-    recommendedForRoles: [],
-  },
+  // COMMENTED OUT: Button Simulator removed - real ESP32 devices in use
+  // {
+  //   id: "button-simulator",
+  //   name: "ESP32 Button Simulator",
+  //   description: "Virtual smart button for testing MQTT and service requests",
+  //   icon: Radio,
+  //   defaultSize: { w: 3, h: 4, minW: 3, minH: 4 },
+  //   category: "status",
+  //   // Not shown by default - can be added manually from Manage Widgets
+  //   recommendedForRoles: [],
+  // },
   // Mock/hardcoded widgets removed: Active Devices, Service Requests Chart, Response Time Chart
   // These had fake data and are not production-ready
 ];

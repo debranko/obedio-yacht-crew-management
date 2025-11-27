@@ -542,6 +542,11 @@ export class DatabaseService {
       throw new Error('Service request not found');
     }
 
+    // CRITICAL: Check if request is already being served (another device accepted first)
+    if (confirmed && request.status === 'serving') {
+      throw new Error('Request already accepted by another crew member');
+    }
+
     // Build update data object
     const updateData: any = {
       assignedTo: crewMember.name,  // Store crew member name as string

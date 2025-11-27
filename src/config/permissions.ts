@@ -16,6 +16,7 @@ export type Permission =
   | 'crew.delete'
   | 'crew.create-account'
   | 'crew.assign-devices'
+  | 'crew.reset-password'
   
   // Guest Management (matches Settings: guests.*)
   | 'guests.view'
@@ -63,7 +64,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
    */
   'admin': [
     // All permissions (admin has everything)
-    'crew.view', 'crew.add', 'crew.edit', 'crew.delete', 'crew.create-account', 'crew.assign-devices',
+    'crew.view', 'crew.add', 'crew.edit', 'crew.delete', 'crew.create-account', 'crew.assign-devices', 'crew.reset-password',
     'guests.view', 'guests.add', 'guests.edit', 'guests.delete',
     'duty.view', 'duty.manage', 'duty.configure',
     'devices.view', 'devices.add', 'devices.edit', 'devices.delete', 'devices.assign',

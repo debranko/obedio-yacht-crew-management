@@ -12,7 +12,7 @@ const defaultPermissions = {
     dashboard: { view: true, customize: true },
     serviceRequests: { view: true, create: true, accept: true, complete: true, delete: true },
     guests: { view: true, create: true, edit: true, delete: true },
-    crew: { view: true, edit: true, manage: true },
+    crew: { view: true, edit: true, manage: true, resetPassword: true },
     devices: { view: true, manage: true },
     settings: { view: true, edit: true }
   },
@@ -20,7 +20,7 @@ const defaultPermissions = {
     dashboard: { view: true, customize: true },
     serviceRequests: { view: true, create: true, accept: true, complete: true, delete: false },
     guests: { view: true, create: true, edit: true, delete: false },
-    crew: { view: true, edit: false, manage: false },
+    crew: { view: true, edit: false, manage: false, resetPassword: false },
     devices: { view: true, manage: false },
     settings: { view: true, edit: false }
   },
@@ -28,7 +28,7 @@ const defaultPermissions = {
     dashboard: { view: true, customize: true },
     serviceRequests: { view: true, create: true, accept: true, complete: true, delete: false },
     guests: { view: true, create: false, edit: false, delete: false },
-    crew: { view: false, edit: false, manage: false },
+    crew: { view: false, edit: false, manage: false, resetPassword: false },
     devices: { view: true, manage: false },
     settings: { view: false, edit: false }
   },
@@ -36,7 +36,7 @@ const defaultPermissions = {
     dashboard: { view: true, customize: false },
     serviceRequests: { view: false, create: false, accept: false, complete: false, delete: false },
     guests: { view: false, create: false, edit: false, delete: false },
-    crew: { view: false, edit: false, manage: false },
+    crew: { view: false, edit: false, manage: false, resetPassword: false },
     devices: { view: false, manage: false },
     settings: { view: false, edit: false }
   },
@@ -44,7 +44,7 @@ const defaultPermissions = {
     dashboard: { view: true, customize: true },
     serviceRequests: { view: true, create: false, accept: false, complete: false, delete: false },
     guests: { view: false, create: false, edit: false, delete: false },
-    crew: { view: true, edit: false, manage: false },
+    crew: { view: true, edit: false, manage: false, resetPassword: false },
     devices: { view: true, manage: true },
     settings: { view: true, edit: true }
   }

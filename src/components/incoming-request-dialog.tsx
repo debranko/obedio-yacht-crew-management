@@ -22,6 +22,7 @@ import {
   ChevronUp,
   Cog
 } from "lucide-react";
+import { playNotificationSound, playEmergencySound } from '../utils/notification-sound';
 import { motion } from "motion/react";
 import { ServiceRequest } from "../contexts/AppDataContext";
 import { useAppData } from "../contexts/AppDataContext";
@@ -650,6 +651,16 @@ export function useIncomingRequests() {
         setLastShownTime(prev => ({ ...prev, [request.id]: now }));
         setCurrentRequest(request);
         setShowDialog(true);
+
+        // Play sound based on user preferences (same settings as Service Requests page)
+        if (userPreferences?.serviceRequestSoundAlerts !== false) {
+          if (request.priority === 'emergency') {
+            playEmergencySound();
+          } else {
+            playNotificationSound();
+          }
+        }
+
         break; // Show only one at a time
       }
     }

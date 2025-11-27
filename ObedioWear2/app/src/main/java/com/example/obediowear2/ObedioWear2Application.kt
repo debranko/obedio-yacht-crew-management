@@ -40,6 +40,10 @@ class ObedioWear2Application : Application() {
         PreferencesManager.init(this)
         Log.i(TAG, "Preferences manager initialized")
 
+        // CRITICAL: Extract crewMemberId from existing JWT token if available
+        // This ensures crewMemberId is set even if device discovery failed previously
+        extractCrewMemberIdFromToken()
+
         // Create notification channels
         NotificationHelper.createNotificationChannels(this)
         Log.i(TAG, "Notification channels created")
@@ -56,6 +60,49 @@ class ObedioWear2Application : Application() {
         discoverDevice()
 
         Log.i(TAG, "ObedioWear2 Application ready")
+    }
+
+    /**
+     * Extract crewMemberId from existing JWT auth token.
+     * This is a fallback to ensure crewMemberId is available even if discovery failed.
+     */
+    private fun extractCrewMemberIdFromToken() {
+        try {
+            val token = PreferencesManager.getAuthToken()
+            if (token == null) {
+                Log.d(TAG, "No auth token available yet - will get from discovery")
+                return
+            }
+
+            // Check if crewMemberId is already set
+            val existingCrewMemberId = PreferencesManager.getCrewMemberId()
+            if (existingCrewMemberId != null) {
+                Log.d(TAG, "CrewMemberId already set: $existingCrewMemberId")
+                return
+            }
+
+            // JWT format: header.payload.signature
+            val parts = token.split(".")
+            if (parts.size < 2) {
+                Log.w(TAG, "Invalid JWT format - cannot extract crewMemberId")
+                return
+            }
+
+            // Decode the payload (Base64)
+            val payloadJson = String(android.util.Base64.decode(parts[1], android.util.Base64.URL_SAFE))
+            val payload = com.google.gson.JsonParser.parseString(payloadJson).asJsonObject
+
+            // Extract crewMemberId from JWT payload
+            if (payload.has("crewMemberId") && !payload.get("crewMemberId").isJsonNull) {
+                val crewMemberId = payload.get("crewMemberId").asString
+                PreferencesManager.setCrewMemberId(crewMemberId)
+                Log.i(TAG, "✅ CrewMemberId extracted from JWT: $crewMemberId")
+            } else {
+                Log.w(TAG, "JWT does not contain crewMemberId")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to extract crewMemberId from JWT: ${e.message}", e)
+        }
     }
 
     /**

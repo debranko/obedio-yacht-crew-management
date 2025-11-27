@@ -28,7 +28,8 @@ import { ClockWidget } from "./clock-widget";
 import { ClockWidget2 } from "./clock-widget-2";
 import { WeatherWindyWidget } from "./weather-windy-widget";
 import { DutyTimerCard } from "./duty-timer-card";
-import { ButtonSimulatorWidget } from "./button-simulator-widget";
+// COMMENTED OUT: Button Simulator removed - real ESP32 devices in use
+// import { ButtonSimulatorWidget } from "./button-simulator-widget";
 import { useAppData } from "../contexts/AppDataContext";
 import { useDND } from "../hooks/useDND";
 import { Activity, Clock, BatteryLow, Users, BellOff, GripVertical, Bell, Save } from "lucide-react";
@@ -59,8 +60,8 @@ const defaultLayout: WidgetLayout[] = [
   // Third row - DND Widget (top right corner as shown)
   { i: "dnd-auto", x: 5, y: 7, w: 3, h: 2, minW: 2, minH: 2 },
 
-  // Button Simulator - bottom (collapsed by default)
-  { i: "button-simulator", x: 0, y: 10, w: 3, h: 3, minW: 3, minH: 3 },
+  // COMMENTED OUT: Button Simulator removed - real ESP32 devices in use
+  // { i: "button-simulator", x: 0, y: 10, w: 3, h: 3, minW: 3, minH: 3 },
 
   // Optional weather widget (can be hidden)
   { i: "weather", x: 0, y: 5, w: 2, h: 2, minW: 2, minH: 2 },
@@ -343,8 +344,8 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
           </div>
         )}
 
-        {/* ESP32 Button Simulator Widget */}
-        {activeWidgets.includes("button-simulator") && (
+        {/* COMMENTED OUT: Button Simulator removed - real ESP32 devices in use */}
+        {/* {activeWidgets.includes("button-simulator") && (
           <div key="button-simulator" className="dashboard-widget">
             <WidgetWrapper id="button-simulator">
               <Card className="h-full overflow-auto">
@@ -352,7 +353,7 @@ export const DashboardGrid = forwardRef<DashboardGridHandle, DashboardGridProps>
               </Card>
             </WidgetWrapper>
           </div>
-        )}
+        )} */}
 
         {/* Mock/hardcoded widgets removed: Active Devices, Service Requests Chart, Response Time Chart */}
       </ResponsiveGridLayout>

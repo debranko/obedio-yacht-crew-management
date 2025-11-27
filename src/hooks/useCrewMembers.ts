@@ -82,3 +82,19 @@ export function useDeleteCrewMember() {
     },
   });
 }
+
+/**
+ * Reset crew member password
+ */
+export function useResetCrewPassword() {
+  return useMutation({
+    mutationFn: ({ id, newPassword }: { id: string; newPassword: string }) =>
+      api.crew.resetPassword(id, newPassword),
+    onSuccess: () => {
+      toast.success('Password reset successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to reset password');
+    },
+  });
+}

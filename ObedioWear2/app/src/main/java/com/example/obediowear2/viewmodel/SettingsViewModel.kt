@@ -95,8 +95,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     val deviceData = response.data.asJsonObject
 
                     // Get assigned crew member if any
-                    if (deviceData.has("assignedCrewMember") && !deviceData.get("assignedCrewMember").isJsonNull) {
-                        val crewMember = deviceData.getAsJsonObject("assignedCrewMember")
+                    // API returns "crewmember" (lowercase) and "crewMemberId"
+                    if (deviceData.has("crewmember") && !deviceData.get("crewmember").isJsonNull) {
+                        val crewMember = deviceData.getAsJsonObject("crewmember")
                         val crewMemberId = crewMember.get("id")?.asString
                         // Backend sends CrewMember with single "name" field, not firstName/lastName
                         val crewMemberName = crewMember.get("name")?.asString ?: "Unknown"
@@ -113,6 +114,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                             }
 
                             Log.i(TAG, "✅ Device discovered - Crew member: $crewMemberName ($crewMemberId)")
+                        }
+                    } else if (deviceData.has("crewMemberId") && !deviceData.get("crewMemberId").isJsonNull) {
+                        // Fallback: if crewmember object is missing but crewMemberId exists
+                        val crewMemberId = deviceData.get("crewMemberId")?.asString
+                        if (crewMemberId != null) {
+                            PreferencesManager.setCrewMemberId(crewMemberId)
+                            Log.i(TAG, "✅ Device discovered - Crew member ID: $crewMemberId (no name available)")
                         }
                     } else {
                         Log.i(TAG, "Device found but not assigned to any crew member")

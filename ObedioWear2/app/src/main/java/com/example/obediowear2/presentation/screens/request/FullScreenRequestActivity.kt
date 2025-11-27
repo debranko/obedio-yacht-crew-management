@@ -68,6 +68,7 @@ import com.example.obediowear2.utils.PreferencesManager
 import com.example.obediowear2.utils.ServerConfig
 import com.example.obediowear2.utils.VibrationHelper
 import com.google.gson.Gson
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -88,6 +89,7 @@ class FullScreenRequestActivity : ComponentActivity() {
     private val activityScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val apiService = ApiClient.instance
     private var wakeLock: PowerManager.WakeLock? = null
+    private var currentRequestId: String? = null  // For MQTT auto-dismiss
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -131,6 +133,10 @@ class FullScreenRequestActivity : ComponentActivity() {
             return
         }
 
+        // Store request ID for MQTT auto-dismiss and start observing
+        currentRequestId = serviceRequest.id
+        observeRequestDismissals()
+
         // Vibrate based on priority
         serviceRequest.let { request ->
             vibrationHelper?.vibrateForRequest(request.priority)
@@ -160,22 +166,17 @@ class FullScreenRequestActivity : ComponentActivity() {
         // Cancel notification immediately
         NotificationHelper.cancelNotificationForRequest(this, request.id)
 
-        // CRITICAL: Set current task IMMEDIATELY for responsive UI
-        // This triggers auto-navigation to ServingNow via MainActivity
-        CurrentServingState.setCurrentTask(request)
-        Log.i(TAG, "✅ CurrentServingState set - will auto-navigate to ServingNow")
-
         // Get crew member ID from preferences
         val crewMemberId = PreferencesManager.getCrewMemberId()
 
         if (crewMemberId == null) {
-            Log.w(TAG, "No crew member ID configured - accepted locally only")
+            Log.w(TAG, "No crew member ID configured - cannot accept")
             finish()
             return
         }
 
-        // Call REST API to accept (backend handles MQTT broadcast for cross-device sync)
-        // Note: No separate MQTT acknowledgment needed - REST API does this
+        // Call REST API to accept FIRST, only set CurrentServingState on success
+        // This prevents showing ServingNow if another watch already accepted
         activityScope.launch {
             try {
                 Log.d(TAG, "Accepting request ${request.id} as crew member $crewMemberId")
@@ -189,11 +190,17 @@ class FullScreenRequestActivity : ComponentActivity() {
 
                 if (response.success) {
                     Log.i(TAG, "✅ Request ${request.id} accepted successfully via API")
+                    // ONLY set CurrentServingState AFTER successful API response
+                    // This ensures only the winning watch shows ServingNow
+                    CurrentServingState.setCurrentTask(request)
+                    Log.i(TAG, "✅ CurrentServingState set - will auto-navigate to ServingNow")
                 } else {
-                    Log.w(TAG, "API returned success=false for accepting request")
+                    Log.w(TAG, "⚠️ API returned success=false - request may already be accepted by another device")
+                    // Don't set CurrentServingState - another watch accepted first
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to accept request via API: ${e.message}", e)
+                Log.e(TAG, "❌ Failed to accept request via API: ${e.message}", e)
+                // Don't set CurrentServingState on error
             }
 
             finish()
@@ -261,6 +268,27 @@ class FullScreenRequestActivity : ComponentActivity() {
         vibrationHelper?.stopVibration()
         NotificationHelper.cancelNotificationForRequest(this, request.id)
         finish()
+    }
+
+    /**
+     * CRITICAL: Listen for MQTT updates when another watch accepts this request.
+     * Auto-dismisses this popup so user doesn't accidentally accept on multiple watches.
+     */
+    private fun observeRequestDismissals() {
+        lifecycleScope.launch {
+            MqttManager.requestDismissedFlow.collect { dismissedRequestId ->
+                if (dismissedRequestId == currentRequestId) {
+                    Log.i(TAG, "🔄 Request dismissed by another device: $dismissedRequestId - auto-closing popup")
+                    runOnUiThread {
+                        vibrationHelper?.stopVibration()
+                        currentRequestId?.let { requestId ->
+                            NotificationHelper.cancelNotificationForRequest(this@FullScreenRequestActivity, requestId)
+                        }
+                        finish()
+                    }
+                }
+            }
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -391,7 +419,7 @@ fun FullScreenRequestScreen(
                         item {
                             MedicalInfoCard(
                                 label = "ALLERGIES",
-                                value = allergies
+                                value = allergies.joinToString(", ")
                             )
                         }
                     }
@@ -399,7 +427,7 @@ fun FullScreenRequestScreen(
                         item {
                             MedicalInfoCard(
                                 label = "CONDITIONS",
-                                value = conditions
+                                value = conditions.joinToString(", ")
                             )
                         }
                     }
@@ -573,23 +601,23 @@ fun ActionButtons(
             }
         }
 
-        // Dismiss button
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(
-            onClick = onDismiss,
-            colors = ButtonDefaults.buttonColors(
-                backgroundColor = ObedioColors.TextMuted.copy(alpha = 0.2f)
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 32.dp)
-                .height(32.dp)
-        ) {
-            Text(
-                text = "DISMISS",
-                style = ObedioTypography.labelSmall,
-                color = ObedioColors.TextSecondary
-            )
-        }
+        // Dismiss button - COMMENTED OUT FOR TESTING
+        // Spacer(modifier = Modifier.height(8.dp))
+        // Button(
+        //     onClick = onDismiss,
+        //     colors = ButtonDefaults.buttonColors(
+        //         backgroundColor = ObedioColors.TextMuted.copy(alpha = 0.2f)
+        //     ),
+        //     modifier = Modifier
+        //         .fillMaxWidth()
+        //         .padding(horizontal = 32.dp)
+        //         .height(32.dp)
+        // ) {
+        //     Text(
+        //         text = "DISMISS",
+        //         style = ObedioTypography.labelSmall,
+        //         color = ObedioColors.TextSecondary
+        //     )
+        // }
     }
 }

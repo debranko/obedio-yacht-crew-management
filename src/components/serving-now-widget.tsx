@@ -26,10 +26,11 @@ export function ServingNowWidget({ onNavigate }: ServingNowWidgetProps) {
     return () => clearInterval(interval);
   }, []);
 
-  // Get accepted/delegated/serving requests (currently being served)
+  // Get only ACCEPTED requests (crew confirmed on watch, actively serving)
+  // Note: 'delegated' = waiting for watch acceptance, should NOT show here
   // Note: Completed requests are auto-removed by AppDataContext after timeout
   const servingNow = serviceRequests.filter(
-    req => req.status === 'accepted' || req.status === 'delegated' || req.status === 'serving'
+    req => req.status === 'accepted'
   );
 
   const handleHeaderClick = () => {

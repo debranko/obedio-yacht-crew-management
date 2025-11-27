@@ -6,7 +6,8 @@ import { DashboardPage, DashboardPageHandle } from "./components/pages/dashboard
 import { CrewManagementPage } from "./components/pages/crew-management";
 import { GuestsListPage } from "./components/pages/guests-list";
 import { DeviceManagerPage } from "./components/pages/device-manager-full";
-import { ButtonSimulatorPage } from "./components/pages/button-simulator";
+// COMMENTED OUT: Button Simulator removed - real ESP32 devices in use
+// import { ButtonSimulatorPage } from "./components/pages/button-simulator";
 import { LocationsPage } from "./components/pages/locations";
 import { ActivityLogPage } from "./components/pages/activity-log";
 import { ServiceRequestsPage } from "./components/pages/service-requests";
@@ -162,7 +163,8 @@ function AppContent() {
     crew: { title: "Crew Management" },
     "guests-list": { title: "Guests List" },
     "device-manager": { title: "Device Manager" },
-    "button-simulator": { title: "Smart Button Simulator" },
+    // COMMENTED OUT: Button Simulator removed - real ESP32 devices in use
+    // "button-simulator": { title: "Smart Button Simulator" },
     locations: { title: "Locations" },
     "service-requests": { title: "Service Requests" },
     "activity-log": { title: "Activity Log" },
@@ -197,8 +199,9 @@ function AppContent() {
           return <GuestsListPage />;
         case "device-manager":
           return <DeviceManagerPage />;
-        case "button-simulator":
-          return <ButtonSimulatorPage />;
+        // COMMENTED OUT: Button Simulator removed - real ESP32 devices in use
+        // case "button-simulator":
+        //   return <ButtonSimulatorPage />;
         case "locations":
           return <LocationsPage />;
         case "service-requests":

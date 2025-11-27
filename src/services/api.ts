@@ -118,6 +118,15 @@ export const crewApi = {
     fetchApi<void>(`/crew/${id}`, {
       method: 'DELETE',
     }),
+
+  /**
+   * Reset crew member password (admin or permitted users only)
+   */
+  resetPassword: (id: string, newPassword: string) =>
+    fetchApi<{ message: string }>(`/crew/${id}/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify({ newPassword }),
+    }),
 };
 
 // =====================

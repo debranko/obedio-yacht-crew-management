@@ -13,7 +13,8 @@ import {
   LucideIcon
 } from "lucide-react";
 import { useState } from "react";
-import { ButtonSimulatorWidget } from "./button-simulator-widget";
+// COMMENTED OUT: Button Simulator removed - real ESP32 devices in use
+// import { ButtonSimulatorWidget } from "./button-simulator-widget";
 
 interface NavItem {
   label: string;
@@ -43,11 +44,12 @@ const navItems: NavItem[] = [
     icon: Smartphone,
     href: "/device-manager"
   },
-  {
-    label: "Button Simulator",
-    icon: Radio,
-    href: "/button-simulator"
-  },
+  // COMMENTED OUT: Button Simulator removed - real ESP32 devices in use
+  // {
+  //   label: "Button Simulator",
+  //   icon: Radio,
+  //   href: "/button-simulator"
+  // },
   {
     label: "Locations",
     icon: MapPin,

@@ -19,10 +19,10 @@ data class Guest(
     val photo: String? = null,
 
     @SerializedName("allergies")
-    val allergies: String? = null,
+    val allergies: List<String>? = null,
 
     @SerializedName("medicalConditions")
-    val medicalConditions: String? = null,
+    val medicalConditions: List<String>? = null,
 
     @SerializedName("emergencyContact")
     val emergencyContact: EmergencyContact? = null

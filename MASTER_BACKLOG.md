@@ -206,17 +206,17 @@
 ## Summary
 | ID | Title | Priority | Status |
 |----|-------|----------|--------|
-| **ID-009** | **⚠️ Delegated→Serving Now (skip accept)** | **CRITICAL** | **Pending** |
+| ~~ID-009~~ | ~~Delegated→Serving Now (skip accept)~~ | ~~CRITICAL~~ | ✅ Done |
+| ~~ID-002~~ | ~~Auto-Calculate Status from Dates~~ | ~~High~~ | ✅ Done |
+| ~~ID-003~~ | ~~Incorrect Onboard Status Display~~ | ~~High~~ | ✅ Done |
+| ~~ID-004~~ | ~~Call Backup Not Persisting to DB~~ | ~~High~~ | ✅ Done |
+| ID-013 | Admin Password Reset for Crew | Medium | 🔄 In Progress |
 | ID-011 | LED Ring Feedback on Button | High | Pending |
 | ID-012 | Do Not Disturb (DND) Feature | High | Pending |
 | ID-001 | Remove Manual Status Dropdown | High | Pending |
-| ID-002 | Auto-Calculate Status from Dates | High | Pending |
-| ID-003 | Incorrect Onboard Status Display | High | Pending |
-| ID-004 | Call Backup Not Persisting to DB | High | Pending |
 | ID-008 | Dashboard Vertical Widget Layout | High | Pending |
 | ID-005 | Backup Badge vs Toggle Desync | Medium | Pending |
 | ID-010 | Merge buttons → "On My Way" | Medium | Pending |
-| ID-013 | Admin Password Reset for Crew | Medium | Pending |
 | ID-006 | Comment Out Button Simulator | Low | Pending |
 | ID-007 | Watches Show "Unknown" Type | Low | Pending |
 

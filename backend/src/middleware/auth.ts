@@ -80,6 +80,7 @@ export function requirePermission(permission: string) {
         'service-requests.complete',
         'guests.view',
         'crew.view',
+        'crew.reset-password', // Can be granted via permission matrix
         'devices.view',
         'system.view-logs'
       ],
@@ -91,6 +92,7 @@ export function requirePermission(permission: string) {
         'service-requests.complete',
         'guests.view',
         'crew.view',
+        'crew.reset-password', // Can be granted via permission matrix
         'devices.view',
         'system.view-logs'
       ],

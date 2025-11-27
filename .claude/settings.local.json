@@ -1,29 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(\"C:/Users/debra/AppData/Local/Android/Sdk/platform-tools/adb.exe\" shell \"pm grant com.example.obediowear android.permission.ACCESS_FINE_LOCATION\")",
-      "Bash(\"C:/Users/debra/AppData/Local/Android/Sdk/platform-tools/adb.exe\" shell \"pm grant com.example.obediowear android.permission.ACCESS_COARSE_LOCATION\")",
-      "Bash(\"C:/Users/debra/AppData/Local/Android/Sdk/platform-tools/adb.exe\" shell \"dumpsys package com.example.obediowear | grep -A 3 ''runtime permissions:''\")",
-      "Bash(\"C:/Users/debra/AppData/Local/Android/Sdk/platform-tools/adb.exe\" shell \"am force-stop com.example.obediowear\")",
-      "Bash(findstr:*)",
-      "Bash(sc query:*)",
-      "Bash(net start mosquitto)",
-      "Bash(pio --version:*)",
-      "Bash(npm run db:seed:*)",
-      "Bash(git checkout:*)",
-      "Bash(npx prisma:*)",
-      "Bash(git stash:*)",
-      "Bash(cat:*)",
-      "Bash(dir:*)",
-      "Bash(powershell:*)",
-      "Bash(tasklist /FI 'IMAGENAME eq node.exe')",
-      "Bash(\"C:/Users/debra/AppData/Local/Android/Sdk/platform-tools/adb.exe\" devices -l)",
-      "Bash(del \"c:\\Users\\debra\\OneDrive\\Desktop\\Luxury Minimal Web App Design\\backend\\prisma\\seed-yersin-images.ts\")",
-      "Bash(del \"c:\\Users\\debra\\OneDrive\\Desktop\\Luxury Minimal Web App Design\\backend\\prisma\\update-location-images.ts\")",
-      "Bash(tree:*)",
-      "Bash(npm run dev:*)",
-      "Bash(.gradlew.bat assembleDebug:*)",
-      "Bash(\"C:/Users/debra/AppData/Local/Android/Sdk/platform-tools/adb.exe\" -s adb-C101X3A271199-pMG9i0._adb-tls-connect._tcp logcat -d -t 200)"
+      "Bash(\"C:/Users/debra/AppData/Local/Android/Sdk/platform-tools/adb.exe\" -s adb-C101X3A271199-pMG9i0._adb-tls-connect._tcp shell \"logcat -d -t 500 | grep -E ''obediowear|Accept|onNewIntent|FullScreen''\")",
+      "Bash(\"C:/Users/debra/AppData/Local/Android/Sdk/platform-tools/adb.exe\" -s adb-C101X3A271199-pMG9i0._adb-tls-connect._tcp shell \"logcat -d -t 500 | grep -iE ''Accept|ViewModel|Finish|Serving|duty|obediowear''\")",
+      "Bash(\"C:/Users/debra/AppData/Local/Android/Sdk/platform-tools/adb.exe\" -s adb-C101X3A271199-pMG9i0._adb-tls-connect._tcp shell \"logcat -d -t 100 | grep -iE ''accept|serving|MQTT|service.*update''\")",
+      "Bash(\"C:/Users/debra/AppData/Local/Android/Sdk/platform-tools/adb.exe\" -s adb-C101X3A271199-pMG9i0._adb-tls-connect._tcp logcat -d -t 200 -s FullScreenRequest:* MqttManager2:* CurrentServingState:* ServingViewModel:*)",
+      "Bash(del \"c:\\Users\\debra\\OneDrive\\Desktop\\Luxury Minimal Web App Design\\RESTART-OBEDIO.bat\")",
+      "Bash(del \"c:\\Users\\debra\\OneDrive\\Desktop\\Luxury Minimal Web App Design\\START-OBEDIO.bat\")",
+      "Bash(del \"c:\\Users\\debra\\OneDrive\\Desktop\\Luxury Minimal Web App Design\\STOP-OBEDIO.bat\")"
     ],
     "deny": [],
     "ask": []

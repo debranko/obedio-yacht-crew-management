@@ -45,12 +45,15 @@ import {
   Camera,
   Upload,
   AlertCircle,
+  Key,
 } from 'lucide-react';
 import { formatDate, parseDate, formatDateDisplay, getDayName } from './duty-roster/utils';
 import { toast } from 'sonner';
 import { useAppData } from '../contexts/AppDataContext';
 import { CameraDialog } from './camera-dialog';
 import { useDevices } from '../hooks/useDevices';
+import { ResetPasswordDialog } from './reset-password-dialog';
+import { usePermissions } from '../hooks/usePermissions';
 
 interface CrewMemberDetailsDialogProps {
   open: boolean;
@@ -80,6 +83,10 @@ export function CrewMemberDetailsDialog({
   });
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [isCameraDialogOpen, setIsCameraDialogOpen] = useState(false);
+  const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false);
+
+  // Permission check for reset password
+  const { can } = usePermissions();
 
   // Fetch real devices from database
   const { data: allDevices = [], isLoading: devicesLoading, refetch: refetchDevices } = useDevices();
@@ -934,6 +941,16 @@ export function CrewMemberDetailsDialog({
                       ? 'Activate for Duty'
                       : 'Remove from Duty'}
                   </Button>
+                  {can('crew.reset-password') && crewMember.userId && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsResetPasswordDialogOpen(true)}
+                    >
+                      <Key className="h-4 w-4 mr-2" />
+                      Reset Password
+                    </Button>
+                  )}
                 </>
               )}
             </div>
@@ -967,6 +984,14 @@ export function CrewMemberDetailsDialog({
         open={isCameraDialogOpen}
         onOpenChange={setIsCameraDialogOpen}
         onCapture={handleCameraCapture}
+      />
+
+      {/* Reset Password Dialog */}
+      <ResetPasswordDialog
+        open={isResetPasswordDialogOpen}
+        onOpenChange={setIsResetPasswordDialogOpen}
+        crewMemberId={crewMember.id}
+        crewMemberName={crewMember.name}
       />
     </Dialog>
   );
